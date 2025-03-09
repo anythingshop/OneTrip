@@ -31,6 +31,23 @@
             margin: 5px;
             padding: 5px;
         }
+        #boneControls {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            font-family: Arial, sans-serif;
+            border-radius: 5px;
+        }
+        #boneControls label {
+            display: block;
+            margin: 5px 0;
+        }
+        input[type="range"] {
+            width: 150px;
+        }
     </style>
 </head>
 <body>
@@ -42,6 +59,22 @@
         </div>
         <button id="gameView">Game View</button>
         <button id="resetView">Reset View</button>
+    </div>
+
+    <div id="boneControls">
+        <h3>Shoulder Adjustment</h3>
+        <label>
+            Left Shoulder Rotation:
+            <input type="range" id="leftShoulderRotation" min="-1" max="1" step="0.05" value="0">
+            <span id="leftShoulderValue">0</span>
+        </label>
+        <label>
+            Right Shoulder Rotation:
+            <input type="range" id="rightShoulderRotation" min="-1" max="1" step="0.05" value="0">
+            <span id="rightShoulderValue">0</span>
+        </label>
+        <button id="applyRotation">Apply Rotation</button>
+        <div id="foundBones"></div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
@@ -140,6 +173,12 @@
             { name: 'Leaves', file: './leaves.glb', position: [0, 0, -10], scale: 0.5, rotationY: 0 }
         ];
 
+        // Shoulder bone references
+        let leftShoulder = null;
+        let rightShoulder = null;
+        let shoulderBones = [];
+        let originalRotations = {};
+
         // Load models
         const loader = new THREE.GLTFLoader();
         let loadedCount = 0;
@@ -213,17 +252,8 @@
                             action.play();
                         }
                         
-                        // Try to fix arm positions (experimental)
-                        try {
-                            // Find arm bones if they exist
-                            modelObj.traverse(node => {
-                                if (node.isBone && (node.name.includes('arm') || node.name.includes('hand'))) {
-                                    console.log('Found arm/hand bone:', node.name);
-                                }
-                            });
-                        } catch (e) {
-                            console.log('Could not adjust arm positions:', e);
-                        }
+                        // Find shoulder bones
+                        findShoulderBones(modelObj);
                     }
                     
                     // Update loaded count
@@ -247,6 +277,127 @@
                 }
             );
         });
+        
+        // Find shoulder bones in the character model
+        function findShoulderBones(model) {
+            const foundBonesDiv = document.getElementById('foundBones');
+            foundBonesDiv.innerHTML = '<h4>Searching for bones...</h4>';
+            
+            let bonesFound = [];
+            
+            model.traverse(node => {
+                // Look for common shoulder bone naming patterns
+                if (node.isBone) {
+                    const name = node.name.toLowerCase();
+                    
+                    // Collect all bone names for debugging
+                    bonesFound.push(node.name);
+                    
+                    // Try to identify shoulder bones
+                    if (name.includes('shoulder') || 
+                        name.includes('clavicle') || 
+                        name.includes('collar') ||
+                        (name.includes('arm') && name.includes('upper')) ||
+                        (name.includes('arm') && name.includes('left')) ||
+                        (name.includes('arm') && name.includes('right'))) {
+                        
+                        // Store original rotation
+                        originalRotations[node.name] = {
+                            x: node.rotation.x,
+                            y: node.rotation.y,
+                            z: node.rotation.z
+                        };
+                        
+                        // Sort into left and right shoulders
+                        if (name.includes('left')) {
+                            leftShoulder = node;
+                            console.log('Found left shoulder:', node.name);
+                        } 
+                        else if (name.includes('right')) {
+                            rightShoulder = node;
+                            console.log('Found right shoulder:', node.name);
+                        }
+                        // If not clearly labeled, make a best guess
+                        else {
+                            shoulderBones.push(node);
+                            console.log('Found potential shoulder bone:', node.name);
+                        }
+                    }
+                }
+            });
+            
+            // Display found bones
+            if (bonesFound.length > 0) {
+                foundBonesDiv.innerHTML = '<h4>Bones found in model:</h4>';
+                foundBonesDiv.innerHTML += `<div style="max-height: 150px; overflow-y: auto;"><pre>${bonesFound.join('\n')}</pre></div>`;
+                
+                if (leftShoulder || rightShoulder || shoulderBones.length > 0) {
+                    foundBonesDiv.innerHTML += '<h4>Potential shoulder bones:</h4>';
+                    if (leftShoulder) foundBonesDiv.innerHTML += `<div>Left shoulder: ${leftShoulder.name}</div>`;
+                    if (rightShoulder) foundBonesDiv.innerHTML += `<div>Right shoulder: ${rightShoulder.name}</div>`;
+                    shoulderBones.forEach(bone => {
+                        foundBonesDiv.innerHTML += `<div>Other: ${bone.name}</div>`;
+                    });
+                    
+                    // If we've found shoulders but not both, make a best guess
+                    if ((leftShoulder && !rightShoulder) || (!leftShoulder && rightShoulder)) {
+                        if (shoulderBones.length > 0) {
+                            if (!leftShoulder) {
+                                leftShoulder = shoulderBones[0];
+                                foundBonesDiv.innerHTML += `<div>Guessing left shoulder: ${leftShoulder.name}</div>`;
+                            }
+                            if (!rightShoulder && shoulderBones.length > 1) {
+                                rightShoulder = shoulderBones[1];
+                                foundBonesDiv.innerHTML += `<div>Guessing right shoulder: ${rightShoulder.name}</div>`;
+                            }
+                        }
+                    }
+                    
+                    // Set initial outward rotation as example
+                    applyShoulderRotation(0.2, 0.2);
+                } 
+                else {
+                    foundBonesDiv.innerHTML += '<div>No shoulder bones found. Try adjusting by model name.</div>';
+                }
+            } 
+            else {
+                foundBonesDiv.innerHTML = '<h4>No bones found in model.</h4>';
+            }
+        }
+        
+        // Apply rotation to shoulder bones
+        function applyShoulderRotation(leftRotation, rightRotation) {
+            // Update UI values
+            document.getElementById('leftShoulderValue').textContent = leftRotation.toFixed(2);
+            document.getElementById('rightShoulderValue').textContent = rightRotation.toFixed(2);
+            
+            // Apply to left shoulder
+            if (leftShoulder) {
+                // Get original rotation
+                const orig = originalRotations[leftShoulder.name] || { x: 0, y: 0, z: 0 };
+                
+                // Apply rotation - typically we'd want to rotate around the vertical axis
+                // since we want to rotate the arms "outward" from the body
+                leftShoulder.rotation.set(
+                    orig.x,
+                    orig.y - leftRotation, // Negative for left shoulder to rotate outward
+                    orig.z
+                );
+            }
+            
+            // Apply to right shoulder
+            if (rightShoulder) {
+                // Get original rotation
+                const orig = originalRotations[rightShoulder.name] || { x: 0, y: 0, z: 0 };
+                
+                // Apply rotation
+                rightShoulder.rotation.set(
+                    orig.x,
+                    orig.y + rightRotation, // Positive for right shoulder to rotate outward
+                    orig.z
+                );
+            }
+        }
         
         // Set up animation selection
         document.getElementById('animSelect').addEventListener('change', function() {
@@ -277,6 +428,32 @@
             camera.position.set(0, 20, 30);
             controls.target.set(0, 0, 0);
             controls.update();
+        });
+        
+        // Shoulder rotation controls
+        document.getElementById('leftShoulderRotation').addEventListener('input', function() {
+            const leftRotation = parseFloat(this.value);
+            const rightRotation = parseFloat(document.getElementById('rightShoulderRotation').value);
+            applyShoulderRotation(leftRotation, rightRotation);
+        });
+        
+        document.getElementById('rightShoulderRotation').addEventListener('input', function() {
+            const leftRotation = parseFloat(document.getElementById('leftShoulderRotation').value);
+            const rightRotation = parseFloat(this.value);
+            applyShoulderRotation(leftRotation, rightRotation);
+        });
+        
+        document.getElementById('applyRotation').addEventListener('click', function() {
+            const leftRotation = parseFloat(document.getElementById('leftShoulderRotation').value);
+            const rightRotation = parseFloat(document.getElementById('rightShoulderRotation').value);
+            
+            // Apply with emphasis
+            applyShoulderRotation(leftRotation, rightRotation);
+            
+            alert(`Rotation applied: Left ${leftRotation.toFixed(2)}, Right ${rightRotation.toFixed(2)}`);
+            
+            // This is informative but may not always work with animation systems
+            console.log('Note: Bone rotations may be overridden by animation data.');
         });
         
         // Animation loop
