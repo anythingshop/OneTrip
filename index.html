@@ -1,0 +1,2023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>One Trip</title>
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+            overflow: hidden; 
+            background: #222;
+            font-family: Arial, sans-serif;
+        }
+        #game-container { 
+            width: 100%; 
+            height: 100vh; 
+        }
+        #ui-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        #loading-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            color: white;
+            pointer-events: auto;
+        }
+        #loading-bar-container {
+            width: 50%;
+            height: 30px;
+            background: #333;
+            border-radius: 15px;
+            margin-top: 20px;
+            overflow: hidden;
+        }
+        #loading-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            transition: width 0.3s;
+        }
+        #balance-meter {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 25px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 12px;
+            overflow: hidden;
+            display: none;
+        }
+        #balance-indicator {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 10px;
+            height: 100%;
+            background: white;
+            transform: translateX(-50%);
+            transition: left 0.1s;
+        }
+        #balance-zone {
+            position: absolute;
+            top: 0;
+            left: 40%;
+            width: 20%;
+            height: 100%;
+            background: rgba(76, 175, 80, 0.3);
+        }
+        #item-counter {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        #controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            pointer-events: none;
+        }
+        .win-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 32px;
+            z-index: 1000;
+            pointer-events: auto;
+        }
+        .win-screen button {
+            padding: 10px 20px;
+            margin-top: 20px;
+            font-size: 18px;
+            cursor: pointer;
+            background: #4CAF50;
+            border: none;
+            border-radius: 5px;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    
+    <div id="ui-container">
+        <div id="loading-screen">
+            <h1>One Trip</h1>
+            <p>Loading assets...</p>
+            <div id="loading-bar-container">
+                <div id="loading-bar"></div>
+            </div>
+        </div>
+        
+        <div id="balance-meter">
+            <div id="balance-zone"></div>
+            <div id="balance-indicator"></div>
+        </div>
+        
+        <div id="item-counter">Bags: 0/5</div>
+        
+        <div id="controls">
+            <p>WASD: Move</p>
+            <p>SHIFT: Run</p>
+            <p>E: Pickup bag</p>
+            <p>Q/E: Balance Left/Right</p>
+        </div>
+    </div>
+
+    <!-- Three.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/DRACOLoader.js"></script>
+
+    <!-- Add this before your game script -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.4/gsap.min.js"></script>
+
+    <script>
+        class OneTripGame {
+            constructor() {
+                // Asset paths - using simple relative paths since files are in the same directory
+                this.assets = {
+                    character: './onetrip_maincharacter.glb',
+                    bag1: './newbag.glb',
+                    bag2: './bag2.glb',
+                    car: './car.glb',
+                    house: './house.glb'
+                };
+                
+                // Game state
+                this.state = {
+                    isLoading: true,
+                    assetsLoaded: 0,
+                    totalAssets: Object.keys(this.assets).length,
+                    isPlaying: false,
+                    bagsCarried: 0,
+                    maxBags: 5,
+                    balance: 0.5, // 0 = fall left, 1 = fall right, 0.5 = balanced
+                    balanceStability: 1.0, // 0 = very unstable, 1 = stable
+                    gameOver: false,
+                    isStumbling: false,
+                    currentLevel: 1,
+                    maxLevel: 3,
+                    score: 0,
+                    levelStartTime: 0,
+                    perfectBalanceTime: 0,
+                    totalBags: 0
+                };
+                
+                // Animation states
+                this.animations = {
+                    current: 'tpose',
+                    mixer: null,
+                    clips: {},
+                    actions: {}
+                };
+                
+                // Bag attachment points
+                this.attachPoints = [];
+                
+                // Available bags
+                this.bags = [];
+                this.availableBags = [];
+                
+                // Timekeeping
+                this.clock = new THREE.Clock();
+                
+                // Win flag
+                this.winScreenShown = false;
+                
+                // Create sound effects object
+                this.sounds = {
+                    pickup: new Audio('https://freesound.org/data/previews/572/572882_12558596-lq.mp3'),
+                    drop: new Audio('https://freesound.org/data/previews/432/432587_8157919-lq.mp3'),
+                    win: new Audio('https://freesound.org/data/previews/269/269598_5150302-lq.mp3'),
+                    fall: new Audio('https://freesound.org/data/previews/160/160708_2703896-lq.mp3'),
+                    balance: new Audio('https://freesound.org/data/previews/110/110011_1537422-lq.mp3')
+                };
+                
+                // Set volume for all sounds
+                Object.values(this.sounds).forEach(sound => {
+                    sound.volume = 0.2;
+                });
+                
+                // Initialize game
+                this.init();
+                
+                // Add asset loading timeout for fallback
+                setTimeout(() => {
+                    if (this.state.isLoading) {
+                        console.log("Assets taking too long to load - creating placeholders");
+                        this.handleMissingAssets();
+                    }
+                }, 10000);
+            }
+            
+            init() {
+                // Check asset URLs first
+                this.checkAssetUrls();
+                
+                // Set up scene
+                this.setupScene();
+                
+                // Set up input
+                this.setupInput();
+                
+                // Add debug console
+                this.addDebugConsole();
+                
+                // Load assets
+                this.loadAssets();
+                
+                // Start game loop
+                this.animate();
+            }
+            
+            setupScene() {
+                // Create scene
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x87CEEB); // Sky blue
+                
+                // Create camera
+                this.camera = new THREE.PerspectiveCamera(
+                    75, 
+                    window.innerWidth / window.innerHeight, 
+                    0.1, 
+                    1000
+                );
+                this.camera.position.set(0, 2, 5);
+                
+                // Create renderer
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(window.devicePixelRatio);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                document.getElementById('game-container').appendChild(this.renderer.domElement);
+                
+                // Add lights
+                this.addLights();
+                
+                // Add ground
+                this.addGround();
+                
+                // Handle window resize
+                window.addEventListener('resize', () => this.onWindowResize());
+                
+                // Add temporary controls for development
+                this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.target.set(0, 1, 0);
+                this.controls.update();
+            }
+            
+            addLights() {
+                // Main directional light (sun)
+                this.sunLight = new THREE.DirectionalLight(0xFFFFFF, 1);
+                this.sunLight.position.set(10, 10, 10);
+                this.sunLight.castShadow = true;
+                this.sunLight.shadow.mapSize.width = 2048;
+                this.sunLight.shadow.mapSize.height = 2048;
+                this.sunLight.shadow.camera.near = 0.5;
+                this.sunLight.shadow.camera.far = 50;
+                this.sunLight.shadow.camera.left = -20;
+                this.sunLight.shadow.camera.right = 20;
+                this.sunLight.shadow.camera.top = 20;
+                this.sunLight.shadow.camera.bottom = -20;
+                this.scene.add(this.sunLight);
+                
+                // Ambient light
+                this.ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+                this.scene.add(this.ambientLight);
+                
+                // Hemisphere light for natural outdoor lighting
+                this.hemiLight = new THREE.HemisphereLight(0xB1E1FF, 0x444444, 0.6);
+                this.scene.add(this.hemiLight);
+            }
+            
+            addGround() {
+                // Create ground plane
+                const groundGeometry = new THREE.PlaneGeometry(100, 100);
+                const groundMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x7CFC00, 
+                    roughness: 0.8, 
+                    metalness: 0.1 
+                });
+                this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
+                this.ground.rotation.x = -Math.PI / 2;
+                this.ground.receiveShadow = true;
+                this.scene.add(this.ground);
+            }
+            
+            onWindowResize() {
+                // Update camera aspect ratio
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                
+                // Update renderer size
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+            
+            setupInput() {
+                // Key states
+                this.keys = {};
+                
+                // Add event listeners
+                window.addEventListener('keydown', (e) => {
+                    this.keys[e.code] = true;
+                });
+                
+                window.addEventListener('keyup', (e) => {
+                    this.keys[e.code] = false;
+                });
+            }
+            
+            loadAssets() {
+                // Set up loaders
+                this.gltfLoader = new THREE.GLTFLoader();
+                
+                // Optional: Set up Draco loader for compressed models
+                const dracoLoader = new THREE.DRACOLoader();
+                dracoLoader.setDecoderPath('https://www.gstatic.com/draco/v1/decoders/');
+                this.gltfLoader.setDRACOLoader(dracoLoader);
+                
+                // Load character
+                this.loadCharacter();
+                
+                // Load other assets
+                this.loadCar();
+                this.loadHouse();
+                this.loadBags();
+            }
+            
+            loadCharacter() {
+                this.gltfLoader.load(
+                    this.assets.character,
+                    (gltf) => {
+                        // Add character to scene
+                        this.character = gltf.scene;
+                        this.character.scale.set(1, 1, 1);
+                        this.character.position.set(-10, 0, 0);
+                        this.character.castShadow = true;
+                        this.character.receiveShadow = true;
+                        this.scene.add(this.character);
+                        
+                        // Enable shadows for all meshes
+                        this.character.traverse((node) => {
+                            if (node.isMesh) {
+                                node.castShadow = true;
+                                node.receiveShadow = true;
+                            }
+                        });
+                        
+                        // Set up animations
+                        this.setupAnimations(gltf);
+                        
+                        // Update loading progress
+                        this.updateLoadingProgress();
+                    },
+                    (xhr) => {
+                        console.log(`Character ${(xhr.loaded / xhr.total) * 100}% loaded`);
+                    },
+                    (error) => {
+                        console.error('Error loading character:', error);
+                        // Add a user-friendly error message
+                        document.getElementById('loading-screen').innerHTML = `
+                            <h1>Error Loading Game</h1>
+                            <p>Failed to load character model. Please refresh the page or check your connection.</p>
+                        `;
+                    }
+                );
+            }
+            
+            setupAnimations(gltf) {
+                // Create animation mixer
+                this.animations.mixer = new THREE.AnimationMixer(this.character);
+                
+                // Store all animation clips
+                gltf.animations.forEach(clip => {
+                    this.animations.clips[clip.name] = clip;
+                    
+                    // Create action for each clip
+                    const action = this.animations.mixer.clipAction(clip);
+                    this.animations.actions[clip.name] = action;
+                    
+                    console.log(`Added animation: ${clip.name}`);
+                });
+                
+                // Check for required animations
+                const requiredAnimations = ['tpose', 'walk', 'run', 'stumble_fall'];
+                requiredAnimations.forEach(anim => {
+                    if (!this.animations.actions[anim]) {
+                        console.warn(`Required animation missing: ${anim}`);
+                    }
+                });
+                
+                // Play initial animation
+                this.playAnimation('tpose');
+            }
+            
+            playAnimation(name, fadeTime = 0.5) {
+                if (!this.animations.actions[name]) {
+                    console.warn(`Animation ${name} not found, using fallback`);
+                    // Use tpose as fallback if requested animation doesn't exist
+                    if (name.includes('carry')) {
+                        name = this.animations.actions['carry_stand_medium'] ? 
+                              'carry_stand_medium' : 'tpose';
+                    } else {
+                        name = 'tpose';
+                    }
+                    
+                    // If even the fallback doesn't exist, return
+                    if (!this.animations.actions[name]) return;
+                }
+                
+                // Skip if already playing this animation
+                if (this.animations.current === name) return;
+                
+                // Get current and new actions
+                const current = this.animations.actions[this.animations.current];
+                const next = this.animations.actions[name];
+                
+                // Fade out current animation
+                if (current) {
+                    current.fadeOut(fadeTime);
+                }
+                
+                // Fade in new animation
+                next.reset();
+                next.fadeIn(fadeTime);
+                next.play();
+                
+                // Update current animation
+                this.animations.current = name;
+            }
+            
+            loadCar() {
+                this.gltfLoader.load(
+                    this.assets.car,
+                    (gltf) => {
+                        // Add car to scene
+                        this.car = gltf.scene;
+                        this.car.scale.set(0.05, 0.05, 0.05); // Fix scale to be much smaller
+                        this.car.position.set(-15, 0, 0); // Position farther to the left
+                        this.car.rotation.y = Math.PI / 2; // Rotate to face right
+                        this.car.castShadow = true;
+                        this.car.receiveShadow = true;
+                        this.scene.add(this.car);
+                        
+                        // Enable shadows for all meshes
+                        this.car.traverse((node) => {
+                            if (node.isMesh) {
+                                node.castShadow = true;
+                                node.receiveShadow = true;
+                            }
+                        });
+                        
+                        // Update loading progress
+                        this.updateLoadingProgress();
+                    },
+                    (xhr) => {
+                        console.log(`Car ${(xhr.loaded / xhr.total) * 100}% loaded`);
+                    },
+                    (error) => {
+                        console.error('Error loading car:', error);
+                    }
+                );
+            }
+            
+            loadHouse() {
+                this.gltfLoader.load(
+                    this.assets.house,
+                    (gltf) => {
+                        // Add house to scene
+                        this.house = gltf.scene;
+                        this.house.scale.set(1, 1, 1);
+                        this.house.position.set(5, 0, 0); // Position to the right
+                        this.house.castShadow = true;
+                        this.house.receiveShadow = true;
+                        this.scene.add(this.house);
+                        
+                        // Enable shadows for all meshes
+                        this.house.traverse((node) => {
+                            if (node.isMesh) {
+                                node.castShadow = true;
+                                node.receiveShadow = true;
+                            }
+                        });
+                        
+                        // Update loading progress
+                        this.updateLoadingProgress();
+                    },
+                    (xhr) => {
+                        console.log(`House ${(xhr.loaded / xhr.total) * 100}% loaded`);
+                    },
+                    (error) => {
+                        console.error('Error loading house:', error);
+                    }
+                );
+            }
+            
+            loadBags() {
+                // Load bag1
+                this.gltfLoader.load(
+                    this.assets.bag1,
+                    (gltf) => {
+                        // Store template for creating instances
+                        this.bag1Template = gltf.scene;
+                        
+                        // Update loading progress
+                        this.updateLoadingProgress();
+                        
+                        // Check if both bag types are loaded
+                        if (this.bag1Template && this.bag2Template) {
+                            this.createBagsOnCar();
+                        }
+                    },
+                    (xhr) => {
+                        console.log(`Bag1 ${(xhr.loaded / xhr.total) * 100}% loaded`);
+                    },
+                    (error) => {
+                        console.error('Error loading bag1:', error);
+                    }
+                );
+                
+                // Load bag2
+                this.gltfLoader.load(
+                    this.assets.bag2,
+                    (gltf) => {
+                        // Store template for creating instances
+                        this.bag2Template = gltf.scene;
+                        
+                        // Update loading progress
+                        this.updateLoadingProgress();
+                        
+                        // Check if both bag types are loaded
+                        if (this.bag1Template && this.bag2Template) {
+                            this.createBagsOnCar();
+                        }
+                    },
+                    (xhr) => {
+                        console.log(`Bag2 ${(xhr.loaded / xhr.total) * 100}% loaded`);
+                    },
+                    (error) => {
+                        console.error('Error loading bag2:', error);
+                    }
+                );
+            }
+            
+            updateLoadingProgress() {
+                // Increment assets loaded
+                this.state.assetsLoaded++;
+                
+                // Calculate progress
+                const progress = this.state.assetsLoaded / this.state.totalAssets;
+                
+                // Update loading bar
+                document.getElementById('loading-bar').style.width = `${progress * 100}%`;
+                
+                // Check if all assets are loaded
+                if (this.state.assetsLoaded >= this.state.totalAssets) {
+                    this.onAssetsLoaded();
+                }
+            }
+            
+            onAssetsLoaded() {
+                // All assets loaded, start game
+                setTimeout(() => {
+                    // Hide loading screen
+                    document.getElementById('loading-screen').style.display = 'none';
+                    
+                    // Show game UI
+                    document.getElementById('balance-meter').style.display = 'block';
+                    document.getElementById('item-counter').style.display = 'block';
+                    
+                    // Set game state to playing
+                    this.state.isLoading = false;
+                    this.state.isPlaying = true;
+                    
+                    console.log('Game started!');
+                }, 1000);
+            }
+            
+            createBagsOnCar() {
+                if (!this.bag1Template || !this.bag2Template || !this.car) return;
+                
+                this.bags = [];
+                this.availableBags = [];
+                
+                // Create varied bags with different weights and effects
+                const bagPositions = [
+                    { x: -15.2, y: 1.2, z: 0.2, type: 'bag1', onCar: true, weight: 1.0, name: "Groceries" },
+                    { x: -14.8, y: 1.2, z: -0.2, type: 'bag2', onCar: true, weight: 1.5, name: "Heavy Books" },
+                    { x: -15.0, y: 1.2, z: 0.0, type: 'bag1', onCar: true, weight: 0.7, name: "Snacks" },
+                    { x: -15.3, y: 0.15, z: 0.5, type: 'bag2', onCar: false, weight: 2.0, name: "Watermelon" },
+                    { x: -14.7, y: 0.15, z: -0.5, type: 'bag1', onCar: false, weight: 0.5, name: "Toilet Paper" }
+                ];
+                
+                // Create UI for bag selection
+                const bagSelectionUI = document.createElement('div');
+                bagSelectionUI.id = 'bag-selection';
+                bagSelectionUI.style.display = 'none';
+                bagSelectionUI.style.position = 'absolute';
+                bagSelectionUI.style.bottom = '100px';
+                bagSelectionUI.style.left = '50%';
+                bagSelectionUI.style.transform = 'translateX(-50%)';
+                bagSelectionUI.style.background = 'rgba(0,0,0,0.7)';
+                bagSelectionUI.style.padding = '10px';
+                bagSelectionUI.style.borderRadius = '5px';
+                bagSelectionUI.style.color = 'white';
+                document.body.appendChild(bagSelectionUI);
+                
+                bagPositions.forEach((pos, index) => {
+                    // Choose template based on type
+                    const template = pos.type === 'bag1' ? this.bag1Template : this.bag2Template;
+                    
+                    // Create bag
+                    const bag = template.clone();
+                    bag.position.set(pos.x, pos.y, pos.z);
+                    bag.scale.set(0.5, 0.5, 0.5);
+                    bag.castShadow = true;
+                    bag.receiveShadow = true;
+                    
+                    // Add metadata - now with weight and name
+                    bag.userData = {
+                        id: index,
+                        isCarried: false,
+                        isOnCar: pos.onCar,
+                        type: pos.type,
+                        weight: pos.weight,
+                        name: pos.name
+                    };
+                    
+                    // Add glow effect to highlight bag
+                    const glowMaterial = new THREE.MeshBasicMaterial({
+                        color: 0xffff00,
+                        transparent: true,
+                        opacity: 0.3
+                    });
+                    
+                    const glowMesh = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.7, 16, 16),
+                        glowMaterial
+                    );
+                    glowMesh.visible = false;
+                    bag.add(glowMesh);
+                    bag.userData.glowMesh = glowMesh;
+                    
+                    // Add to scene
+                    this.scene.add(bag);
+                    
+                    // Store reference
+                    this.bags.push(bag);
+                    this.availableBags.push(bag);
+                });
+                
+                console.log(`Created ${this.bags.length} bags`);
+            }
+            
+            handleInput(deltaTime) {
+                // Movement keys
+                const moveForward = this.keys['KeyW'] || false;
+                const moveBackward = this.keys['KeyS'] || false;
+                const moveLeft = this.keys['KeyA'] || false;
+                const moveRight = this.keys['KeyD'] || false;
+                
+                // Action keys
+                const isRunning = this.keys['ShiftLeft'] || false;
+                const isPickingUp = this.keys['KeyE'] || false;
+                
+                // Skip if character isn't loaded
+                if (!this.character) return;
+                
+                // Calculate movement direction
+                let moveX = 0;
+                let moveZ = 0;
+                
+                if (moveForward) moveZ -= 1;
+                if (moveBackward) moveZ += 1;
+                if (moveLeft) moveX -= 1;
+                if (moveRight) moveX += 1;
+                
+                // Normalize for diagonal movement
+                const length = Math.sqrt(moveX * moveX + moveZ * moveZ);
+                if (length > 0) {
+                    moveX /= length;
+                    moveZ /= length;
+                }
+                
+                // Calculate speed based on running and bag weight
+                let baseSpeed = isRunning ? 5 : 3;
+                
+                // Reduce speed based on number of bags carried
+                const bagWeight = this.state.bagsCarried * 0.15;
+                const speedFactor = Math.max(0.3, 1 - bagWeight);
+                const effectiveSpeed = baseSpeed * speedFactor;
+                
+                // Apply movement
+                this.character.position.x += moveX * effectiveSpeed * deltaTime;
+                this.character.position.z += moveZ * effectiveSpeed * deltaTime;
+                
+                // Rotate character to face movement direction
+                if (length > 0) {
+                    const targetRotation = Math.atan2(moveX, moveZ);
+                    this.character.rotation.y = targetRotation;
+                    
+                    // Determine animation
+                    if (this.state.bagsCarried > 0) {
+                        // Carrying bags
+                        const loadWeight = this.state.bagsCarried > 2 ? 'heavy' : 'medium';
+                        const moveSpeed = isRunning ? 'run' : 'walk';
+                        this.playAnimation(`carry_${moveSpeed}_${loadWeight}`);
+                    } else {
+                        // Not carrying anything
+                        this.playAnimation(isRunning ? 'run' : 'walk');
+                    }
+                } else {
+                    // Character is standing still
+                    if (this.state.bagsCarried > 0) {
+                        const loadWeight = this.state.bagsCarried > 2 ? 'heavy' : 'medium';
+                        this.playAnimation(`carry_stand_${loadWeight}`);
+                    } else {
+                        this.playAnimation('tpose');
+                    }
+                }
+                
+                // Handle pickup
+                if (isPickingUp && !this.state.gameOver) {
+                    this.tryPickupBag();
+                }
+            }
+            
+            tryPickupBag() {
+                // Skip if already carrying max bags or during animation
+                if (this.state.bagsCarried >= this.state.maxBags || 
+                    this.animations.current.includes('pickup')) return;
+                
+                // Find closest bag
+                let closestBag = null;
+                let closestDistance = 2; // Maximum pickup distance
+                
+                this.availableBags.forEach(bag => {
+                    const distance = this.character.position.distanceTo(bag.position);
+                    
+                    if (distance < closestDistance) {
+                        closestDistance = distance;
+                        closestBag = bag;
+                    }
+                });
+                
+                if (closestBag) {
+                    // Determine if bag is on car or ground
+                    const pickupType = closestBag.userData.isOnCar ? 'pickup_high' : 'pickup_low';
+                    
+                    // Play pickup animation
+                    this.playAnimation(pickupType, 0.3);
+                    
+                    // Set timeout to coincide with animation
+                    setTimeout(() => {
+                        // Remove from available bags
+                        this.availableBags = this.availableBags.filter(bag => bag !== closestBag);
+                        
+                        // Hide the original bag
+                        this.scene.remove(closestBag);
+                        
+                        // Increase carried bags counter
+                        this.state.bagsCarried++;
+                        
+                        // Update UI
+                        document.getElementById('item-counter').textContent = `Bags: ${this.state.bagsCarried}/${this.state.maxBags}`;
+                        
+                        // Create bag attached to character
+                        this.attachBagToCharacter(closestBag.userData.type);
+                        
+                        // Transition to carry animation
+                        const loadWeight = this.state.bagsCarried > 2 ? 'heavy' : 'medium';
+                        this.playAnimation(`carry_stand_${loadWeight}`);
+                    }, 1000); // Timing should match animation
+                }
+            }
+            
+            attachBagToCharacter(bagType) {
+                if (!this.character) return;
+                
+                // Create attachment points if they don't exist
+                if (this.attachPoints.length === 0) {
+                    // Define attachment points based on number of bags
+                    const points = [
+                        { x: 0, y: 1.2, z: 0.2 },  // First bag - center
+                        { x: 0.2, y: 1.2, z: 0.2 }, // Second bag - right side
+                        { x: -0.2, y: 1.2, z: 0.2 }, // Third bag - left side
+                        { x: 0, y: 1.4, z: 0.2 },  // Fourth bag - top center
+                        { x: 0.1, y: 1.4, z: 0.3 }  // Fifth bag - top right
+                    ];
+                    
+                    points.forEach((point, index) => {
+                        const attachPoint = new THREE.Object3D();
+                        attachPoint.position.set(point.x, point.y, point.z);
+                        this.character.add(attachPoint);
+                        this.attachPoints.push(attachPoint);
+                    });
+                }
+                
+                // Choose template based on type
+                const template = bagType === 'bag1' ? this.bag1Template : this.bag2Template;
+                
+                // Create new bag instance
+                const bag = template.clone();
+                bag.scale.set(0.5, 0.5, 0.5);
+                
+                // Attach to appropriate point
+                const attachIndex = this.state.bagsCarried - 1;
+                if (this.attachPoints[attachIndex]) {
+                    this.attachPoints[attachIndex].add(bag);
+                }
+                
+                // Adjust balance difficulty based on bag position
+                if (attachIndex > 1) {
+                    // Bags beyond the first two make balance harder
+                    this.state.balanceStability *= 0.8;
+                }
+            }
+            
+            dropAllBags() {
+                // Skip if no bags
+                if (this.state.bagsCarried === 0) return;
+                
+                // Process each attachment point
+                this.attachPoints.forEach(point => {
+                    // Process all children of this point (should be bags)
+                    while (point.children.length > 0) {
+                        const bag = point.children[0];
+                        
+                        // Get world position
+                        const worldPos = new THREE.Vector3();
+                        bag.getWorldPosition(worldPos);
+                        
+                        // Remove from attachment
+                        point.remove(bag);
+                        
+                        // Create new bag at world position
+                        const newBag = bag.clone();
+                        newBag.position.copy(worldPos);
+                        
+                        // Add some randomness to the drop
+                        newBag.position.x += (Math.random() - 0.5) * 2;
+                        newBag.position.z += (Math.random() - 0.5) * 2;
+                        newBag.position.y = 0.15; // Place on ground
+                        
+                        // Random rotation
+                        newBag.rotation.y = Math.random() * Math.PI * 2;
+                        
+                        // Add back to scene
+                        this.scene.add(newBag);
+                        
+                        // Add to available bags
+                        newBag.userData = {
+                            id: this.bags.length,
+                            isCarried: false,
+                            isOnCar: false,
+                            type: Math.random() > 0.5 ? 'bag1' : 'bag2'
+                        };
+                        
+                        this.bags.push(newBag);
+                        this.availableBags.push(newBag);
+                    }
+                });
+                
+                // Reset state
+                this.state.bagsCarried = 0;
+                this.state.balanceStability = 1.0;
+                
+                // Update UI
+                document.getElementById('item-counter').textContent = `Bags: ${this.state.bagsCarried}/${this.state.maxBags}`;
+            }
+            
+            updateBalance(deltaTime) {
+                // Skip if not carrying bags
+                if (this.state.bagsCarried === 0) {
+                    // Reset indicator position
+                    document.getElementById('balance-indicator').style.left = '50%';
+                    // Reset character rotation
+                    if (this.character) this.character.rotation.z = 0;
+                    return;
+                }
+                
+                // Skip during pickup animation
+                if (this.animations.current.includes('pickup')) return;
+                
+                // Calculate left vs right weight distribution
+                let leftWeight = 0;
+                let rightWeight = 0;
+                
+                this.attachPoints.forEach((point, index) => {
+                    if (point.children.length > 0) {
+                        const bagWeight = point.children[0].userData?.weight || 1;
+                        
+                        if (index === 0) { // center bag
+                            leftWeight += bagWeight * 0.5;
+                            rightWeight += bagWeight * 0.5;
+                        } else if (index === 1) { // right side bag
+                            rightWeight += bagWeight;
+                        } else if (index === 2) { // left side bag
+                            leftWeight += bagWeight;
+                        } else if (index === 3) { // top center bag
+                            leftWeight += bagWeight * 0.6; // Slightly destabilizing
+                            rightWeight += bagWeight * 0.6;
+                        } else if (index === 4) { // top right bag
+                            rightWeight += bagWeight * 1.2; // Very destabilizing
+                        }
+                    }
+                });
+                
+                // Calculate imbalance factor (-1 to 1, 0 is balanced)
+                const totalWeight = leftWeight + rightWeight;
+                const weightDifference = (rightWeight - leftWeight) / totalWeight;
+                
+                // Apply natural balance movement based on weight distribution
+                const balanceShift = weightDifference * 0.01 * deltaTime * 5;
+                
+                // Balance difficulty scales with weight and stability
+                const balanceDifficulty = totalWeight * 0.05 / this.state.balanceStability;
+                
+                // Random wobble based on difficulty
+                const randomWobble = (Math.random() - 0.5) * balanceDifficulty;
+                
+                // Player input for balance
+                const balanceLeft = this.keys['KeyQ'] || false;
+                const balanceRight = this.keys['KeyE'] || false;
+                
+                let balanceInput = 0;
+                if (balanceLeft) balanceInput -= 0.02;
+                if (balanceRight) balanceInput += 0.02;
+                
+                // Update balance value - natural shift + player input + random wobble
+                this.state.balance += balanceShift;
+                this.state.balance += randomWobble * deltaTime * 2;
+                this.state.balance += balanceInput;
+                
+                // Clamp balance between 0 and 1
+                this.state.balance = Math.max(0, Math.min(1, this.state.balance));
+                
+                // Update UI
+                const indicator = document.getElementById('balance-indicator');
+                indicator.style.left = `${this.state.balance * 100}%`;
+                
+                // Visual feedback - color the balance meter based on stability
+                const balanceMeter = document.getElementById('balance-meter');
+                if (this.state.balance < 0.3 || this.state.balance > 0.7) {
+                    balanceMeter.style.backgroundColor = 'rgba(255,0,0,0.5)';
+                } else if (this.state.balance < 0.4 || this.state.balance > 0.6) {
+                    balanceMeter.style.backgroundColor = 'rgba(255,165,0,0.5)';
+                } else {
+                    balanceMeter.style.backgroundColor = 'rgba(0,0,0,0.5)';
+                }
+                
+                // Update character tilt
+                if (this.character) {
+                    // Tilt based on balance (convert 0-1 to -0.3 to 0.3 radians)
+                    const tiltAmount = (this.state.balance - 0.5) * 0.6;
+                    this.character.rotation.z = tiltAmount;
+                    
+                    // Handle stumbling animations
+                    this.handleStumbleAnimations();
+                }
+            }
+            
+            handleStumbleAnimations() {
+                if ((this.state.balance < 0.25 || this.state.balance > 0.75) && 
+                    !this.state.isStumbling && !this.animations.current.includes('pickup') && 
+                    !this.state.gameOver) {
+                    
+                    // Critical imbalance - heavy stumbling
+                    const stumblingSound = new Audio('https://freesound.org/data/previews/448/448008_6142149-lq.mp3');
+                    stumblingSound.volume = 0.3;
+                    stumblingSound.play();
+                    
+                    // Show a warning message
+                    this.showFloatingText("Whoa! I'm losing balance!", 1500);
+                        
+                    this.state.isStumbling = true;
+                } 
+                else if ((this.state.balance < 0.35 || this.state.balance > 0.65) && 
+                         !this.state.isStumbling && !this.animations.current.includes('pickup') && 
+                         !this.state.gameOver) {
+                    
+                    // Minor stumble
+                    const minorStumbleSound = new Audio('https://freesound.org/data/previews/110/110011_1537422-lq.mp3');
+                    minorStumbleSound.volume = 0.1;
+                    minorStumbleSound.play();
+                    
+                    // Show a hint message
+                    this.showFloatingText("Need to adjust!", 1000);
+                        
+                    this.state.isStumbling = true;
+                } 
+                else if (this.state.balance > 0.35 && this.state.balance < 0.65 && this.state.isStumbling) {
+                    // Recover from stumble
+                    this.state.isStumbling = false;
+                }
+                
+                // Check if balance is completely lost
+                if ((this.state.balance < 0.1 || this.state.balance > 0.9) && !this.state.gameOver) {
+                    this.loseBalance();
+                }
+            }
+            
+            showFloatingText(message, duration = 2000) {
+                const floatingText = document.createElement('div');
+                floatingText.style.position = 'absolute';
+                floatingText.style.color = 'white';
+                floatingText.style.backgroundColor = 'rgba(0,0,0,0.7)';
+                floatingText.style.padding = '5px 10px';
+                floatingText.style.borderRadius = '5px';
+                floatingText.style.fontWeight = 'bold';
+                floatingText.style.transition = 'all 0.5s';
+                floatingText.style.opacity = '0';
+                floatingText.style.top = '40%';
+                floatingText.style.left = '50%';
+                floatingText.style.transform = 'translate(-50%, -50%)';
+                floatingText.style.pointerEvents = 'none';
+                floatingText.style.zIndex = '1000';
+                floatingText.textContent = message;
+                
+                document.body.appendChild(floatingText);
+                
+                // Fade in
+                setTimeout(() => {
+                    floatingText.style.opacity = '1';
+                }, 10);
+                
+                // Fade out and remove
+                setTimeout(() => {
+                    floatingText.style.opacity = '0';
+                    setTimeout(() => {
+                        document.body.removeChild(floatingText);
+                    }, 500);
+                }, duration);
+            }
+            
+            loseBalance() {
+                // Skip if already triggered
+                if (this.state.gameOver) return;
+                
+                console.log("Lost balance!");
+                
+                // Play stumble animation
+                this.playAnimation('stumble_fall', 0.3);
+                
+                // Drop all bags
+                setTimeout(() => {
+                    this.dropAllBags();
+                }, 500);
+                
+                // Game over state
+                this.state.gameOver = true;
+                
+                // Reset after delay
+                setTimeout(() => {
+                    this.state.gameOver = false;
+                    this.state.balance = 0.5;
+                    this.state.isStumbling = false;
+                    
+                    // Return to idle animation
+                    this.playAnimation('tpose');
+                    
+                    console.log("Reset after fall");
+                }, 3000);
+            }
+            
+            updateCamera() {
+                // Skip if character isn't loaded
+                if (!this.character) return;
+                
+                // Set camera to follow behind character
+                const targetPos = new THREE.Vector3();
+                this.character.getWorldPosition(targetPos);
+                
+                // Get character's forward direction
+                const forward = new THREE.Vector3(0, 0, -1);
+                forward.applyQuaternion(this.character.quaternion);
+                
+                // Position camera behind character
+                const cameraOffset = new THREE.Vector3()
+                    .copy(forward)
+                    .multiplyScalar(-5) // Distance behind
+                    .add(new THREE.Vector3(0, 2, 0)); // Height offset
+                
+                const cameraTargetPos = new THREE.Vector3()
+                    .copy(targetPos)
+                    .add(cameraOffset);
+                
+                // Check if the calculated position is valid
+                if (isNaN(cameraTargetPos.x) || isNaN(cameraTargetPos.y) || isNaN(cameraTargetPos.z)) {
+                    console.error('Invalid camera position calculated');
+                    return;
+                }
+                
+                // Smoothly move camera
+                this.camera.position.lerp(cameraTargetPos, 0.05);
+                
+                // Look at character
+                this.controls.target.copy(targetPos);
+                this.controls.update();
+            }
+            
+            // Check if player reached house with all bags
+            checkWinCondition() {
+                if (!this.character || !this.house || this.state.gameOver) return;
+                
+                // Get positions
+                const characterPos = new THREE.Vector3();
+                this.character.getWorldPosition(characterPos);
+                
+                const housePos = new THREE.Vector3();
+                this.house.getWorldPosition(housePos);
+                
+                // Calculate distance to house
+                const distanceToHouse = characterPos.distanceTo(housePos);
+                
+                // Check win condition
+                if (distanceToHouse < 5 && this.state.bagsCarried === this.state.maxBags) {
+                    // Player won!
+                    this.showWinScreen();
+                }
+            }
+            
+            showWinScreen() {
+                if (this.winScreenShown) return;
+                this.winScreenShown = true;
+                
+                console.log("Win condition met!");
+                
+                // Play win sound
+                this.sounds.win.play();
+                
+                // Calculate score
+                const timeBonus = Math.max(0, 30 - Math.floor((Date.now() - this.state.levelStartTime) / 1000));
+                const balanceBonus = Math.floor(this.state.perfectBalanceTime);
+                const bagBonus = this.state.bagsCarried * 50;
+                const totalScore = timeBonus + balanceBonus + bagBonus;
+                
+                // Add to total score
+                this.state.score += totalScore;
+                
+                // Create win screen
+                const winScreen = document.createElement('div');
+                winScreen.className = 'win-screen';
+                
+                // Check if this is the final level
+                const isFinalLevel = this.state.currentLevel >= this.state.maxLevel;
+                
+                winScreen.innerHTML = `
+                    <h1>Level ${this.state.currentLevel} Completed!</h1>
+                    <p>You successfully carried all bags to the house.</p>
+                    <div style="background: rgba(0,0,0,0.5); padding: 20px; margin: 20px; border-radius: 10px;">
+                        <p>Time Bonus: ${timeBonus} points</p>
+                        <p>Balance Bonus: ${balanceBonus} points</p>
+                        <p>Bags Bonus: ${bagBonus} points</p>
+                        <p style="font-size: 24px; margin-top: 10px;">Total Score: ${totalScore} points</p>
+                    </div>
+                    ${isFinalLevel ? 
+                        `<p>Congratulations! You've completed all levels!</p>
+                         <p>Final Score: ${this.state.score}</p>
+                         <button id="restart-game-button">Play Again</button>` :
+                        `<button id="next-level-button">Next Level</button>`
+                    }
+                `;
+                
+                // Add to document
+                document.body.appendChild(winScreen);
+                
+                // Add button event
+                setTimeout(() => {
+                    if (isFinalLevel) {
+                        document.getElementById('restart-game-button').addEventListener('click', () => {
+                            document.body.removeChild(winScreen);
+                            this.startLevel(1);
+                        });
+                    } else {
+                        document.getElementById('next-level-button').addEventListener('click', () => {
+                            document.body.removeChild(winScreen);
+                            this.startLevel(this.state.currentLevel + 1);
+                        });
+                    }
+                }, 100);
+            }
+            
+            resetGame() {
+                // Reset win flag
+                this.winScreenShown = false;
+                
+                // Reset character position
+                if (this.character) {
+                    this.character.position.set(-10, 0, 0);
+                }
+                
+                // Reset bags
+                this.dropAllBags();
+                
+                // Recreate bags
+                this.bags.forEach(bag => this.scene.remove(bag));
+                this.bags = [];
+                this.availableBags = [];
+                this.createBagsOnCar();
+                
+                // Reset game state
+                this.state.bagsCarried = 0;
+                this.state.balance = 0.5;
+                this.state.balanceStability = 1.0;
+                this.state.gameOver = false;
+                this.state.isStumbling = false;
+                
+                // Reset UI
+                document.getElementById('item-counter').textContent = `Bags: ${this.state.bagsCarried}/${this.state.maxBags}`;
+            }
+            
+            update(deltaTime) {
+                // Skip if game isn't active
+                if (!this.state.isPlaying) return;
+                
+                // Update animations
+                if (this.animations.mixer) {
+                    this.animations.mixer.update(deltaTime);
+                }
+                
+                // Handle input (skip during game over)
+                if (!this.state.gameOver) {
+                    this.handleInput(deltaTime);
+                }
+                
+                // Update balance
+                this.updateBalance(deltaTime);
+                
+                // Track perfect balance time
+                if (this.state.bagsCarried > 0 && 
+                    this.state.balance > 0.4 && 
+                    this.state.balance < 0.6) {
+                    this.state.perfectBalanceTime += deltaTime;
+                }
+                
+                // Update weather effects
+                if (this.weather && this.weather.userData && this.weather.userData.update) {
+                    this.weather.userData.update(deltaTime);
+                }
+                
+                // Update obstacles
+                if (this.obstacles) {
+                    this.obstacles.forEach(obstacle => {
+                        if (obstacle.userData && obstacle.userData.update) {
+                            obstacle.userData.update(deltaTime);
+                        }
+                        
+                        // Check for collision with character
+                        if (this.character && obstacle.userData && obstacle.userData.effect) {
+                            const distance = obstacle.position.distanceTo(this.character.position);
+                            if (distance < 1.5) {
+                                obstacle.userData.effect(this.character);
+                            }
+                        }
+                    });
+                }
+                
+                // Update camera
+                this.updateCamera();
+                
+                // Check win condition
+                this.checkWinCondition();
+            }
+            
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                
+                // Calculate delta time
+                const deltaTime = this.clock.getDelta();
+                
+                // Update game
+                this.update(deltaTime);
+                
+                // Render scene
+                this.renderer.render(this.scene, this.camera);
+            }
+            
+            addDebugConsole() {
+                // Create debug console container
+                const debugContainer = document.createElement('div');
+                debugContainer.style.position = 'absolute';
+                debugContainer.style.bottom = '10px';
+                debugContainer.style.right = '10px';
+                debugContainer.style.backgroundColor = 'rgba(0,0,0,0.7)';
+                debugContainer.style.color = 'white';
+                debugContainer.style.padding = '10px';
+                debugContainer.style.borderRadius = '5px';
+                debugContainer.style.maxHeight = '200px';
+                debugContainer.style.overflow = 'auto';
+                debugContainer.style.maxWidth = '300px';
+                debugContainer.style.fontSize = '12px';
+                debugContainer.id = 'debug-console';
+                document.body.appendChild(debugContainer);
+                
+                // Override console.log and console.error
+                const originalLog = console.log;
+                const originalError = console.error;
+                
+                console.log = function() {
+                    originalLog.apply(console, arguments);
+                    const message = Array.from(arguments).join(' ');
+                    debugContainer.innerHTML += `<div>${message}</div>`;
+                    debugContainer.scrollTop = debugContainer.scrollHeight;
+                };
+                
+                console.error = function() {
+                    originalError.apply(console, arguments);
+                    const message = Array.from(arguments).join(' ');
+                    debugContainer.innerHTML += `<div style="color:red">${message}</div>`;
+                    debugContainer.scrollTop = debugContainer.scrollHeight;
+                };
+            }
+            
+            handleMissingAssets() {
+                // Create basic placeholder geometries for missing models
+                if (!this.character) {
+                    console.log("Creating placeholder for missing character model");
+                    const geo = new THREE.CapsuleGeometry(0.5, 1, 4, 8);
+                    const mat = new THREE.MeshStandardMaterial({color: 0x00ff00});
+                    this.character = new THREE.Mesh(geo, mat);
+                    this.character.position.set(-3, 1, 0);
+                    this.scene.add(this.character);
+                    
+                    // Mock animation mixer to prevent errors
+                    this.animations.mixer = new THREE.AnimationMixer(this.character);
+                    this.animations.actions.tpose = {
+                        fadeOut: () => {},
+                        reset: () => {},
+                        fadeIn: () => {},
+                        play: () => {}
+                    };
+                    this.animations.current = 'tpose';
+                }
+                
+                // Create simple car placeholder
+                if (!this.car) {
+                    console.log("Creating placeholder for missing car model");
+                    const geo = new THREE.BoxGeometry(2, 1, 4);
+                    const mat = new THREE.MeshStandardMaterial({color: 0x0000ff});
+                    this.car = new THREE.Mesh(geo, mat);
+                    this.car.position.set(-5, 0.5, 0);
+                    this.scene.add(this.car);
+                }
+                
+                // Create simple house placeholder
+                if (!this.house) {
+                    console.log("Creating placeholder for missing house model");
+                    const geo = new THREE.BoxGeometry(4, 3, 4);
+                    const mat = new THREE.MeshStandardMaterial({color: 0xff0000});
+                    this.house = new THREE.Mesh(geo, mat);
+                    this.house.position.set(5, 1.5, 0);
+                    this.scene.add(this.house);
+                }
+                
+                // Create placeholders for bags if needed
+                if (this.availableBags.length === 0) {
+                    console.log("Creating placeholder bags");
+                    this.bag1Template = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.5, 0.5, 0.5),
+                        new THREE.MeshStandardMaterial({color: 0xffff00})
+                    );
+                    this.bag2Template = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.3, 8, 8),
+                        new THREE.MeshStandardMaterial({color: 0xff00ff})
+                    );
+                    this.createBagsOnCar();
+                }
+                
+                // Hide loading screen and show game UI
+                document.getElementById('loading-screen').style.display = 'none';
+                document.getElementById('balance-meter').style.display = 'block';
+                document.getElementById('item-counter').style.display = 'block';
+                
+                // Set game state to playing
+                this.state.isLoading = false;
+                this.state.isPlaying = true;
+            }
+            
+            // Add a points system based on speed and balance maintenance
+            calculateScore() {
+                const timeBonus = Math.max(0, 100 - this.gameTimer);
+                const balanceBonus = Math.floor(this.perfectBalanceTime * 10);
+                const bagBonus = this.state.bagsCarried * 20;
+                
+                return timeBonus + balanceBonus + bagBonus;
+            }
+            
+            // Unlockable items like better shoes for better balance,
+            // stronger arms to carry more bags, etc.
+            unlockUpgrade(type) {
+                switch(type) {
+                    case 'shoes':
+                        this.playerUpgrades.balanceStability += 0.1;
+                        break;
+                    case 'arms':
+                        this.state.maxBags += 1;
+                        break;
+                    case 'cart':
+                        // Special item that lets player carry many bags but moves slower
+                        this.playerUpgrades.hasCart = true;
+                        this.state.maxBags = 10;
+                        this.playerSpeed *= 0.7;
+                        break;
+                }
+            }
+            
+            // Add this method to check if URLs are accessible
+            checkAssetUrls() {
+                const urls = Object.values(this.assets);
+                let checkedCount = 0;
+                
+                // Try original paths first
+                urls.forEach(url => {
+                    fetch(url, { method: 'HEAD' })
+                        .then(response => {
+                            if (response.ok) {
+                                console.log(`✅ Asset URL valid: ${url}`);
+                            } else {
+                                console.error(`❌ Asset URL returns ${response.status}: ${url}`);
+                                
+                                // Try with raw GitHub URLs
+                                this.tryRawGitHubUrls();
+                            }
+                        })
+                        .catch(error => {
+                            console.error(`❌ Asset URL check failed: ${url}`);
+                            // Try with raw GitHub URLs
+                            this.tryRawGitHubUrls();
+                        })
+                        .finally(() => {
+                            checkedCount++;
+                            if (checkedCount === urls.length) {
+                                console.log('URL check complete');
+                            }
+                        });
+                });
+            }
+            
+            tryRawGitHubUrls() {
+                // Only do this once
+                if (this.triedRawUrls) return;
+                this.triedRawUrls = true;
+                
+                console.log("Trying raw GitHub URLs...");
+                
+                // Use raw GitHub URLs as fallback
+                this.assets = {
+                    character: 'https://raw.githubusercontent.com/anythingshop/OneTrip/main/onetrip_maincharacter.glb',
+                    bag1: 'https://raw.githubusercontent.com/anythingshop/OneTrip/main/newbag.glb',
+                    bag2: 'https://raw.githubusercontent.com/anythingshop/OneTrip/main/bag2.glb',
+                    car: 'https://raw.githubusercontent.com/anythingshop/OneTrip/main/car.glb',
+                    house: 'https://raw.githubusercontent.com/anythingshop/OneTrip/main/house.glb'
+                };
+                
+                // Restart asset loading
+                this.loadAssets();
+            }
+
+            // Add environmental hazards and obstacles
+            setupLevel(levelNumber = 1) {
+                // Clear any existing obstacles
+                if (this.obstacles) {
+                    this.obstacles.forEach(obstacle => this.scene.remove(obstacle));
+                }
+                this.obstacles = [];
+                
+                // Level configurations
+                const levels = [
+                    { // Level 1 - Basic path
+                        weather: 'clear',
+                        obstacles: []
+                    },
+                    { // Level 2 - Puddles
+                        weather: 'light_rain',
+                        obstacles: [
+                            { type: 'puddle', x: -5, z: 0, size: 2 },
+                            { type: 'puddle', x: 0, z: 2, size: 1.5 }
+                        ]
+                    },
+                    { // Level 3 - Neighbors and more
+                        weather: 'rainy',
+                        obstacles: [
+                            { type: 'puddle', x: -8, z: 0, size: 2 },
+                            { type: 'puddle', x: -3, z: 0, size: 1.5 },
+                            { type: 'neighbor', x: 0, z: 0, patrolRadius: 3, speed: 1 }
+                        ]
+                    }
+                ];
+                
+                // Get level data (default to level 1 if not found)
+                const level = levels[levelNumber - 1] || levels[0];
+                
+                // Set up weather
+                this.setupWeather(level.weather);
+                
+                // Create obstacles
+                level.obstacles.forEach(obstacle => {
+                    this.createObstacle(obstacle.type, obstacle);
+                });
+                
+                // Update UI with level info
+                this.showFloatingText(`Level ${levelNumber}`, 3000);
+                
+                return level;
+            }
+
+            createObstacle(type, options) {
+                let obstacle;
+                
+                switch(type) {
+                    case 'puddle':
+                        obstacle = this.createPuddle(options);
+                        break;
+                    case 'neighbor':
+                        obstacle = this.createNeighbor(options);
+                        break;
+                    case 'ice':
+                        obstacle = this.createIce(options);
+                        break;
+                }
+                
+                if (obstacle) {
+                    this.obstacles.push(obstacle);
+                    this.scene.add(obstacle);
+                }
+                
+                return obstacle;
+            }
+
+            createPuddle(options) {
+                const size = options.size || 2;
+                const puddle = new THREE.Group();
+                puddle.position.set(options.x, 0.01, options.z);
+                
+                // Create puddle mesh
+                const puddleGeo = new THREE.CircleGeometry(size, 32);
+                const puddleMat = new THREE.MeshStandardMaterial({
+                    color: 0x2196F3,
+                    transparent: true,
+                    opacity: 0.7,
+                    metalness: 0.9,
+                    roughness: 0.1
+                });
+                
+                const puddleMesh = new THREE.Mesh(puddleGeo, puddleMat);
+                puddleMesh.rotation.x = -Math.PI / 2; // Flat on ground
+                puddle.add(puddleMesh);
+                
+                // Add ripple animation
+                const rippleGeo = new THREE.CircleGeometry(size * 0.8, 32);
+                const rippleMat = new THREE.MeshBasicMaterial({
+                    color: 0xFFFFFF,
+                    transparent: true,
+                    opacity: 0.2
+                });
+                
+                const rippleMesh = new THREE.Mesh(rippleGeo, rippleMat);
+                rippleMesh.rotation.x = -Math.PI / 2;
+                rippleMesh.position.y = 0.02;
+                puddle.add(rippleMesh);
+                
+                // Replace GSAP animation code with plain JS
+                animateRipple = () => {
+                    rippleMesh.scale.set(1, 1, 1);
+                    rippleMesh.material.opacity = 0.3;
+                    
+                    // Use simple animation with requestAnimationFrame instead of GSAP
+                    let startTime = performance.now();
+                    const duration = 2000; // 2 seconds
+                    
+                    const animate = (currentTime) => {
+                        const elapsed = currentTime - startTime;
+                        const progress = Math.min(elapsed / duration, 1);
+                        
+                        // Scale up
+                        const scale = 1 + (0.5 * progress);
+                        rippleMesh.scale.set(scale, scale, scale);
+                        
+                        // Fade out
+                        rippleMesh.material.opacity = 0.3 * (1 - progress);
+                        
+                        if (progress < 1) {
+                            requestAnimationFrame(animate);
+                        } else {
+                            // Reset and schedule next ripple
+                            setTimeout(animateRipple, Math.random() * 3000);
+                        }
+                    };
+                    
+                    requestAnimationFrame(animate);
+                };
+                
+                setTimeout(animateRipple, Math.random() * 3000);
+                
+                // Add obstacle data and collision effect
+                puddle.userData = {
+                    type: 'puddle',
+                    size: size,
+                    effect: (character) => {
+                        // Slow down player and make balance harder when walking through
+                        this.state.balanceStability *= 0.7;
+                        
+                        // Play splash sound
+                        const splashSound = new Audio('https://freesound.org/data/previews/60/60779_71257-lq.mp3');
+                        splashSound.volume = 0.2;
+                        splashSound.play();
+                        
+                        // Show splash effect
+                        this.createSplashEffect(puddle.position.x, puddle.position.z);
+                        
+                        // Show message
+                        this.showFloatingText("Splish splash!", 1000);
+                        
+                        // Reset stability after a delay
+                        setTimeout(() => {
+                            this.state.balanceStability /= 0.7;
+                        }, 2000);
+                    }
+                };
+                
+                return puddle;
+            }
+
+            createNeighbor(options) {
+                const neighbor = new THREE.Group();
+                neighbor.position.set(options.x, 0, options.z);
+                
+                // Create character
+                const bodyGeo = new THREE.CapsuleGeometry(0.5, 1, 8, 8);
+                const headGeo = new THREE.SphereGeometry(0.3, 16, 16);
+                const bodyMat = new THREE.MeshStandardMaterial({ color: 0xFF5722 });
+                const headMat = new THREE.MeshStandardMaterial({ color: 0xE0A080 });
+                
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.position.y = 0.75;
+                neighbor.add(body);
+                
+                const head = new THREE.Mesh(headGeo, headMat);
+                head.position.y = 1.8;
+                neighbor.add(head);
+                
+                // Add speech bubble
+                const speech = document.createElement('div');
+                speech.style.position = 'absolute';
+                speech.style.padding = '10px';
+                speech.style.backgroundColor = 'white';
+                speech.style.borderRadius = '5px';
+                speech.style.display = 'none';
+                speech.style.width = '150px';
+                speech.style.textAlign = 'center';
+                speech.style.zIndex = '10';
+                speech.innerHTML = "Hey neighbor! Need a hand?";
+                document.body.appendChild(speech);
+                
+                // Set up patrol behavior
+                neighbor.userData = {
+                    type: 'neighbor',
+                    speech: speech,
+                    patrolRadius: options.patrolRadius || 3,
+                    patrolAngle: Math.random() * Math.PI * 2,
+                    patrolSpeed: options.speed || 1,
+                    originalX: options.x,
+                    originalZ: options.z,
+                    speechTimer: 0,
+                    update: (deltaTime) => {
+                        // Move in a circular patrol
+                        neighbor.userData.patrolAngle += neighbor.userData.patrolSpeed * deltaTime * 0.5;
+                        const x = neighbor.userData.originalX + Math.cos(neighbor.userData.patrolAngle) * neighbor.userData.patrolRadius;
+                        const z = neighbor.userData.originalZ + Math.sin(neighbor.userData.patrolAngle) * neighbor.userData.patrolRadius;
+                        
+                        // Look in movement direction
+                        const angle = Math.atan2(
+                            z - neighbor.position.z,
+                            x - neighbor.position.x
+                        );
+                        neighbor.rotation.y = angle;
+                        
+                        // Smooth movement
+                        neighbor.position.x = THREE.MathUtils.lerp(neighbor.position.x, x, 0.1);
+                        neighbor.position.z = THREE.MathUtils.lerp(neighbor.position.z, z, 0.1);
+                        
+                        // Update speech bubble position
+                        if (this.camera && neighbor.userData.speech) {
+                            const vector = new THREE.Vector3();
+                            vector.setFromMatrixPosition(head.matrixWorld);
+                            vector.project(this.camera);
+                            
+                            const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+                            const y = -(vector.y * 0.5 - 0.5) * window.innerHeight;
+                            
+                            neighbor.userData.speech.style.left = x - 75 + 'px';
+                            neighbor.userData.speech.style.top = y - 70 + 'px';
+                        }
+                        
+                        // Check distance to player
+                        if (this.character) {
+                            const distToPlayer = neighbor.position.distanceTo(this.character.position);
+                            if (distToPlayer < 3) {
+                                // Show speech bubble when player is close
+                                neighbor.userData.speech.style.display = 'block';
+                                
+                                // Randomly say something new
+                                neighbor.userData.speechTimer += deltaTime;
+                                if (neighbor.userData.speechTimer > 5) {
+                                    neighbor.userData.speechTimer = 0;
+                                    
+                                    const phrases = [
+                                        "Hey neighbor! Need a hand?",
+                                        "That's a lot of bags you got there!",
+                                        "Going for the one-trip challenge?",
+                                        "You're gonna drop those...",
+                                        "Impressive balancing skills!",
+                                        "My record is 7 bags in one trip!"
+                                    ];
+                                    
+                                    neighbor.userData.speech.innerHTML = phrases[Math.floor(Math.random() * phrases.length)];
+                                }
+                                
+                                // Cause distraction (make balance harder)
+                                if (this.state.bagsCarried > 0) {
+                                    this.state.balanceStability *= 0.99;
+                                }
+                            } else {
+                                neighbor.userData.speech.style.display = 'none';
+                                neighbor.userData.speechTimer = 0;
+                            }
+                        }
+                    },
+                    effect: (character) => {
+                        // Bumping into neighbor
+                        this.state.balance += (Math.random() > 0.5 ? 0.1 : -0.1);
+                        
+                        // Say something when bumped
+                        neighbor.userData.speech.style.display = 'block';
+                        neighbor.userData.speech.innerHTML = "Hey! Watch where you're going!";
+                        
+                        // Play bumping sound
+                        const bumpSound = new Audio('https://freesound.org/data/previews/331/331912_3248244-lq.mp3');
+                        bumpSound.volume = 0.3;
+                        bumpSound.play();
+                    }
+                };
+                
+                return neighbor;
+            }
+
+            setupWeather(type) {
+                // Clear any existing weather
+                if (this.weather) {
+                    this.scene.remove(this.weather);
+                    this.weather = null;
+                }
+                
+                switch(type) {
+                    case 'light_rain':
+                        this.createRain(5000, 0.2);
+                        // Slightly darken sky
+                        this.scene.background = new THREE.Color(0x6b9dc9);
+                        // Make ground slightly darker
+                        this.ground.material.color.set(0x6dba00);
+                        break;
+                        
+                    case 'rainy':
+                        this.createRain(15000, 0.5);
+                        // Darken sky more
+                        this.scene.background = new THREE.Color(0x4a6d8e);
+                        // Make ground dark and wet
+                        this.ground.material.color.set(0x5d9900);
+                        this.ground.material.roughness = 0.3;
+                        break;
+                        
+                    case 'clear':
+                    default:
+                        // Reset to default
+                        this.scene.background = new THREE.Color(0x87CEEB);
+                        this.ground.material.color.set(0x7CFC00);
+                        this.ground.material.roughness = 0.8;
+                        break;
+                }
+            }
+
+            createRain(count, intensity) {
+                const rainGeometry = new THREE.BufferGeometry();
+                const rainVertices = [];
+                
+                // Generate rain drops in a large area
+                for (let i = 0; i < count; i++) {
+                    const x = (Math.random() - 0.5) * 100;
+                    const y = Math.random() * 50;
+                    const z = (Math.random() - 0.5) * 100;
+                    
+                    rainVertices.push(x, y, z);
+                }
+                
+                rainGeometry.setAttribute('position', new THREE.Float32BufferAttribute(rainVertices, 3));
+                
+                // Create material for raindrops
+                const rainMaterial = new THREE.PointsMaterial({
+                    color: 0xaaaaaa,
+                    size: 0.1,
+                    transparent: true,
+                    opacity: 0.6
+                });
+                
+                // Create the rain particle system
+                this.weather = new THREE.Points(rainGeometry, rainMaterial);
+                this.scene.add(this.weather);
+                
+                // Rain properties for animation
+                this.weather.userData = {
+                    type: 'rain',
+                    intensity: intensity,
+                    update: (deltaTime) => {
+                        // Move rain down
+                        const positions = this.weather.geometry.attributes.position.array;
+                        
+                        for (let i = 0; i < positions.length; i += 3) {
+                            // Move each drop down
+                            positions[i + 1] -= 10 * intensity * deltaTime;
+                            
+                            // Reset drops that go below the ground
+                            if (positions[i + 1] < 0) {
+                                positions[i + 1] = 50; // Move to top
+                                positions[i] = (Math.random() - 0.5) * 100; // Random x
+                                positions[i + 2] = (Math.random() - 0.5) * 100; // Random z
+                            }
+                        }
+                        
+                        this.weather.geometry.attributes.position.needsUpdate = true;
+                        
+                        // Make game slightly more difficult in rain
+                        if (this.state.bagsCarried > 0) {
+                            this.state.balanceStability = THREE.MathUtils.lerp(
+                                this.state.balanceStability,
+                                1.0 - (intensity * 0.3),
+                                0.01
+                            );
+                        }
+                    }
+                };
+            }
+
+            startLevel(levelNumber) {
+                // Reset game state
+                this.resetGame();
+                
+                // Set level
+                this.state.currentLevel = levelNumber;
+                
+                // Configure level elements
+                const level = this.setupLevel(levelNumber);
+                
+                // Start level timer
+                this.state.levelStartTime = Date.now();
+                this.state.perfectBalanceTime = 0;
+                
+                // Show level intro
+                this.showLevelIntro(levelNumber);
+            }
+
+            showLevelIntro(levelNumber) {
+                // Create level intro screen
+                const introScreen = document.createElement('div');
+                introScreen.className = 'win-screen';
+                
+                const levelNames = [
+                    "The Driveway",
+                    "Rainy Day",
+                    "The Nosy Neighbor"
+                ];
+                
+                const levelObjectives = [
+                    "Carry all 5 bags from your car to your house in one trip!",
+                    "Watch out for puddles that can affect your balance!",
+                    "Don't get distracted by your chatty neighbor!"
+                ];
+                
+                introScreen.innerHTML = `
+                    <h1>Level ${levelNumber}: ${levelNames[levelNumber-1] || 'Challenge'}</h1>
+                    <p>${levelObjectives[levelNumber-1] || 'Get all bags home in one trip!'}</p>
+                    <p>Balance carefully and distribute weight evenly</p>
+                    <button id="start-level-button">Start Level</button>
+                `;
+                
+                // Add to document
+                document.body.appendChild(introScreen);
+                
+                // Add start button event
+                setTimeout(() => {
+                    document.getElementById('start-level-button').addEventListener('click', () => {
+                        document.body.removeChild(introScreen);
+                        // Game already set up, just start playing
+                        this.state.isPlaying = true;
+                    });
+                }, 100);
+            }
+
+            // Add this helper function to create the splash effect
+            createSplashEffect(x, z) {
+                // Create particle system for splash
+                const particleCount = 20;
+                const particles = new THREE.Group();
+                particles.position.set(x, 0.1, z);
+                
+                for (let i = 0; i < particleCount; i++) {
+                    const particle = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.05, 4, 4),
+                        new THREE.MeshBasicMaterial({ color: 0x2196F3 })
+                    );
+                    
+                    // Random position around center
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = Math.random() * 0.5;
+                    particle.position.x = Math.cos(angle) * radius;
+                    particle.position.z = Math.sin(angle) * radius;
+                    
+                    // Initial y velocity
+                    particle.userData = {
+                        velocity: 0.05 + Math.random() * 0.1,
+                        gravity: -0.005
+                    };
+                    
+                    particles.add(particle);
+                }
+                
+                this.scene.add(particles);
+                
+                // Add to update loop
+                const splashUpdate = (deltaTime) => {
+                    let allFallen = true;
+                    
+                    particles.children.forEach(particle => {
+                        // Apply gravity
+                        particle.userData.velocity += particle.userData.gravity;
+                        
+                        // Update position
+                        particle.position.y += particle.userData.velocity;
+                        
+                        // Check if still above ground
+                        if (particle.position.y > 0) {
+                            allFallen = false;
+                        }
+                    });
+                    
+                    // Remove when all particles have fallen
+                    if (allFallen) {
+                        this.scene.remove(particles);
+                        return false; // Remove from update loop
+                    }
+                    
+                    return true; // Continue updating
+                };
+                
+                // Add to a list of effects to update
+                if (!this.effects) this.effects = [];
+                this.effects.push(splashUpdate);
+            }
+        }
+        
+        // Initialize game when page loads
+        window.onload = () => {
+            new OneTripGame();
+        };
+    </script>
+</body>
+</html> 
