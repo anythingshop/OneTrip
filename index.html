@@ -2458,14 +2458,16 @@
                     // Update character position
                     characterTilt.position.add(moveDirection);
                     
-                    // Rotate character to face movement direction (not camera)
-                    targetRotation = Math.atan2(moveDirection.x, moveDirection.z);
+                    // Rotate character to face movement direction
+                    // We need to negate the x or z component to get the correct facing direction
+                    // Using atan2(x, -z) because we want character to face TOWARD the direction of movement
+                    targetRotation = Math.atan2(moveDirection.x, -moveDirection.z);
                 }
                 
                 // Smoothly rotate the character model to face the movement direction
                 if (characterTilt.rotation.y !== targetRotation) {
                     const rotDiff = ((targetRotation - characterTilt.rotation.y + Math.PI) % (Math.PI * 2)) - Math.PI;
-                    characterTilt.rotation.y += rotDiff * 0.1;
+                    characterTilt.rotation.y += rotDiff * 0.2; // Increased rotation speed
                 }
             } else {
                 // Character is not moving, slow down gradually
@@ -2710,18 +2712,22 @@
                         // Only rotate camera if in game view mode and not in game over state
                         const dx = e.movementX || e.mozMovementX || e.webkitMovementX || 0;
                         if (dx !== 0 && mouseLookActive) {
-                            // Store mouse movement for balance control (but don't affect character rotation)
+                            // Store mouse movement for balance control
+                            // Use the same input for both balance and camera rotation
                             lastMouseMoveX = dx;
                             
-                            // Rotate the camera around the character, but don't change character rotation
-                            // This lets player look around without changing movement direction
+                            // Calculate rotation amount with sensitivity
                             const rotationAmount = -dx * mouseRotationSensitivity;
                             
-                            // Update camera orbit angle (separate from character rotation)
+                            // Update camera orbit angle 
                             cameraOrbitAngle = (cameraOrbitAngle + rotationAmount) % (Math.PI * 2);
                             
                             // Update camera position based on new orbit angle
                             updateCameraPositionSafely();
+                            
+                            // When carrying bags and balance is enabled, the same mouse movement
+                            // will be used to update balance in updateBalanceBasedOnControls
+                            // This gives us dual control with a single input
                         }
                     }
                 });
@@ -2996,16 +3002,20 @@
             if (!isGameOver) {
                 // Process input and update character position first
                 // We DO NOT update camera here
-            updateCharacterMovement(delta);
-            
+                updateCharacterMovement(delta);
+                
                 // Reset camera update flag for this frame
                 cameraUpdateScheduled = false;
                 
                 // Update animations
-            if (mixer) mixer.update(delta);
+                if (mixer) mixer.update(delta);
                 
                 // Handle balance updates based on control input
                 updateBalanceBasedOnControls();
+                
+                // Reset lastMouseMoveX at the end of the frame to prevent accumulation
+                // but after it's been used for both camera and balance control
+                lastMouseMoveX = 0;
                 
                 // Ensure attached bags remain visible
                 ensureAttachedBagsVisibility();
@@ -3096,28 +3106,36 @@
             
             // Mouse input takes priority if available
             if (lastMouseMoveX !== 0) {
-                horizontalInput = lastMouseMoveX * 0.01; // Scale appropriately
-                lastMouseMoveX = 0; // Reset after use
+                // Increased sensitivity for more responsive balance control
+                horizontalInput = lastMouseMoveX * 0.02; // Doubled from 0.01
+                // Don't reset lastMouseMoveX here - let it affect both camera and balance
             } 
             // Joystick rotation is another source of input
             else if (rotationJoystickActive) {
-                horizontalInput = rotationJoystickDirection.x * 0.1; // Scale for joystick
+                // Increased sensitivity for more responsive balance control
+                horizontalInput = rotationJoystickDirection.x * 0.2; // Doubled from 0.1
             }
             
             // Apply a balance change based on the horizontal input
             // This is completely independent from movement
             if (horizontalInput !== 0) {
-                const balanceImpact = horizontalInput * 0.05; // Adjust sensitivity
+                // Increased sensitivity and made sign more intuitive:
+                // Moving mouse or joystick right tilts balance right, and vice versa
+                const balanceImpact = horizontalInput * 0.08; // Increased from 0.05
+                
+                // Apply the balance impact
                 balanceValue += balanceImpact;
                 
-                // Log balance changes for debugging
+                // Create visual feedback proportional to input
                 if (Math.abs(balanceImpact) > 0.01) {
+                    // Debug message for when balance changes significantly
                     console.log(`Balance impact: ${balanceImpact.toFixed(3)}, New balance: ${balanceValue.toFixed(2)}`);
                 }
             }
             
             // Natural centering force - stronger when further from center
-            const centeringForce = (0.5 - balanceValue) * 0.01;
+            // Make the centering force weaker to make manual control more important
+            const centeringForce = (0.5 - balanceValue) * 0.005; // Reduced from 0.01
             balanceValue += centeringForce;
             
             // Apply random balance disturbances based on weight carried
@@ -3217,14 +3235,16 @@
                     // Update character position
                     characterTilt.position.add(moveDirection);
                     
-                    // Rotate character to face movement direction (not camera)
-                    targetRotation = Math.atan2(moveDirection.x, moveDirection.z);
+                    // Rotate character to face movement direction
+                    // We need to negate the x or z component to get the correct facing direction
+                    // Using atan2(x, -z) because we want character to face TOWARD the direction of movement
+                    targetRotation = Math.atan2(moveDirection.x, -moveDirection.z);
                 }
                 
                 // Smoothly rotate the character model to face the movement direction
                 if (characterTilt.rotation.y !== targetRotation) {
                     const rotDiff = ((targetRotation - characterTilt.rotation.y + Math.PI) % (Math.PI * 2)) - Math.PI;
-                    characterTilt.rotation.y += rotDiff * 0.1;
+                    characterTilt.rotation.y += rotDiff * 0.2; // Increased rotation speed
                 }
             } else {
                 // Character is not moving, slow down gradually
@@ -3801,15 +3821,15 @@
             const rotationAmount = rotationJoystickDirection.x * touchRotationSensitivity;
             
             if (Math.abs(rotationAmount) > 0.001) {
-                // Update camera orbit angle instead of character rotation
-                // This keeps movement controls consistent with the camera view
+                // Update camera orbit angle
                 cameraOrbitAngle = (cameraOrbitAngle + rotationAmount) % (Math.PI * 2);
                 
                 // Update camera position based on new orbit angle
                 updateCameraPositionSafely();
                 
-                // Note: Balance handling is now done in updateBalanceBasedOnControls
-                // This keeps rotation and balance updates separate but coordinated
+                // Note: The rotation joystick input is used for both camera orbit and balance
+                // Balance control happens in updateBalanceBasedOnControls using rotationJoystickDirection
+                // This way players can control both camera view and balance with the same input
             }
         }
 
