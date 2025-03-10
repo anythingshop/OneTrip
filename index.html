@@ -78,6 +78,11 @@
             top: 0;
             left: 40%;
         }
+        #balanceDirection {
+            margin-top: 5px;
+            font-weight: bold;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -114,6 +119,7 @@
             <div class="balanceZone"></div>
             <div id="balanceIndicator"></div>
         </div>
+        <div id="balanceDirection">Balanced</div>
         <div>
             <button id="toggleBalance">Toggle Balance Effect</button>
         </div>
@@ -248,6 +254,7 @@
         let currentLowerBodyAction = null;
         let balanceEnabled = false;
         let balanceValue = 0.5;
+        let currentBalanceDirection = "center"; // left, center, right
         
         // Reference to hand bones for attaching bags
         let leftHand = null;
@@ -261,6 +268,10 @@
         
         // Currently attached bag
         let attachedBag = null;
+
+        // References for mirrored animations
+        let stumbleLeftAction = null;
+        let stumbleRightAction = null;
 
         // Load models
         const loader = new THREE.GLTFLoader();
@@ -355,6 +366,43 @@
             );
         });
         
+        // Create a mirrored animation by flipping position and rotation values
+        function createMirroredAnimation(originalClip, newName) {
+            // Clone the original animation
+            const mirroredTracks = [];
+            
+            // Process each track in the original clip
+            originalClip.tracks.forEach(track => {
+                const trackName = track.name;
+                const values = track.values.slice(); // Clone the values
+                
+                // For position tracks (X axis movement), invert X values
+                if (trackName.endsWith('.position')) {
+                    // Position tracks have [x,y,z, x,y,z, ...] format
+                    for (let i = 0; i < values.length; i += 3) {
+                        values[i] = -values[i]; // Invert X position
+                    }
+                }
+                
+                // For quaternion tracks (rotations), we need to flip appropriate components
+                if (trackName.endsWith('.quaternion')) {
+                    // Quaternion tracks have [x,y,z,w, x,y,z,w, ...] format
+                    // To mirror, we invert Y and Z components
+                    for (let i = 0; i < values.length; i += 4) {
+                        values[i + 1] = -values[i + 1]; // Invert Y
+                        values[i + 2] = -values[i + 2]; // Invert Z
+                    }
+                }
+                
+                // Create a new track with mirrored values
+                const mirroredTrack = new THREE.KeyframeTrack(trackName, track.times, values);
+                mirroredTracks.push(mirroredTrack);
+            });
+            
+            // Create the mirrored animation clip
+            return new THREE.AnimationClip(newName, originalClip.duration, mirroredTracks);
+        }
+        
         // Set up animation mixing system
         function setupAnimationMixing(clipsList) {
             // Create empty lists for animation dropdowns
@@ -385,14 +433,8 @@
                 'mixamorigRightToeBase', 'mixamorigRightToe_End'
             ];
             
-            // Create a dummy instance to get bone references for cloning
-            const dummyChar = characterModel.clone();
-            
             // Process each animation
             clipsList.forEach(clip => {
-                // Create action
-                const action = mixer.clipAction(clip);
-                
                 // Process the animation for upper body
                 const upperBodyTracks = [];
                 const lowerBodyTracks = [];
@@ -443,8 +485,16 @@
                     lowerSelect.value = clip.name;
                 }
                 
+                // Create mirrored animation for stumble_lowerbody
                 if (clip.name === 'stumble_lowerbody') {
-                    lowerSelect.value = clip.name;
+                    // Create mirrored version for left stumble
+                    const mirroredClip = createMirroredAnimation(lowerBodyClip, 'stumble_lowerbody_left_lower');
+                    
+                    // Store the original as right stumble and the mirrored as left stumble
+                    stumbleRightAction = lowerBodyActions[clip.name];
+                    stumbleLeftAction = mixer.clipAction(mirroredClip);
+                    
+                    console.log('Created mirrored stumble animation for left direction');
                 }
             });
             
@@ -497,6 +547,30 @@
             
             currentLowerBodyAction = action;
             console.log(`Playing lower body animation: ${name}`);
+        }
+        
+        // Function to play stumble animation based on balance direction
+        function playStumbleAnimation(direction) {
+            // Fade out current lower body animation
+            if (currentLowerBodyAction) {
+                currentLowerBodyAction.fadeOut(0.3);
+            }
+            
+            let action;
+            if (direction === 'left') {
+                action = stumbleLeftAction;
+                console.log('Playing left stumble animation');
+            } else {
+                action = stumbleRightAction;
+                console.log('Playing right stumble animation');
+            }
+            
+            if (action) {
+                action.reset();
+                action.fadeIn(0.3);
+                action.play();
+                currentLowerBodyAction = action;
+            }
         }
         
         // Function to attach a bag to the character's hand
@@ -589,22 +663,58 @@
             document.getElementById('balanceValue').textContent = value.toFixed(2);
             document.getElementById('balanceIndicator').style.left = `${value * 100}%`;
             
+            // Get direction element
+            const directionEl = document.getElementById('balanceDirection');
+            
             // Change indicator color based on balance
             const indicator = document.getElementById('balanceIndicator');
-            if (value < 0.2 || value > 0.8) {
+            
+            let newDirection = "center";
+            
+            if (value < 0.2) {
+                // Left imbalance (severe)
                 indicator.style.background = '#ff4444'; // Red for danger
-            } else if (value < 0.3 || value > 0.7) {
+                directionEl.textContent = "Severe Left Imbalance";
+                directionEl.style.color = '#ff4444';
+                newDirection = "left";
+            } else if (value < 0.3) {
+                // Left imbalance (moderate)
                 indicator.style.background = '#ffaa44'; // Orange for warning
+                directionEl.textContent = "Left Imbalance";
+                directionEl.style.color = '#ffaa44';
+                newDirection = "left";
+            } else if (value > 0.8) {
+                // Right imbalance (severe)
+                indicator.style.background = '#ff4444'; // Red for danger
+                directionEl.textContent = "Severe Right Imbalance";
+                directionEl.style.color = '#ff4444';
+                newDirection = "right";
+            } else if (value > 0.7) {
+                // Right imbalance (moderate)
+                indicator.style.background = '#ffaa44'; // Orange for warning
+                directionEl.textContent = "Right Imbalance";
+                directionEl.style.color = '#ffaa44';
+                newDirection = "right";
             } else {
+                // Balanced
                 indicator.style.background = '#ffffff'; // White for safe
+                directionEl.textContent = "Balanced";
+                directionEl.style.color = '#ffffff';
+                newDirection = "center";
             }
             
-            // Apply stumble animation to lower body when balance is poor
+            // Apply animation based on balance if enabled
             if (balanceEnabled) {
-                if (value < 0.2 || value > 0.8) {
-                    setLowerBodyAnimation('stumble_lowerbody');
-                } else {
-                    setLowerBodyAnimation('walk');
+                if (newDirection !== currentBalanceDirection) {
+                    if (newDirection === "left") {
+                        playStumbleAnimation("left");
+                    } else if (newDirection === "right") {
+                        playStumbleAnimation("right");
+                    } else {
+                        setLowerBodyAnimation('walk');
+                    }
+                    
+                    currentBalanceDirection = newDirection;
                 }
             }
         }
