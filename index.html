@@ -859,8 +859,6 @@
         // Reference to hand bones for attaching bags
         let leftHand = null;
         let rightHand = null;
-        let leftForeArm = null;
-        let rightForeArm = null;
         
         // References to bags for attaching
         let groundBag1 = null;
@@ -960,14 +958,6 @@
                                 if (node.name === 'mixamorigRightHand') {
                                     rightHand = node;
                                     console.log('Found right hand bone:', node.name);
-                                }
-                                if (node.name === 'mixamorigLeftForeArm') {
-                                    leftForeArm = node;
-                                    console.log('Found left forearm bone:', node.name);
-                                }
-                                if (node.name === 'mixamorigRightForeArm') {
-                                    rightForeArm = node;
-                                    console.log('Found right forearm bone:', node.name);
                                 }
                             }
                         });
@@ -1517,16 +1507,16 @@
                 return;
             }
             
-            console.log("Attaching bag to", hand.name);
+            console.log("Attaching bag to hand...");
             showPickupFeedback("Picked up bag!");
             
-            // Store original parent and transform for detaching later
+            // Store original parent and transform for later restoration
             const originalParent = bag.parent;
             const originalPosition = bag.position.clone();
             const originalRotation = bag.rotation.clone();
             const originalScale = bag.scale.clone();
             
-            // Remove from original parent
+            // Remove from current parent
             originalParent.remove(bag);
             
             // Create a new container for the bag to better control positioning
@@ -1539,34 +1529,12 @@
             // Reset bag position within container
             bag.position.set(0, 0, 0);
             
-            // Determine which bone to use based on hand and current animation
+            // Attach container to hand
+            hand.add(bagContainer);
+            
+            // Get offset position based on current attachedBags and which hand
             const isLeftHand = hand.name === 'mixamorigLeftHand';
-            const currentAnim = currentAnimation ? currentAnimation.name : '';
-            const useCarryMode = currentAnim.includes('carry') || currentAnim.includes('run');
-            
-            // Choose appropriate attachment bone based on animation
-            let attachmentBone = hand;
-            if (useCarryMode) {
-                // Use forearm for carry animations
-                attachmentBone = isLeftHand ? leftForeArm : rightForeArm;
-                console.log(`Using ${isLeftHand ? 'left' : 'right'} forearm for carry animation`);
-            } else {
-                // Use hand for pickup animations
-                console.log(`Using ${isLeftHand ? 'left' : 'right'} hand for regular animation`);
-            }
-            
-            // Attach container to the chosen bone
-            if (attachmentBone) {
-                attachmentBone.add(bagContainer);
-                console.log(`Bag container added to ${attachmentBone.name}`);
-            } else {
-                // Fallback to hand if forearm is not available
-                hand.add(bagContainer);
-                console.log(`Fallback: Bag container added to ${hand.name}`);
-            }
-            
-            // Get offset position based on current attachedBags and which hand/bone
-            const handOffset = getHandOffset(isLeftHand, attachedBags.length, useCarryMode);
+            const handOffset = getHandOffset(isLeftHand, attachedBags.length);
             
             // Apply offset to container
             bagContainer.position.set(handOffset.x, handOffset.y, handOffset.z);
@@ -1575,11 +1543,11 @@
             if (isLeftHand) {
                 bag.rotation.set(0, Math.PI / 2, 0); // For left hand
                 // Slightly tilt bag based on hand
-                bagContainer.rotation.set(useCarryMode ? 0.1 : 0.2, 0, 0.1);
+                bagContainer.rotation.set(0.2, 0, 0.1);
             } else {
                 bag.rotation.set(0, -Math.PI / 2, 0); // For right hand
                 // Slightly tilt bag based on hand
-                bagContainer.rotation.set(useCarryMode ? 0.1 : 0.2, 0, -0.1);
+                bagContainer.rotation.set(0.2, 0, -0.1);
             }
             
             // Adjust scale to make bags more noticeable
@@ -1596,17 +1564,27 @@
                     node.castShadow = true;
                     node.receiveShadow = true;
                     node.visible = true; // Explicitly set visible flag
+                    console.log(`Mesh found in bag: ${node.name}, visible: ${node.visible}`);
                     
                     // Ensure materials are visible and have good rendering properties
                     if (node.material) {
-                        // Log material properties for debugging
-                        console.log("Bag material:", node.material.type, "transparent:", node.material.transparent, "visible:", node.visible);
+                        // Log more detailed material properties for debugging
+                        console.log("Bag material details:", {
+                            type: node.material.type,
+                            transparent: node.material.transparent,
+                            opacity: node.material.opacity,
+                            visible: node.visible,
+                            depthWrite: node.material.depthWrite,
+                            depthTest: node.material.depthTest,
+                            colorHex: node.material.color ? '#' + node.material.color.getHexString() : 'N/A'
+                        });
                         
                         // Make sure material is not transparent unless it needs to be
                         node.material.transparent = false;
                         node.material.opacity = 1.0;
                         node.material.depthWrite = true;
                         node.material.depthTest = true;
+                        node.material.visible = true; // Ensure material visibility flag is set
                         
                         // If it's a standard material, set good rendering properties
                         if (node.material.isMeshStandardMaterial) {
@@ -1644,46 +1622,24 @@
         }
         
         // Get appropriate hand offset based on which hand and how many bags are carried
-        function getHandOffset(isLeftHand, bagCount, isCarryMode = false) {
-            // Different offsets for carry mode vs pickup mode
-            if (isCarryMode) {
-                // Forearm attachment positions for carry animations
-                if (bagCount === 0) {
-                    return isLeftHand ? 
-                        { x: 0.3, y: -0.1, z: 0.1 } : // Left forearm - first bag
-                        { x: -0.3, y: -0.1, z: 0.1 }; // Right forearm - first bag
-                }
-                // Second bag position - slightly shifted from first
-                else if (bagCount === 1) {
-                    return isLeftHand ? 
-                        { x: 0.2, y: 0.1, z: 0.2 } : // Left forearm - second bag
-                        { x: -0.2, y: 0.1, z: 0.2 }; // Right forearm - second bag
-                }
-                // Third bag position - on top
-                else {
-                    return isLeftHand ? 
-                        { x: 0.3, y: 0.3, z: 0.0 } : // Left forearm - third bag
-                        { x: -0.3, y: 0.3, z: 0.0 }; // Right forearm - third bag
-                }
-            } else {
-                // Original hand attachment positions for pickup animations
-                if (bagCount === 0) {
-                    return isLeftHand ? 
-                        { x: 0.5, y: 0.0, z: 0.2 } : // Left hand - first bag
-                        { x: -0.5, y: 0.0, z: 0.2 }; // Right hand - first bag
-                }
-                // Second bag position - slightly shifted from first
-                else if (bagCount === 1) {
-                    return isLeftHand ? 
-                        { x: 0.4, y: 0.2, z: 0.3 } : // Left hand - second bag
-                        { x: -0.4, y: 0.2, z: 0.3 }; // Right hand - second bag
-                }
-                // Third bag position - on top
-                else {
-                    return isLeftHand ? 
-                        { x: 0.5, y: 0.4, z: 0.0 } : // Left hand - third bag
-                        { x: -0.5, y: 0.4, z: 0.0 }; // Right hand - third bag
-                }
+        function getHandOffset(isLeftHand, bagCount) {
+            // Base position for the first bag - moved further out and forward
+            if (bagCount === 0) {
+                return isLeftHand ? 
+                    { x: 0.5, y: 0.0, z: 0.2 } : // Left hand - first bag
+                    { x: -0.5, y: 0.0, z: 0.2 }; // Right hand - first bag
+            }
+            // Second bag position - slightly shifted from first
+            else if (bagCount === 1) {
+                return isLeftHand ? 
+                    { x: 0.4, y: 0.2, z: 0.3 } : // Left hand - second bag (slightly above and behind)
+                    { x: -0.4, y: 0.2, z: 0.3 }; // Right hand - second bag (slightly above and behind)
+            }
+            // Third bag position - on top
+            else {
+                return isLeftHand ? 
+                    { x: 0.5, y: 0.4, z: 0.0 } : // Left hand - third bag (on top)
+                    { x: -0.5, y: 0.4, z: 0.0 }; // Right hand - third bag (on top)
             }
         }
         
@@ -1708,26 +1664,31 @@
         
         // Update carrying statistics with new animation naming
         function updateCarryingStats() {
-            // Count bags
+            // Update counter
             bagCountEl.textContent = attachedBags.length;
             
-            // Calculate total weight
+            // Recalculate total weight
             totalBagWeight = attachedBags.reduce((total, bag) => total + bag.weight, 0);
-            totalWeightEl.textContent = totalBagWeight + " kg";
+            totalWeightEl.textContent = totalBagWeight.toFixed(1) + " kg";
             
-            // Show/hide balance UI based on whether bags are being carried
-            const balanceUI = document.getElementById('balanceUI');
+            // Update balance system if carrying bags
             if (attachedBags.length > 0) {
-                if (balanceUI) balanceUI.style.display = 'block';
-                
-                // Always enable balance system when carrying bags
+                // Automatically enable balance system when carrying bags
                 if (!balanceEnabled) {
                     balanceEnabled = true;
-                    updateDebug("Balance system enabled - carrying bags");
+                    document.getElementById('balanceToggle').textContent = "Balance: ON";
+                    document.getElementById('balanceToggle').classList.add('active');
+                    updateDebug("Balance system enabled - avoid tipping over!");
                 }
-            } else {
-                if (balanceUI) balanceUI.style.display = 'none';
                 
+                // Set appropriate animation
+                if (currentAnimation && !currentAnimation.name.startsWith('carry')) {
+                    setAnimation("carry_idle");
+                }
+                
+                // Show balance UI
+                document.getElementById('balanceUI').style.display = 'block';
+            } else {
                 // Disable balance system when not carrying bags
                 if (balanceEnabled) {
                     balanceEnabled = false;
@@ -2222,7 +2183,8 @@
                 // Calculate movement speed with acceleration/deceleration
                 const targetSpeed = maxMovementSpeed * Math.sqrt(inputX*inputX + inputZ*inputZ);
                 const speedDiff = targetSpeed - movementAcceleration;
-                movementAcceleration += speedDiff * 0.2 * (delta * 60); // Increased from 0.08, make framerate independent
+                // Use a lower acceleration value to make movement smoother
+                movementAcceleration += speedDiff * 0.1 * (delta * 60); // Reduced from 0.2 for smoother control
                 
                 // Always use camera direction for movement, not character direction
                 const cameraForward = new THREE.Vector3(0, 0, -1);
@@ -2236,15 +2198,11 @@
                     
                     // Right is perpendicular to forward in horizontal plane
                     cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraForward);
-                } else {
-                    // Use character's orientation for non-third-person
-                    cameraForward.set(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
-                    cameraRight.set(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
                 }
                 
                 // Calculate movement direction relative to camera
                 moveDirection.set(0, 0, 0)
-                    .add(cameraRight.multiplyScalar(-inputX))  // Changed from positive to negative
+                    .add(cameraRight.multiplyScalar(inputX))  // Fixed sign for correct A and D movement
                     .add(cameraForward.multiplyScalar(-inputZ));
                 
                 moveDirection.normalize().multiplyScalar(movementAcceleration);
@@ -3017,7 +2975,8 @@
                 // Calculate movement speed with acceleration/deceleration
                 const targetSpeed = maxMovementSpeed * Math.sqrt(inputX*inputX + inputZ*inputZ);
                 const speedDiff = targetSpeed - movementAcceleration;
-                movementAcceleration += speedDiff * 0.2 * (delta * 60); // Increased from 0.08, make framerate independent
+                // Use a lower acceleration value to make movement smoother
+                movementAcceleration += speedDiff * 0.1 * (delta * 60); // Reduced from 0.2 for smoother control
                 
                 // Always use camera direction for movement, not character direction
                 const cameraForward = new THREE.Vector3(0, 0, -1);
@@ -3035,7 +2994,7 @@
                 
                 // Calculate movement direction relative to camera
                 moveDirection.set(0, 0, 0)
-                    .add(cameraRight.multiplyScalar(-inputX))  // Flipped for correct movement
+                    .add(cameraRight.multiplyScalar(inputX))  // Fixed sign for correct A and D movement
                     .add(cameraForward.multiplyScalar(-inputZ));
                 
                 moveDirection.normalize().multiplyScalar(movementAcceleration);
