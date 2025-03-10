@@ -3611,6 +3611,50 @@
             }
         }
         
+        // Function to update carrying effects based on total weight and number of bags
+        function updateCarryingEffects() {
+            // Determine weight class based on total weight or bag count
+            let newWeightClass = "none";
+            
+            if (attachedBags.length > 0) {
+                if (totalBagWeight <= 3) {
+                    newWeightClass = "light";
+                } else if (totalBagWeight <= 7) {
+                    newWeightClass = "medium";
+                } else {
+                    newWeightClass = "heavy";
+                }
+            }
+            
+            // Update weight class display
+            if (weightClassEl) weightClassEl.textContent = newWeightClass.charAt(0).toUpperCase() + newWeightClass.slice(1);
+            
+            // If weight class changed, update the animation
+            if (newWeightClass !== carryWeightClass) {
+                updateDebug(`Carry weight class changed: ${carryWeightClass} → ${newWeightClass}`);
+                carryWeightClass = newWeightClass;
+                
+                // Update animation if we're already carrying and moving
+                if (attachedBags.length > 0) {
+                    if (isMoving) {
+                        forcedAnimationUpdate(`carry_walk_${carryWeightClass}`);
+                    } else {
+                        forcedAnimationUpdate(`carry_idle_${carryWeightClass}`);
+                    }
+                }
+            }
+            
+            // Update movement speed based on weight
+            if (attachedBags.length > 0) {
+                // Reduce max speed based on weight (heavier = slower)
+                const weightFactor = 1.0 - (totalBagWeight * 0.03);
+                maxMovementSpeed = 0.08 * Math.max(0.6, weightFactor);
+            } else {
+                // Reset to default speed when not carrying
+                maxMovementSpeed = 0.08;
+            }
+        }
+        
         // Start the main animation loop
         animate(0);
     </script>
