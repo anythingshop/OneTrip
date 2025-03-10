@@ -419,26 +419,28 @@
         let currentLowerBodyAction = null;
         let currentUpperBodyAnimation = 'walk';
         let currentLowerBodyAnimation = 'walk';
-        let balanceEnabled = true; // Set to true by default now
+        let balanceEnabled = false; // Set to false by default now
         let balanceValue = 0.5;
         let currentBalanceDirection = "center"; // left, center, right
         let carryWeightClass = "none"; // none, light, medium, heavy
+        let lastMovementState = false; // Track previous movement state
         
         // Movement and control variables
         let moveDirection = new THREE.Vector3();
-        let movementSpeed = 0.05;
-        let turnSpeed = 0.05;
+        let movementSpeed = 0.03; // Reduced from 0.05
+        let turnSpeed = 0.03; // Reduced from 0.05
         let isMoving = false;
         let targetRotation = 0;
         let movementAcceleration = 0;
-        let maxMovementSpeed = 0.1;
+        let maxMovementSpeed = 0.08; // Reduced from 0.1
         let cameraMode = "thirdPerson"; // thirdPerson or orbit
         
         // Animation transition variables
-        let animationTransitionTime = 0.5; // seconds to blend between animations
+        let animationTransitionTime = 1.2; // Increased blend time between animations
         let isAnimationTransitioning = false;
         let animationTransitionTimeout = null;
         let lastAnimationChange = 0;
+        let animationChangeMinDelay = 800; // Minimum ms between animation changes
         
         // Joystick variables
         let joystickActive = false;
@@ -687,10 +689,10 @@
         function setUpperBodyAnimation(name) {
             // Prevent rapid animation changes
             const now = Date.now();
-            if (now - lastAnimationChange < 300) {
+            if (now - lastAnimationChange < animationChangeMinDelay) { // Use variable for min delay
+                updateDebug(`Ignoring animation change: too soon (${name})`);
                 return; // Ignore if we just changed animations
             }
-            lastAnimationChange = now;
             
             updateDebug(`Setting upper body anim: ${name}`);
             
@@ -711,8 +713,12 @@
             
             // If already playing this animation, don't restart it
             if (currentUpperBodyAnimation === name && currentUpperBodyAction) {
+                updateDebug(`Already playing ${name}, not restarting`);
                 return;
             }
+            
+            // Set animation transitioning flag
+            isAnimationTransitioning = true;
             
             // Fade out current animation
             if (currentUpperBodyAction) {
@@ -727,14 +733,29 @@
             
             currentUpperBodyAction = action;
             currentUpperBodyAnimation = name;
+            lastAnimationChange = now;
+            
+            // Clear transition flag after transition completes
+            clearTimeout(animationTransitionTimeout);
+            animationTransitionTimeout = setTimeout(() => {
+                isAnimationTransitioning = false;
+                updateDebug(`Animation transition complete: ${name}`);
+            }, animationTransitionTime * 1000);
         }
         
         // Function to set lower body animation
         function setLowerBodyAnimation(name) {
             // Prevent rapid animation changes
             const now = Date.now();
-            if (now - lastAnimationChange < 300) {
+            if (now - lastAnimationChange < animationChangeMinDelay) { // Use variable for min delay
+                updateDebug(`Ignoring lower body animation change: too soon (${name})`);
                 return; // Ignore if we just changed animations
+            }
+            
+            // Don't change animations if we're in the middle of a transition
+            if (isAnimationTransitioning) {
+                updateDebug(`Ignoring animation during transition: ${name}`);
+                return;
             }
             
             updateDebug(`Setting lower body anim: ${name}`);
@@ -746,8 +767,12 @@
             
             // If already playing this animation, don't restart it
             if (currentLowerBodyAnimation === name && currentLowerBodyAction) {
+                updateDebug(`Already playing ${name}, not restarting`);
                 return;
             }
+            
+            // Set animation transitioning flag
+            isAnimationTransitioning = true;
             
             // Fade out current animation
             if (currentLowerBodyAction) {
@@ -762,39 +787,14 @@
             
             currentLowerBodyAction = action;
             currentLowerBodyAnimation = name;
-        }
-        
-        // Function to update animations based on balance direction
-        function updateAnimationsForBalance(direction, intensity) {
-            // Use stumble for lower body when imbalanced
-            if (direction !== "center") {
-                // If moving, use stumble_lowerbody, otherwise use default animation
-                if (isMoving && !currentLowerBodyAnimation.startsWith('stumble')) {
-                    setLowerBodyAnimation('stumble_lowerbody');
-                }
-                
-                // Apply a tilt to the entire character
-                if (characterTilt) {
-                    // Calculate tilt angle based on intensity but with reduced maximum tilt
-                    // Max tilt reduced from 0.5 to 0.3 radians (about 17 degrees instead of 29 degrees)
-                    const tiltAmount = Math.min(0.3, Math.max(0, (intensity - 0.3) * 1.5 + 0.1));
-                    const tiltAngle = (direction === 'left' ? -1 : 1) * tiltAmount;
-                    
-                    // Apply tilt with smooth transition
-                    gsapTilt(tiltAngle);
-                }
-            } else {
-                // Return to normal walking and no tilt
-                if (isMoving && currentLowerBodyAnimation.startsWith('stumble')) {
-                    setLowerBodyAnimation('walk');
-                } else if (!isMoving && currentLowerBodyAnimation.startsWith('stumble')) {
-                    setLowerBodyAnimation('idle');
-                }
-                
-                if (characterTilt) {
-                    gsapTilt(0);
-                }
-            }
+            lastAnimationChange = now;
+            
+            // Clear transition flag after transition completes
+            clearTimeout(animationTransitionTimeout);
+            animationTransitionTimeout = setTimeout(() => {
+                isAnimationTransitioning = false;
+                updateDebug(`Animation transition complete: ${name}`);
+            }, animationTransitionTime * 1000);
         }
         
         // Function to animate tilt smoothly using GSAP-like approach
@@ -804,8 +804,15 @@
             // Current angle
             const currentAngle = characterTilt.rotation.z;
             
-            // Animation duration (in frames)
-            const duration = 30;
+            // If angles are very close, don't bother animating
+            if (Math.abs(targetAngle - currentAngle) < 0.01) {
+                return;
+            }
+            
+            updateDebug(`Tilting character from ${currentAngle.toFixed(2)} to ${targetAngle.toFixed(2)}`);
+            
+            // Animation duration (in frames) - increased for smoother transition
+            const duration = 60; // doubled from 30
             
             // Amount to change per frame
             const angleStep = (targetAngle - currentAngle) / duration;
@@ -949,10 +956,27 @@
                 } else {
                     newWeightClass = "heavy";
                 }
+                
+                // Enable balance system when carrying bags
+                if (!balanceEnabled) {
+                    balanceEnabled = true;
+                    updateDebug("Balance system enabled - carrying bags");
+                }
+            } else {
+                // Disable balance system when not carrying bags
+                if (balanceEnabled) {
+                    balanceEnabled = false;
+                    updateDebug("Balance system disabled - no bags");
+                    
+                    // Reset any tilt when bags are dropped
+                    if (characterTilt) {
+                        gsapTilt(0);
+                    }
+                }
             }
             
             // Update weight class display
-            weightClassEl.textContent = newWeightClass.charAt(0).toUpperCase() + newWeightClass.slice(1);
+            if (weightClassEl) weightClassEl.textContent = newWeightClass.charAt(0).toUpperCase() + newWeightClass.slice(1);
             
             // If weight class changed, update the animation
             if (newWeightClass !== carryWeightClass) {
@@ -969,8 +993,8 @@
                     if (carryWeightClass !== "none") {
                         setUpperBodyAnimation(`${baseAnimName}_${carryWeightClass}`);
                     } else {
-                        // If no bags, go back to walk
-                        setUpperBodyAnimation('walk');
+                        // If no bags, go back to walk or idle depending on movement
+                        setUpperBodyAnimation(isMoving ? 'walk' : 'idle');
                     }
                 } else if (attachedBags.length > 0) {
                     // If we picked up our first bag, switch to carry animation
@@ -1029,19 +1053,27 @@
             let newDirection = "center";
             let intensity = 0;
             
+            // If not carrying bags, always stay balanced
+            if (attachedBags.length === 0) {
+                indicator.style.background = '#ffffff'; // White for safe
+                balanceDirectionEl.textContent = "Balanced";
+                balanceDirectionEl.style.color = '#ffffff';
+                return;
+            }
+            
             // Apply weight-based balance adjustments
             // The more bags the player carries, the more sensitive their balance becomes
             let weightFactor = 1.0;
             if (totalBagWeight > 0) {
-                // Each kg makes balance 10% more sensitive (range shifts inward)
-                weightFactor = 1.0 + (totalBagWeight * 0.1);
+                // Each kg makes balance 8% more sensitive (reduced from 10%)
+                weightFactor = 1.0 + (totalBagWeight * 0.08);
             }
             
             // Adjust thresholds based on weight
-            const leftSevereThreshold = 0.2 * weightFactor;
-            const leftModerateThreshold = 0.3 * weightFactor;
-            const rightModerateThreshold = 0.7 / weightFactor;
-            const rightSevereThreshold = 0.8 / weightFactor;
+            const leftSevereThreshold = 0.3 * weightFactor; // Increased from 0.2
+            const leftModerateThreshold = 0.4 * weightFactor; // Increased from 0.3
+            const rightModerateThreshold = 0.6 / weightFactor; // Changed from 0.7
+            const rightSevereThreshold = 0.7 / weightFactor; // Changed from 0.8
             
             if (value < leftSevereThreshold) {
                 // Left imbalance (severe)
@@ -1049,7 +1081,7 @@
                 balanceDirectionEl.textContent = "Severe Left Imbalance";
                 balanceDirectionEl.style.color = '#ff4444';
                 newDirection = "left";
-                intensity = 0.5 - value; // 0.3 to 0.5 range
+                intensity = 0.4 - value; // Reduced range
             } else if (value < leftModerateThreshold) {
                 // Left imbalance (moderate)
                 indicator.style.background = '#ffaa44'; // Orange for warning
@@ -1063,14 +1095,14 @@
                 balanceDirectionEl.textContent = "Severe Right Imbalance";
                 balanceDirectionEl.style.color = '#ff4444';
                 newDirection = "right";
-                intensity = value - 0.5; // 0.3 to 0.5 range
+                intensity = value - 0.5; // Reduced range
             } else if (value > rightModerateThreshold) {
                 // Right imbalance (moderate)
                 indicator.style.background = '#ffaa44'; // Orange for warning
                 balanceDirectionEl.textContent = "Right Imbalance";
                 balanceDirectionEl.style.color = '#ffaa44';
                 newDirection = "right";
-                intensity = value - 0.7; // 0 to 0.3 range
+                intensity = value - 0.6; // Reduced range
             } else {
                 // Balanced
                 indicator.style.background = '#ffffff'; // White for safe
@@ -1086,9 +1118,42 @@
             }
             
             // Apply animation based on balance if enabled
-            if (balanceEnabled && (newDirection !== currentBalanceDirection || Math.abs(intensity) > 0.05)) {
+            if (balanceEnabled && newDirection !== currentBalanceDirection) {
                 updateAnimationsForBalance(newDirection, intensity);
                 currentBalanceDirection = newDirection;
+            }
+        }
+        
+        // Function to update animations based on balance direction
+        function updateAnimationsForBalance(direction, intensity) {
+            // Use stumble for lower body when imbalanced
+            if (direction !== "center") {
+                // If moving, use stumble_lowerbody, otherwise use default animation
+                if (isMoving && !currentLowerBodyAnimation.startsWith('stumble')) {
+                    setLowerBodyAnimation('stumble_lowerbody');
+                }
+                
+                // Apply a tilt to the entire character
+                if (characterTilt) {
+                    // Calculate tilt angle based on intensity but with reduced maximum tilt
+                    // Max tilt reduced from 0.5 to 0.3 radians (about 17 degrees instead of 29 degrees)
+                    const tiltAmount = Math.min(0.2, Math.max(0, (intensity - 0.2) * 1.0 + 0.05));
+                    const tiltAngle = (direction === 'left' ? -1 : 1) * tiltAmount;
+                    
+                    // Apply tilt with smooth transition
+                    gsapTilt(tiltAngle);
+                }
+            } else {
+                // Return to normal walking and no tilt
+                if (isMoving && currentLowerBodyAnimation.startsWith('stumble')) {
+                    setLowerBodyAnimation('walk');
+                } else if (!isMoving && currentLowerBodyAnimation.startsWith('stumble')) {
+                    setLowerBodyAnimation('idle');
+                }
+                
+                if (characterTilt) {
+                    gsapTilt(0);
+                }
             }
         }
         
@@ -1198,26 +1263,27 @@
         
         // Function to update the balance system based on movement and turning
         function updateMovementBasedBalance() {
-            if (!balanceEnabled) return;
+            // Only apply balance effects when carrying bags
+            if (!balanceEnabled || attachedBags.length === 0) return;
             
             // Calculate balance shifts based on movement and turning
             let balanceShift = 0;
             
-            // Movement speed affects balance
-            balanceShift += movementAcceleration * 0.3; // Reduced from 0.5 to make it less sensitive
+            // Movement speed affects balance - reduced sensitivity
+            balanceShift += movementAcceleration * 0.15; // Reduced from 0.3
             
-            // Turning affects balance
-            if (Math.abs(targetRotation - characterTilt.rotation.y) > 0.05) {
+            // Turning affects balance - reduced sensitivity
+            if (Math.abs(targetRotation - characterTilt.rotation.y) > 0.1) { // Increased threshold from 0.05 to 0.1
                 const turnDirection = ((targetRotation - characterTilt.rotation.y) + Math.PI) % (Math.PI * 2) - Math.PI;
-                balanceShift += turnDirection * 0.01; // Reduced from 0.02 to make it less sensitive
+                balanceShift += turnDirection * 0.005; // Reduced from 0.01
             }
             
             // Carrying weight makes balance harder
-            const carryFactor = 1 + (totalBagWeight * 0.03); // Reduced from 0.05
+            const carryFactor = 1 + (totalBagWeight * 0.02); // Reduced from 0.03
             balanceShift *= carryFactor;
             
-            // Apply changes to balance value with smoothing
-            balanceValue = Math.max(0, Math.min(1, balanceValue + balanceShift));
+            // Apply changes to balance value with smoothing and reduced rate of change
+            balanceValue = Math.max(0, Math.min(1, balanceValue + (balanceShift * 0.5))); // Added 0.5 multiplier to slow changes
             
             // Update the UI
             document.getElementById('balanceSlider').value = balanceValue * 100;
@@ -1253,7 +1319,7 @@
         function updateCharacterMovement(delta) {
             if (!characterTilt) return;
             
-            // Reset movement flag
+            // Store previous movement state to detect changes
             const wasMoving = isMoving;
             isMoving = false;
             
@@ -1263,8 +1329,13 @@
             
             // Process joystick input if active
             if (joystickActive) {
-                inputX = joystickDirection.x;
-                inputZ = joystickDirection.y;
+                // Add a small deadzone to prevent tiny movements
+                if (Math.abs(joystickDirection.x) > 0.15) {
+                    inputX = joystickDirection.x;
+                }
+                if (Math.abs(joystickDirection.y) > 0.15) {
+                    inputZ = joystickDirection.y;
+                }
             } 
             // Otherwise process keyboard input
             else {
@@ -1309,7 +1380,7 @@
                 // Calculate movement speed with acceleration/deceleration
                 const targetSpeed = maxMovementSpeed * Math.sqrt(inputX*inputX + inputZ*inputZ);
                 const speedDiff = targetSpeed - movementAcceleration;
-                movementAcceleration += speedDiff * 0.1;
+                movementAcceleration += speedDiff * 0.08; // Reduced from 0.1 for smoother acceleration
                 
                 // Calculate movement vector based on character's forward direction
                 moveDirection.set(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
@@ -1318,22 +1389,22 @@
                 // Update character position
                 characterTilt.position.add(moveDirection);
                 
-                // Update animations based on movement state change
-                if (!wasMoving || currentUpperBodyAnimation === 'idle') {
+                // Update animations based on movement state change - ONLY if state actually changed
+                if (!wasMoving && !lastMovementState) {
                     // Just started moving
+                    updateDebug("State change: idle → moving");
                     if (attachedBags.length > 0) {
                         setUpperBodyAnimation(`carry_${carryWeightClass}`);
                     } else {
                         setUpperBodyAnimation('walk');
                     }
-                }
-                
-                if (!wasMoving || currentLowerBodyAnimation === 'idle') {
+                    
                     if (currentBalanceDirection === "center") {
                         setLowerBodyAnimation('walk');
                     } else {
                         setLowerBodyAnimation('stumble_lowerbody');
                     }
+                    lastMovementState = true;
                 }
             } else {
                 // Character is not moving, slow down gradually
@@ -1342,9 +1413,10 @@
                     movementAcceleration = 0;
                 }
                 
-                // Update animations for idle state only if we were previously moving
-                if (wasMoving) {
+                // Update animations for idle state ONLY if we were previously moving
+                if (wasMoving && lastMovementState) {
                     // Just stopped moving
+                    updateDebug("State change: moving → idle");
                     if (!currentUpperBodyAnimation.startsWith('pickup')) {
                         if (attachedBags.length > 0) {
                             setUpperBodyAnimation(`carry_${carryWeightClass}`);
@@ -1356,6 +1428,7 @@
                     if (!currentLowerBodyAnimation.startsWith('stumble') && currentLowerBodyAnimation !== 'idle') {
                         setLowerBodyAnimation('idle');
                     }
+                    lastMovementState = false;
                 }
             }
             
@@ -1545,8 +1618,14 @@
         // Initialize controls when everything is loaded
         window.addEventListener('load', function() {
             setupJoystickControls();
-            document.getElementById('toggleBalance').textContent = 'Disable Balance Effect';
+            // Start with balance system disabled
+            document.getElementById('toggleBalance').textContent = 'Enable Balance Effect';
             document.getElementById('helpOverlay').style.display = 'block'; // Show help on start
+            
+            // Set initial balance to center
+            balanceValue = 0.5;
+            document.getElementById('balanceSlider').value = 50;
+            updateBalanceSystem(balanceValue);
             
             // Add a simple debug message
             updateDebug('Game loaded successfully');
@@ -1617,12 +1696,14 @@
         function attemptPickupInteraction() {
             // Don't allow pickups during pickup animations
             if (currentUpperBodyAnimation.startsWith('pickup')) {
+                updateDebug("Cannot pickup: already in pickup animation");
                 return false;
             }
             
             const bagInView = findInteractableBagInViewDirection();
             
             if (bagInView) {
+                updateDebug(`Found bag to pick up: ${bagInView.isGroundBag ? 'ground' : 'car'} bag`);
                 if (bagInView.isGroundBag) {
                     // Ground pickup
                     setUpperBodyAnimation('pickup_low');
@@ -1647,6 +1728,8 @@
                     }, 500);
                 }
                 return true;
+            } else {
+                updateDebug("No bag found to pick up");
             }
             
             return false;
@@ -1661,7 +1744,7 @@
             const now = new Date().toLocaleTimeString();
             debugEl.innerHTML = `[${now}] ${message}<br>` + debugEl.innerHTML.split('<br>').slice(0, 10).join('<br>');
         }
-        
+
         // Add keyboard shortcut to toggle development UI
         document.addEventListener('keydown', function(e) {
             // Press D key to toggle development controls
