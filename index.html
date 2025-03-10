@@ -351,8 +351,8 @@
     <div id="helpOverlay">
         <h2>Controls</h2>
         <p><strong>Touch Controls:</strong> Left joystick to move, right joystick to rotate, button to pick up bags</p>
-        <p><strong>Keyboard/Mouse:</strong> WASD or arrows to move, mouse to rotate, E or SPACE to pick up, Q or R to drop</p>
-        <p><strong>Balance:</strong> Moving quickly affects balance when carrying bags</p>
+        <p><strong>Keyboard/Mouse:</strong> WASD or arrows to move, mouse to rotate, SPACE to pick up, R to drop</p>
+        <p><strong>Balance:</strong> Use Q and E keys to control balance when carrying bags</p>
         <p><strong>Tips:</strong> Get close to bags to pick them up. Ground bags use right hand, car bags use left hand.</p>
         <button id="closeHelpBtn">Got it!</button>
     </div>
@@ -1123,18 +1123,26 @@
                 console.log("Tree model loaded for forest boundary");
                 const treeModel = gltf.scene;
                 
-                // Enable shadows on tree
+                // Enable shadows on tree and ensure visibility
                 treeModel.traverse(node => {
                     if (node.isMesh) {
                         node.castShadow = true;
                         node.receiveShadow = true;
+                        node.visible = true;
                         
                         // Improve tree materials
                         if (node.material) {
                             // Clone material to avoid shared material issues
                             node.material = node.material.clone();
                             node.material.roughness = 0.8;
+                            node.material.transparent = false;
+                            node.material.opacity = 1.0;
+                            node.material.depthWrite = true;
+                            node.material.depthTest = true;
+                            node.material.side = THREE.DoubleSide;
                             node.material.needsUpdate = true;
+                            
+                            console.log(`Set material properties for tree mesh: ${node.name}`);
                         }
                     }
                 });
@@ -1255,11 +1263,12 @@
                 console.log("Rock model loaded for boundary");
                 const rockModel = gltf.scene;
                 
-                // Enable shadows on rocks
+                // Enable shadows on rocks and ensure visibility
                 rockModel.traverse(node => {
                     if (node.isMesh) {
                         node.castShadow = true;
                         node.receiveShadow = true;
+                        node.visible = true;
                         
                         // Improve rock materials
                         if (node.material) {
@@ -1267,7 +1276,14 @@
                             node.material = node.material.clone();
                             node.material.roughness = 0.9;
                             node.material.metalness = 0.1;
+                            node.material.transparent = false;
+                            node.material.opacity = 1.0;
+                            node.material.depthWrite = true;
+                            node.material.depthTest = true;
+                            node.material.side = THREE.DoubleSide;
                             node.material.needsUpdate = true;
+                            
+                            console.log(`Set material properties for rock mesh: ${node.name}`);
                         }
                     }
                 });
@@ -1341,117 +1357,101 @@
         
         // Function to create procedural mountain barrier around the edge of the map
         function createMountainBarrier() {
-            console.log("Creating procedural mountain barrier...");
+            console.log("Creating mountain barrier using large scaled rocks...");
             
-            // Create procedural mountains that encircle the play area
-            const numSegments = 12; // Divide the circle into segments
-            const barrierRadius = 65; // Outside the rock boundary
-            
-            for (let i = 0; i < numSegments; i++) {
-                // Calculate the start and end angles for this segment
-                const startAngle = (i / numSegments) * Math.PI * 2;
-                const endAngle = ((i + 1) / numSegments) * Math.PI * 2;
+            // Use the rocks.glb model instead of procedural mountains
+            loader.load('./rocks.glb', (gltf) => {
+                console.log("Rock model loaded for mountain boundary");
+                const rockModel = gltf.scene;
                 
-                // Skip a segment to create an entrance/exit path
-                if (i === 9) continue; // Skip a segment at a specific location
-                
-                // Create mountain segment geometry
-                // Use a custom geometry instead of primitives
-                const mountainGeometry = new THREE.BufferGeometry();
-                
-                // Create mountain profile with multiple peaks and valleys
-                const vertices = [];
-                const indices = [];
-                const uvs = [];
-                
-                // Resolution parameters
-                const radialSegments = 10; // Segments from inner to outer edge
-                const heightSegments = 20; // Segments along the arc
-                
-                // Create vertices for the mountain segment
-                for (let r = 0; r <= radialSegments; r++) {
-                    const radiusFactor = r / radialSegments;
-                    const radius = barrierRadius + radiusFactor * 15; // Thickness of the mountain
-                    
-                    for (let h = 0; h <= heightSegments; h++) {
-                        const angle = startAngle + (h / heightSegments) * (endAngle - startAngle);
-                        const x = Math.cos(angle) * radius;
-                        const z = Math.sin(angle) * radius;
+                // Enable shadows on rocks and ensure visibility
+                rockModel.traverse(node => {
+                    if (node.isMesh) {
+                        node.castShadow = true;
+                        node.receiveShadow = true;
+                        node.visible = true;
                         
-                        // Create mountain height based on noise and position
-                        const angleNoise = Math.sin(angle * 5) * Math.cos(angle * 3);
-                        const radiusNoise = Math.sin(radius * 0.1) * Math.cos(radius * 0.05);
-                        
-                        // Height is highest in the middle of the radial segments
-                        let height = 0;
-                        if (r > 0) { // Keep inner edge at ground level
-                            // Profile that rises and then falls
-                            const peakFactor = 4 * radiusFactor * (1 - radiusFactor);
-                            height = 30 * peakFactor; // Base height
-                            
-                            // Add noise for natural look
-                            height += (angleNoise + radiusNoise) * 5;
-                            
-                            // Add peaks
-                            if (Math.random() > 0.95 && r > radialSegments * 0.3 && r < radialSegments * 0.8) {
-                                height += Math.random() * 10;
-                            }
+                        // Improve rock materials
+                        if (node.material) {
+                            // Clone material to avoid shared material issues
+                            node.material = node.material.clone();
+                            node.material.roughness = 0.9;
+                            node.material.metalness = 0.1;
+                            node.material.transparent = false;
+                            node.material.opacity = 1.0;
+                            node.material.depthWrite = true;
+                            node.material.depthTest = true;
+                            node.material.needsUpdate = true;
+                            console.log(`Set material properties for mountain rock mesh`);
                         }
-                        
-                        // Add vertex
-                        vertices.push(x, height, z);
-                        
-                        // Simple UVs for texturing
-                        uvs.push(r / radialSegments, h / heightSegments);
                     }
-                }
-                
-                // Create faces using indices
-                for (let r = 0; r < radialSegments; r++) {
-                    const row1 = r * (heightSegments + 1);
-                    const row2 = (r + 1) * (heightSegments + 1);
-                    
-                    for (let h = 0; h < heightSegments; h++) {
-                        // Triangle 1
-                        indices.push(row1 + h, row2 + h, row1 + h + 1);
-                        
-                        // Triangle 2
-                        indices.push(row1 + h + 1, row2 + h, row2 + h + 1);
-                    }
-                }
-                
-                // Create buffers for the geometry
-                const positionBuffer = new Float32Array(vertices);
-                const indexBuffer = new Uint32Array(indices);
-                const uvBuffer = new Float32Array(uvs);
-                
-                // Set the attributes for the geometry
-                mountainGeometry.setAttribute('position', new THREE.BufferAttribute(positionBuffer, 3));
-                mountainGeometry.setAttribute('uv', new THREE.BufferAttribute(uvBuffer, 2));
-                mountainGeometry.setIndex(new THREE.BufferAttribute(indexBuffer, 1));
-                
-                // Compute normals for proper lighting
-                mountainGeometry.computeVertexNormals();
-                
-                // Create mountain material with realistic texture
-                const mountainMaterial = new THREE.MeshStandardMaterial({
-                    color: 0x6b7d6d,
-                    roughness: 0.9,
-                    metalness: 0.1,
-                    side: THREE.DoubleSide
                 });
                 
-                // Create mesh and add to scene
-                const mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
-                mountain.castShadow = true;
-                mountain.receiveShadow = true;
+                // Create large rock formations in a circular pattern
+                const numSegments = 12;
+                const barrierRadius = 65; // Outside the rock boundary
                 
-                // Add the mountain to the scene
-                scene.add(mountain);
-                console.log(`Added mountain segment ${i} with ${vertices.length / 3} vertices and ${indices.length / 3} triangles`);
-            }
-            
-            console.log("Mountain barrier created successfully");
+                for (let i = 0; i < numSegments; i++) {
+                    // Skip index 9 to create a gap for the entrance/exit
+                    if (i === 9) continue;
+                    
+                    const angle = (i / numSegments) * Math.PI * 2;
+                    const radius = barrierRadius + (Math.random() * 5 - 2.5);
+                    
+                    const x = Math.cos(angle) * radius;
+                    const z = Math.sin(angle) * radius;
+                    
+                    // Create a large rock "mountain"
+                    const mountainRock = rockModel.clone();
+                    
+                    // Scale it up significantly to create a mountain-like effect
+                    const baseScale = 8.0 + Math.random() * 4.0; // Much larger scale
+                    mountainRock.scale.set(
+                        baseScale * (0.8 + Math.random() * 0.4),
+                        baseScale * (1.0 + Math.random() * 0.6),
+                        baseScale * (0.8 + Math.random() * 0.4)
+                    );
+                    
+                    // Add some rotation for natural look
+                    mountainRock.rotation.y = Math.random() * Math.PI * 2;
+                    mountainRock.rotation.x = (Math.random() - 0.5) * 0.2;
+                    mountainRock.rotation.z = (Math.random() - 0.5) * 0.2;
+                    
+                    // Position the mountain rock
+                    mountainRock.position.set(x, -baseScale * 0.3, z); // Partially buried
+                    
+                    // Add to scene
+                    scene.add(mountainRock);
+                    console.log(`Added mountain rock at position: ${x.toFixed(2)}, ${mountainRock.position.y.toFixed(2)}, ${z.toFixed(2)} with scale: ${baseScale.toFixed(2)}`);
+                    
+                    // Add smaller rocks around the base of the mountain for more detail
+                    for (let j = 0; j < 3; j++) {
+                        const smallRock = rockModel.clone();
+                        const smallScale = baseScale * 0.3 * (0.8 + Math.random() * 0.4);
+                        smallRock.scale.set(smallScale, smallScale, smallScale);
+                        smallRock.rotation.y = Math.random() * Math.PI * 2;
+                        
+                        // Position near the main mountain rock
+                        const offsetAngle = Math.random() * Math.PI * 2;
+                        const offsetRadius = baseScale * 0.6;
+                        const offsetX = Math.cos(offsetAngle) * offsetRadius;
+                        const offsetZ = Math.sin(offsetAngle) * offsetRadius;
+                        
+                        smallRock.position.set(x + offsetX, -smallScale * 0.2, z + offsetZ);
+                        scene.add(smallRock);
+                    }
+                }
+                
+                console.log("Mountain barrier created successfully using rock models");
+            },
+            // Progress handler
+            (xhr) => {
+                console.log(`Rock model for mountains ${(xhr.loaded / xhr.total * 100).toFixed(0)}% loaded`);
+            },
+            // Error handler
+            (error) => {
+                console.error('Error loading rock model for mountains:', error);
+            });
         }
         
         // Call the functions to create forest and mountains after all models are loaded
@@ -2531,8 +2531,9 @@
                 cameraForward.y = 0; // Keep movement on horizontal plane
                 cameraForward.normalize();
                 
-                // Right is perpendicular to forward in horizontal plane
+                // Calculate right vector correctly based on camera forward direction
                 cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraForward);
+                cameraRight.normalize();
                 
                 // Calculate movement direction relative to camera
                 moveDirection.set(0, 0, 0)
@@ -2613,6 +2614,9 @@
             
             updateDebug(`Forcing animation: ${name}`);
             
+            // Get the original animation name before modifications
+            const originalName = name;
+            
             // Check if we should use a carry animation based on weight class
             if (attachedBags.length > 0 && (name === 'walk' || name === 'idle' || name === 'run')) {
                 // For carrying, use the special format
@@ -2656,6 +2660,22 @@
             currentUpperBodyAction = action;
             currentUpperBodyAnimation = name;
             lastAnimationChange = Date.now();
+            
+            // Also update lower body animation when appropriate
+            // For regular walk/idle animations or for carry animations
+            if (originalName === 'walk' || originalName === 'idle' || originalName === 'run') {
+                // Use the original name for lower body when not carrying
+                setLowerBodyAnimation(originalName);
+                updateDebug(`Also setting lower body animation to: ${originalName}`);
+            } else if (name.startsWith('carry_')) {
+                // For carry animations, extract the base animation (walk/idle/run)
+                const baseParts = name.split('_');
+                if (baseParts.length >= 2) {
+                    const lowerAnim = baseParts[1]; // 'walk', 'idle', etc.
+                    setLowerBodyAnimation(lowerAnim);
+                    updateDebug(`Setting lower body animation for carry to: ${lowerAnim}`);
+                }
+            }
             
             // Clear transition flag after transition completes
             clearTimeout(animationTransitionTimeout);
@@ -3057,13 +3077,13 @@
         window.addEventListener('keydown', function(e) {
             keysPressed[e.key.toLowerCase()] = true;
             
-            // Space or E = interact/pickup
-            if (e.key === ' ' || e.key.toLowerCase() === 'e') {
+            // Space = interact/pickup (E is now used for balance)
+            if (e.key === ' ') {
                 attemptPickupInteraction();
             }
             
-            // Q or R = drop bag
-            if (e.key.toLowerCase() === 'q' || e.key.toLowerCase() === 'r') {
+            // R = drop bag (Q is now used for balance)
+            if (e.key.toLowerCase() === 'r') {
                 detachBag();
             }
             
@@ -3195,22 +3215,25 @@
             // Get horizontal input from mouse/joystick for balance
             let horizontalInput = 0;
             
-            // Mouse input takes priority if available
-            if (lastMouseMoveX !== 0) {
-                // Increased sensitivity for more responsive balance control
-                horizontalInput = lastMouseMoveX * 0.05; // Increased from 0.02 for better control
-            } 
-            // Joystick rotation is another source of input
+            // Use dedicated keyboard controls for balance (Q and E keys)
+            if (keysPressed['q']) {
+                // Q key - lean left
+                horizontalInput = -1.0;
+            } else if (keysPressed['e']) {
+                // E key - lean right
+                horizontalInput = 1.0;
+            }
+            // Joystick rotation is another source of input if keyboard isn't being used
             else if (rotationJoystickActive) {
                 // Increased sensitivity for more responsive balance control
-                horizontalInput = rotationJoystickDirection.x * 0.5; // Increased from 0.2 for better control
+                horizontalInput = rotationJoystickDirection.x * 0.5;
             }
             
             // Apply a balance change based on the horizontal input
             // This is completely independent from movement
             if (horizontalInput !== 0) {
-                // Moving mouse or joystick right tilts balance right, and vice versa
-                const balanceImpact = horizontalInput * 0.15; // Increased from 0.08 for more responsive control
+                // Moving joystick right or pressing E tilts balance right, and vice versa
+                const balanceImpact = horizontalInput * 0.15;
                 
                 // Apply the balance impact
                 balanceValue += balanceImpact;
@@ -3308,8 +3331,9 @@
                 cameraForward.y = 0; // Keep movement on horizontal plane
                 cameraForward.normalize();
                 
-                // Right is perpendicular to forward in horizontal plane
+                // Calculate right vector correctly based on camera forward direction
                 cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraForward);
+                cameraRight.normalize();
                 
                 // Calculate movement direction relative to camera
                 moveDirection.set(0, 0, 0)
@@ -3438,7 +3462,7 @@
                 if (isUsingTouch) {
                     helpText.textContent = "Touch Controls: Left joystick to move, right joystick to rotate, button to pick up bags";
                 } else {
-                    helpText.textContent = "Keyboard/Mouse: WASD or arrows to move, mouse to look around, E or SPACE to pick up, Q or R to drop";
+                    helpText.textContent = "Keyboard/Mouse: WASD or arrows to move, mouse to look around, SPACE to pick up, R to drop";
                 }
             }
             
@@ -4138,7 +4162,7 @@
         // Also activate balance control when carrying bags, regardless of mouse look
         document.addEventListener('keydown', function(e) {
             // When picking up a bag, activate mouse controls for balance
-            if (e.code === 'KeyE' || e.code === 'Space') {
+            if (e.code === 'Space') {
                 if (!mouseLookActive && balanceEnabled && attachedBags.length > 0) {
                     document.body.requestPointerLock = document.body.requestPointerLock || 
                                                      document.body.mozRequestPointerLock ||
