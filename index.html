@@ -322,8 +322,8 @@
             <div id="balanceIndicator"></div>
         </div>
         <div id="balanceDirection">Balanced</div>
-    </div>
-    
+        </div>
+        
     <div id="carryInfo">
         <div>Bags: <span id="bagCount">0</span></div>
         <div>Weight: <span id="totalWeight">0</span> kg</div>
@@ -411,7 +411,7 @@
         // Ground with enhanced visual quality
         const groundGeometry = new THREE.PlaneGeometry(200, 200, 50, 50); // Added more segments for detail
         const groundMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x2D4C31, // Updated to the specified color for better grass integration
+            color: 0x2D4C31, // Richer green color that matches the grass
             roughness: 0.8,
             metalness: 0.1,
         });
@@ -784,27 +784,10 @@
             { name: 'Rocks', file: './rocks.glb', position: [5, 0, -5], scale: 0.5, rotationY: 0 },
             { name: 'Leaves', file: './leaves.glb', position: [2, 0, 15], scale: 0.5, rotationY: 0 },
             
-            // Add grass around the character and car area - Increased scale values
-            { name: 'Grass Large 1', file: './grass_large1.glb', position: [-18, 0, -18], scale: 2.5, rotationY: Math.random() * Math.PI * 2 },
-            { name: 'Grass Large 2', file: './grass_large2.glb', position: [-10, 0, -25], scale: 2.8, rotationY: Math.random() * Math.PI * 2 },
-            { name: 'Grass Large 3', file: './grass_large3.glb', position: [-8, 0, -15], scale: 2.6, rotationY: Math.random() * Math.PI * 2 },
-            
-            // Add grass around the path - Increased scale values
-            { name: 'Grass Medium 1', file: './grass_medium1.glb', position: [-3, 0, -10], scale: 2.2, rotationY: Math.random() * Math.PI * 2 },
-            { name: 'Grass Medium 2', file: './grass_medium2.glb', position: [3, 0, -5], scale: 2.3, rotationY: Math.random() * Math.PI * 2 },
-            { name: 'Grass Medium 3', file: './grass_medium3.glb', position: [-4, 0, 5], scale: 2.4, rotationY: Math.random() * Math.PI * 2 },
-            
-            // Add grass near the house - Increased scale values
-            { name: 'Grass Small 1', file: './grass_small1.glb', position: [-5, 0, 20], scale: 2.0, rotationY: Math.random() * Math.PI * 2 },
-            { name: 'Grass Small 2', file: './grass_small2.glb', position: [5, 0, 22], scale: 1.8, rotationY: Math.random() * Math.PI * 2 },
-            { name: 'Grass Small 3', file: './grass_small3.glb', position: [2, 0, 25], scale: 1.9, rotationY: Math.random() * Math.PI * 2 },
-            
-            // Add more grass clusters for visual density - Increased scale values
-            { name: 'Grass Cluster 1', file: './grass_medium1.glb', position: [-15, 0, -5], scale: 2.2, rotationY: Math.random() * Math.PI * 2 },
-            { name: 'Grass Cluster 2', file: './grass_large1.glb', position: [12, 0, 0], scale: 2.6, rotationY: Math.random() * Math.PI * 2 },
-            { name: 'Grass Cluster 3', file: './grass_small2.glb', position: [8, 0, -15], scale: 2.0, rotationY: Math.random() * Math.PI * 2 },
-            { name: 'Grass Cluster 4', file: './grass_medium3.glb', position: [-7, 0, 15], scale: 2.2, rotationY: Math.random() * Math.PI * 2 },
-            { name: 'Grass Cluster 5', file: './grass_large3.glb', position: [15, 0, 18], scale: 2.7, rotationY: Math.random() * Math.PI * 2 }
+            // Load grass model templates (will be used for instancing)
+            { name: 'Grass Large Template', file: './grass_large1.glb', position: [1000, 0, 1000], scale: 1.0, rotationY: 0 }, // Positioned far away, just for loading
+            { name: 'Grass Medium Template', file: './grass_medium1.glb', position: [1000, 0, 1000], scale: 1.0, rotationY: 0 },
+            { name: 'Grass Small Template', file: './grass_small1.glb', position: [1000, 0, 1000], scale: 1.0, rotationY: 0 }
         ];
 
         // Animation variables
@@ -918,6 +901,11 @@
         let loadedCount = 0;
         let characterModel;
         
+        // Reference to grass templates for instancing
+        let grassLargeTemplate = null;
+        let grassMediumTemplate = null;
+        let grassSmallTemplate = null;
+        
         models.forEach(model => {
             // Create label for this model
             const labelMesh = createLabel(model.name, {
@@ -948,7 +936,20 @@
                         }
                     });
                     
-                    scene.add(modelObj);
+                    // Store grass templates for instancing
+                    if (model.name === 'Grass Large Template') {
+                        grassLargeTemplate = modelObj.clone();
+                        // Don't add the template to the scene
+                    } else if (model.name === 'Grass Medium Template') {
+                        grassMediumTemplate = modelObj.clone();
+                        // Don't add the template to the scene
+                    } else if (model.name === 'Grass Small Template') {
+                        grassSmallTemplate = modelObj.clone();
+                        // Don't add the template to the scene
+                    } else {
+                        // Add other models to the scene normally
+                        scene.add(modelObj);
+                    }
                     
                     // Store references to bags
                     if (model.name === 'Ground Bag 1') groundBag1 = modelObj;
@@ -1010,28 +1011,26 @@
                     
                     if (loadedCount === models.length) {
                         document.getElementById('info').textContent = 
-                            `All models loaded - Use controls to test animations and balance system`;
+                            `All models loaded - Generating environment...`;
                         
-                        // Once all models are loaded, set up collision detection
+                        // Once all models are loaded, set up collision detection and create grass
                         setupCollisionDetection();
                         
-                        // DISABLED: Instanced grass was causing the game to break
-                        // setTimeout(() => {
-                        //     createInstancedGrass();
-                        // }, 1000);
+                        // Create instanced grass after all models are loaded
+                        createInstancedGrass();
                     }
                 },
                 (xhr) => {
-                console.log(`${model.name} ${Math.round(xhr.loaded / xhr.total * 100)}% loaded`);
+                    console.log(`${model.name} ${Math.round(xhr.loaded / xhr.total * 100)}% loaded`);
                 },
                 (error) => {
-                console.error(`Error loading ${model.name}:`, error);
-                loadedCount++;
-                document.getElementById('info').textContent += 
-                    `\nError loading ${model.name}`;
-            }
-        );
-    });
+                    console.error(`Error loading ${model.name}:`, error);
+                    loadedCount++;
+                    document.getElementById('info').textContent += 
+                        `\nError loading ${model.name}`;
+                }
+            );
+        });
         
         // Set up animation mixing system
         function setupAnimationMixing(clipsList) {
@@ -1518,10 +1517,10 @@
                 if (attachedBags.length > 0) {
                     if (isMoving) {
                         forcedAnimationUpdate(`carry_walk_${carryWeightClass}`);
-                    } else {
+                } else {
                         forcedAnimationUpdate(`carry_stand_${carryWeightClass}`);
-                    }
                 }
+            }
             }
             
             // Update the balance UI to reflect current state
@@ -1683,7 +1682,7 @@
                 intensity = (value - rightModerateThreshold) / (rightSevereThreshold - rightModerateThreshold);
                 balanceDirectionEl.textContent = "Right Imbalance";
                 balanceDirectionEl.style.color = '#ff9900';
-            } else {
+                } else {
                 // Balanced
                 indicator.style.background = '#00ff00'; // Green
                 newDirection = "center";
@@ -1941,12 +1940,12 @@
             // Handle rotation based on input device
             if (isUsingTouch) {
                 // For touch devices, use the rotation joystick to rotate the character and camera together
-                if (rotationJoystickActive) {
-                    const rotationAmount = rotationJoystickDirection.x * touchRotationSensitivity;
-                    characterTilt.rotation.y += rotationAmount;
-                    
-                    // Update target rotation for balance system
-                    targetRotation = characterTilt.rotation.y;
+            if (rotationJoystickActive) {
+                const rotationAmount = rotationJoystickDirection.x * touchRotationSensitivity;
+                characterTilt.rotation.y += rotationAmount;
+                
+                // Update target rotation for balance system
+                targetRotation = characterTilt.rotation.y;
                     
                     // Update camera to follow character rotation
                     updateThirdPersonCamera();
@@ -2360,35 +2359,35 @@
                 });
             } else {
                 // Mobile-specific mouse events for testing on desktop
-                joystick.addEventListener('mousedown', function(e) {
+            joystick.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                joystickActive = true;
+                updateJoystickPosition(e.clientX, e.clientY);
+            });
+            
+            rotationJoystick.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                rotationJoystickActive = true;
+                updateRotationJoystickPosition(e.clientX, e.clientY);
+            });
+            
+            document.addEventListener('mousemove', function(e) {
+                if (joystickActive) {
                     e.preventDefault();
-                    joystickActive = true;
                     updateJoystickPosition(e.clientX, e.clientY);
-                });
-                
-                rotationJoystick.addEventListener('mousedown', function(e) {
+                }
+                if (rotationJoystickActive) {
                     e.preventDefault();
-                    rotationJoystickActive = true;
                     updateRotationJoystickPosition(e.clientX, e.clientY);
-                });
-                
-                document.addEventListener('mousemove', function(e) {
-                    if (joystickActive) {
-                        e.preventDefault();
-                        updateJoystickPosition(e.clientX, e.clientY);
-                    }
-                    if (rotationJoystickActive) {
-                        e.preventDefault();
-                        updateRotationJoystickPosition(e.clientX, e.clientY);
-                    }
-                });
-                
-                document.addEventListener('mouseup', function() {
-                    joystickActive = false;
-                    rotationJoystickActive = false;
-                    resetJoystick();
-                    resetRotationJoystick();
-                });
+                }
+            });
+            
+            document.addEventListener('mouseup', function() {
+                joystickActive = false;
+                rotationJoystickActive = false;
+                resetJoystick();
+                resetRotationJoystick();
+            });
             }
             
             // Mouse right-click for rotation - disabled for new control scheme
@@ -2398,10 +2397,10 @@
             
             // Interact button for pickups - use keyboard for desktop, touch for mobile
             if (isUsingTouch) {
-                interact.addEventListener('touchstart', function(e) {
-                    e.preventDefault();
-                    attemptPickupInteraction();
-                });
+            interact.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                attemptPickupInteraction();
+            });
             } else {
                 // For desktop, keyboard controls will handle pickups
                 // Hide the interact button
@@ -2936,12 +2935,12 @@
                 }
             }
         }
+
+        // Collision detection variables
+        let collisionObjects = [];
         
         // Function to set up collision detection
         function setupCollisionDetection() {
-            // Reset the collision objects array
-            collisionObjects = [];
-            
             // Add collision objects (house, car, environment objects)
             scene.traverse(function(object) {
                 // Add objects that should block movement to collision list
@@ -3092,244 +3091,130 @@
             if (balanceUI) balanceUI.style.display = 'none';
         }
 
-        // After all models are loaded, add instanced grass to fill the terrain
-        // DISABLED: This function was causing the game to break
-        /*
-        // DISABLED function createInstancedGrass() {
-            // First, we need to load the grass models to create the instance meshes
-            const grassTypes = [
-                { file: './grass_small1.glb', count: 500, scaleRange: [1.0, 1.5], heightOffset: 0.0 },
-                { file: './grass_small2.glb', count: 500, scaleRange: [1.0, 1.5], heightOffset: 0.0 },
-                { file: './grass_small3.glb', count: 500, scaleRange: [1.0, 1.5], heightOffset: 0.0 },
-                { file: './grass_medium1.glb', count: 400, scaleRange: [1.2, 1.8], heightOffset: 0.0 },
-                { file: './grass_medium2.glb', count: 400, scaleRange: [1.2, 1.8], heightOffset: 0.0 },
-                { file: './grass_medium3.glb', count: 400, scaleRange: [1.2, 1.8], heightOffset: 0.0 },
-                { file: './grass_large1.glb', count: 300, scaleRange: [1.5, 2.2], heightOffset: 0.0 },
-                { file: './grass_large2.glb', count: 300, scaleRange: [1.5, 2.2], heightOffset: 0.0 },
-                { file: './grass_large3.glb', count: 300, scaleRange: [1.5, 2.2], heightOffset: 0.0 }
-            ];
+        // Function to create instanced grass efficiently
+        function createInstancedGrass() {
+            if (!grassLargeTemplate || !grassMediumTemplate || !grassSmallTemplate) {
+                console.error("Grass templates not loaded properly");
+                return;
+            }
             
-            // Show loading message
-            document.getElementById('info').textContent = 'Creating instanced grass...';
-            
-            let loadedInstances = 0;
-            let instancedObjects = [];
-            
-            grassTypes.forEach(grassType => {
-                const loader = new THREE.GLTFLoader();
-                loader.load(grassType.file, (gltf) => {
-                    // Find the mesh in the loaded model
-                    let grassMesh = null;
-                    gltf.scene.traverse(child => {
-                        if (child.isMesh) {
-                            grassMesh = child;
-                            
-                            // Ensure materials cast and receive shadows
-                            child.castShadow = true;
-                            child.receiveShadow = true;
-                            
-                            // Make sure the material uses the right parameters
-                            if (child.material) {
-                                child.material.roughness = 0.8;
-                                child.material.metalness = 0.1;
-                                // Ensure the color is consistent
-                                if (grassType.file.includes('small')) {
-                                    child.material.color.setHex(0x2D4C31); // Slightly lighter
-                                } else if (grassType.file.includes('medium')) {
-                                    child.material.color.setHex(0x2A4730); // Medium shade
-                                } else {
-                                    child.material.color.setHex(0x274229); // Darker for large grass
-                                }
-                            }
-                        }
-                    });
-                    
-                    if (grassMesh) {
-                        // Create an instanced mesh
-                        const instancedMesh = new THREE.InstancedMesh(
-                            grassMesh.geometry,
-                            grassMesh.material,
-                            grassType.count
-                        );
-                        
-                        // Enable shadows for the instanced mesh
-                        instancedMesh.castShadow = true;
-                        instancedMesh.receiveShadow = true;
-                        
-                        // Create matrices for each instance
-                        const dummy = new THREE.Object3D();
-                        const groundSize = 95; // Slightly less than half of the ground plane size (200)
-                        const pathExclusionWidth = 3; // Don't place grass on the path
-                        
-                        // Create clusters of grass for more natural distribution
-                        const clusterCount = Math.floor(grassType.count / 10); // Create clusters of around 10 grass blades
-                        const clusterPositions = [];
-                        
-                        // Generate cluster center positions
-                        for (let c = 0; c < clusterCount; c++) {
-                            let x, z;
-                            let attempts = 0;
-                            let validPosition = false;
-                            
-                            while (!validPosition && attempts < 50) {
-                                x = (Math.random() * 2 - 1) * groundSize;
-                                z = (Math.random() * 2 - 1) * groundSize;
-                                
-                                // Check if position is valid (not on path, not near objects)
-                                if (Math.abs(x) < pathExclusionWidth && z > -30 && z < 30) {
-                                    attempts++;
-                                    continue;
-                                }
-                                
-                                // Check distance to important objects
-                                const distToCharacter = Math.sqrt(Math.pow(x - (-15), 2) + Math.pow(z - (-20), 2));
-                                const distToCar = Math.sqrt(Math.pow(x - (-5), 2) + Math.pow(z - (-20), 2));
-                                const distToHouse = Math.sqrt(Math.pow(x - 0, 2) + Math.pow(z - 30, 2));
-                                
-                                if (distToCharacter < 5 || distToCar < 5 || distToHouse < 10) {
-                                    attempts++;
-                                    continue;
-                                }
-                                
-                                // Check distance to other clusters for better distribution
-                                let tooClose = false;
-                                for (const pos of clusterPositions) {
-                                    const dist = Math.sqrt(Math.pow(x - pos.x, 2) + Math.pow(z - pos.z, 2));
-                                    if (dist < 8) { // Minimum distance between clusters
-                                        tooClose = true;
-                                        break;
-                                    }
-                                }
-                                
-                                if (tooClose) {
-                                    attempts++;
-                                    continue;
-                                }
-                                
-                                validPosition = true;
-                                clusterPositions.push({ x, z });
-                            }
-                            
-                            if (!validPosition) continue; // Skip this cluster if no valid position found
-                            
-                            // Create grass instances around this cluster center
-                            const grassPerCluster = Math.min(10, Math.floor(grassType.count / clusterCount));
-                            for (let g = 0; g < grassPerCluster; g++) {
-                                const index = c * grassPerCluster + g;
-                                if (index >= grassType.count) break;
-                                
-                                // Randomize position around cluster center
-                                const clusterRadius = 3 + Math.random() * 2; // 3-5 unit radius
-                                const angle = Math.random() * Math.PI * 2;
-                                const distance = Math.random() * clusterRadius;
-                                
-                                const posX = x + Math.cos(angle) * distance;
-                                const posZ = z + Math.sin(angle) * distance;
-                                
-                                // Set position
-                                dummy.position.set(
-                                    posX,
-                                    grassType.heightOffset + (Math.random() * 0.05), // Small height variation
-                                    posZ
-                                );
-                                
-                                // Random rotation
-                                dummy.rotation.y = Math.random() * Math.PI * 2;
-                                
-                                // Random scale within range, with slight variation
-                                const scale = grassType.scaleRange[0] + Math.random() * (grassType.scaleRange[1] - grassType.scaleRange[0]);
-                                const scaleVariation = 0.9 + Math.random() * 0.2; // 0.9-1.1 variation factor
-                                dummy.scale.set(
-                                    scale * scaleVariation,
-                                    scale * (0.95 + Math.random() * 0.1), // Height variation
-                                    scale * scaleVariation
-                                );
-                                
-                                // Apply matrix
-                                dummy.updateMatrix();
-                                instancedMesh.setMatrixAt(index, dummy.matrix);
-                            }
-                        }
-                        
-                        // Fill remaining instances if any
-                        const remainingCount = grassType.count - (clusterCount * Math.min(10, Math.floor(grassType.count / clusterCount)));
-                        if (remainingCount > 0) {
-                            const startIndex = grassType.count - remainingCount;
-                            
-                            for (let i = 0; i < remainingCount; i++) {
-                                let x, z;
-                                let attempts = 0;
-                                let validPosition = false;
-                                
-                                while (!validPosition && attempts < 20) {
-                                    x = (Math.random() * 2 - 1) * groundSize;
-                                    z = (Math.random() * 2 - 1) * groundSize;
-                                    
-                                    if (Math.abs(x) < pathExclusionWidth && z > -30 && z < 30) {
-                                        attempts++;
-                                        continue;
-                                    }
-                                    
-                                    const distToCharacter = Math.sqrt(Math.pow(x - (-15), 2) + Math.pow(z - (-20), 2));
-                                    const distToCar = Math.sqrt(Math.pow(x - (-5), 2) + Math.pow(z - (-20), 2));
-                                    const distToHouse = Math.sqrt(Math.pow(x - 0, 2) + Math.pow(z - 30, 2));
-                                    
-                                    if (distToCharacter < 5 || distToCar < 5 || distToHouse < 10) {
-                                        attempts++;
-                                        continue;
-                                    }
-                                    
-                                    validPosition = true;
-                                }
-                                
-                                if (!validPosition) continue; // Skip this instance if no valid position found
-                                
-                                // Set position
-                                dummy.position.set(
-                                    x,
-                                    grassType.heightOffset + (Math.random() * 0.05),
-                                    z
-                                );
-                                
-                                // Random rotation
-                                dummy.rotation.y = Math.random() * Math.PI * 2;
-                                
-                                // Random scale within range
-                                const scale = grassType.scaleRange[0] + Math.random() * (grassType.scaleRange[1] - grassType.scaleRange[0]);
-                                dummy.scale.set(scale, scale, scale);
-                                
-                                // Apply matrix
-                                dummy.updateMatrix();
-                                instancedMesh.setMatrixAt(startIndex + i, dummy.matrix);
-                            }
-                        }
-                        
-                        // Update the instance matrix
-                        instancedMesh.instanceMatrix.needsUpdate = true;
-                        
-                        // Add to scene
-                        scene.add(instancedMesh);
-                        instancedObjects.push(instancedMesh);
-                        
-                        // Update loaded count
-                        loadedInstances++;
-                        
-                        // Log progress
-                        console.log(`Loaded instanced grass ${loadedInstances}/${grassTypes.length}`);
-                        
-                        // When all are loaded, update loading message
-                        if (loadedInstances === grassTypes.length) {
-                            document.getElementById('info').textContent = 'Instanced grass added to scene!';
-                            setTimeout(() => {
-                                document.getElementById('info').textContent = '';
-                            }, 3000);
-                        }
+            // Extract the geometries and materials from templates - preserving original materials
+            const extractGeometryAndMaterial = (template) => {
+                let geo = null;
+                let mat = null;
+                
+                template.traverse(child => {
+                    if (child.isMesh && child.geometry && !geo) {
+                        geo = child.geometry.clone();
+                        // Preserve the original material with all its properties (texture, alpha, etc.)
+                        mat = child.material.clone();
                     }
                 });
-            });
+                
+                return { geometry: geo, material: mat };
+            };
             
-            // Return the array of instanced objects for future reference
-            return instancedObjects;
+            const largeGrassData = extractGeometryAndMaterial(grassLargeTemplate);
+            const mediumGrassData = extractGeometryAndMaterial(grassMediumTemplate);
+            const smallGrassData = extractGeometryAndMaterial(grassSmallTemplate);
+            
+            // Check if we have valid data
+            if (!largeGrassData.geometry || !mediumGrassData.geometry || !smallGrassData.geometry) {
+                console.error("Could not extract geometry from grass templates");
+                return;
+            }
+            
+            // Define the number of instances for each type (keep reasonable for performance)
+            const largeGrassCount = 150;   // Increased to 150
+            const mediumGrassCount = 250;  // Increased to 250
+            const smallGrassCount = 350;   // Increased to 350
+            
+            // Create instanced meshes
+            const createInstancedGrassMesh = (geometry, material, count, sizeFactor) => {
+                const instancedMesh = new THREE.InstancedMesh(
+                    geometry,
+                    material,
+                    count
+                );
+                
+                instancedMesh.castShadow = true;
+                instancedMesh.receiveShadow = true;
+                
+                // Set size and position for each instance
+                const dummy = new THREE.Object3D();
+                
+                for (let i = 0; i < count; i++) {
+                    // Generate random position within bounds
+                    // Keep away from the path area
+                    let x, z;
+                    let validPosition = false;
+                    
+                    while (!validPosition) {
+                        // Generate position within bounds of the ground
+                        x = Math.random() * 180 - 90; // -90 to 90
+                        z = Math.random() * 180 - 90; // -90 to 90
+                        
+                        // Avoid the path area (keep 5 units away from center line)
+                        validPosition = (Math.abs(x) > 5 || z < -25 || z > 25);
+                        
+                        // Avoid areas near the car, character, and house
+                        const carDistance = Math.sqrt(Math.pow(x - (-5), 2) + Math.pow(z - (-20), 2));
+                        const characterDistance = Math.sqrt(Math.pow(x - (-15), 2) + Math.pow(z - (-20), 2));
+                        const houseDistance = Math.sqrt(Math.pow(x - 0, 2) + Math.pow(z - 30, 2));
+                        
+                        validPosition = validPosition && carDistance > 8 && characterDistance > 8 && houseDistance > 10;
+                    }
+                    
+                    // Set position
+                    dummy.position.set(x, 0, z);
+                    
+                    // Random rotation
+                    dummy.rotation.y = Math.random() * Math.PI * 2;
+                    
+                    // Random scale variation for natural look (larger overall to make grass more visible)
+                    const scale = sizeFactor * (1.0 + Math.random() * 0.5);  // Increased base size
+                    dummy.scale.set(scale, scale, scale);
+                    
+                    // Apply to instanced mesh
+                    dummy.updateMatrix();
+                    instancedMesh.setMatrixAt(i, dummy.matrix);
+                }
+                
+                // Update the instance matrix
+                instancedMesh.instanceMatrix.needsUpdate = true;
+                
+                return instancedMesh;
+            };
+            
+            // Create each type of grass with appropriate sizing (increased overall size)
+            const largeGrassInstances = createInstancedGrassMesh(
+                largeGrassData.geometry, 
+                largeGrassData.material, 
+                largeGrassCount, 
+                2.0  // Increased from 1.2 to 2.0
+            );
+            
+            const mediumGrassInstances = createInstancedGrassMesh(
+                mediumGrassData.geometry, 
+                mediumGrassData.material, 
+                mediumGrassCount, 
+                1.6  // Increased from 0.9 to 1.6
+            );
+            
+            const smallGrassInstances = createInstancedGrassMesh(
+                smallGrassData.geometry, 
+                smallGrassData.material, 
+                smallGrassCount, 
+                1.2  // Increased from 0.7 to 1.2
+            );
+            
+            // Add instanced meshes to the scene
+            scene.add(largeGrassInstances);
+            scene.add(mediumGrassInstances);
+            scene.add(smallGrassInstances);
+            
+            console.log(`Created ${largeGrassCount + mediumGrassCount + smallGrassCount} grass instances`);
+            document.getElementById('info').textContent = `All models loaded - Ready to play!`;
         }
     </script>
 </body>
