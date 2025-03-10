@@ -442,6 +442,44 @@
             path.position.set(0, 0.02, 5); // Slightly above ground to prevent z-fighting
             path.receiveShadow = true;
             scene.add(path);
+            
+            // Add steps leading to the house
+            createPorchSteps();
+        }
+        
+        // Create porch steps leading to the house
+        function createPorchSteps() {
+            const stepWidth = 4;
+            const stepDepth = 0.8;
+            const stepMaterial = new THREE.MeshStandardMaterial({ color: 0xA0A0A0 });
+            
+            // Add three steps of increasing height
+            for (let i = 0; i < 3; i++) {
+                const stepHeight = 0.2 + (i * 0.2); // Increasing height for each step
+                const stepGeometry = new THREE.BoxGeometry(stepWidth, stepHeight, stepDepth);
+                const step = new THREE.Mesh(stepGeometry, stepMaterial);
+                
+                // Position each step - offset in z direction to line up with the house porch
+                const zPosition = 28 - (i * stepDepth);
+                step.position.set(0, stepHeight / 2, zPosition);
+                
+                step.castShadow = true;
+                step.receiveShadow = true;
+                
+                // Mark as a collidable object
+                step.userData.isCollider = true;
+                
+                scene.add(step);
+            }
+            
+            // Add a porch platform
+            const porchGeometry = new THREE.BoxGeometry(stepWidth, 0.8, 2);
+            const porch = new THREE.Mesh(porchGeometry, stepMaterial);
+            porch.position.set(0, 0.4, 25.5);
+            porch.castShadow = true;
+            porch.receiveShadow = true;
+            porch.userData.isCollider = true;
+            scene.add(porch);
         }
         createDriveway();
 
@@ -497,11 +535,11 @@
         let cameraMode = "thirdPerson"; // thirdPerson or orbit
         
         // Animation transition variables
-        let animationTransitionTime = 1.2; // Increased blend time between animations
+        let animationTransitionTime = 0.5; // Reduced from 1.2 for faster transitions
         let isAnimationTransitioning = false;
         let animationTransitionTimeout = null;
         let lastAnimationChange = 0;
-        let animationChangeMinDelay = 800; // Minimum ms between animation changes
+        let animationChangeMinDelay = 250; // Reduced from 800ms to make animations more responsive
         
         // Joystick variables
         let joystickActive = false;
@@ -667,6 +705,9 @@
                     if (loadedCount === models.length) {
                         document.getElementById('info').textContent = 
                             `All models loaded - Use controls to test animations and balance system`;
+                        
+                        // Once all models are loaded, set up collision detection
+                        setupCollisionDetection();
                     }
                     },
                     (xhr) => {
@@ -997,7 +1038,35 @@
             
             // Position relative to hand with offset
             bag.position.set(handOffset.x, handOffset.y, handOffset.z);
-            bag.rotation.set(0, 0, 0);
+            
+            // Adjust rotation to make bag appear natural in hand
+            if (isLeftHand) {
+                bag.rotation.set(0, Math.PI / 2, 0); // Adjust rotation for left hand
+            } else {
+                bag.rotation.set(0, -Math.PI / 2, 0); // Adjust rotation for right hand
+            }
+            
+            // Adjust scale if needed to make bags look right in hand
+            const handScale = 0.8; // Slightly smaller scale for held bags
+            bag.scale.set(
+                originalScale.x * handScale,
+                originalScale.y * handScale,
+                originalScale.z * handScale
+            );
+            
+            // Make sure bag is visible
+            bag.traverse(node => {
+                if (node.isMesh) {
+                    node.castShadow = true;
+                    node.receiveShadow = true;
+                    // Ensure materials are visible
+                    if (node.material) {
+                        node.material.transparent = false;
+                        node.material.opacity = 1.0;
+                        node.material.needsUpdate = true;
+                    }
+                }
+            });
             
             // Generate random weight between 1-5 kg
             const weight = Math.floor(Math.random() * 5) + 1;
@@ -1024,20 +1093,20 @@
             // Base position for the first bag
             if (bagCount === 0) {
                 return isLeftHand ? 
-                    { x: 0.2, y: 0, z: 0 } : 
-                    { x: -0.2, y: 0, z: 0 };
+                    { x: 0.4, y: 0.1, z: 0 } : // Left hand - moved further out
+                    { x: -0.4, y: 0.1, z: 0 }; // Right hand - moved further out
             }
             // Second bag position
             else if (bagCount === 1) {
                 return isLeftHand ? 
-                    { x: 0.2, y: 0, z: 0.2 } : 
-                    { x: -0.2, y: 0, z: 0.2 };
+                    { x: 0.3, y: 0.1, z: 0.3 } : // Left hand - second bag slightly above and behind
+                    { x: -0.3, y: 0.1, z: 0.3 }; // Right hand - second bag slightly above and behind
             }
             // Third bag position
             else {
                 return isLeftHand ? 
-                    { x: 0.2, y: 0.2, z: 0 } : 
-                    { x: -0.2, y: 0.2, z: 0 };
+                    { x: 0.3, y: 0.3, z: -0.1 } : // Left hand - third bag on top
+                    { x: -0.3, y: 0.3, z: -0.1 }; // Right hand - third bag on top
             }
         }
         
@@ -1068,6 +1137,14 @@
             // Calculate total weight
             totalBagWeight = attachedBags.reduce((total, bag) => total + bag.weight, 0);
             totalWeightEl.textContent = totalBagWeight + " kg";
+            
+            // Show/hide balance UI based on whether bags are being carried
+            const balanceUI = document.getElementById('balanceUI');
+            if (attachedBags.length > 0) {
+                if (balanceUI) balanceUI.style.display = 'block';
+            } else {
+                if (balanceUI) balanceUI.style.display = 'none';
+            }
             
             // Determine weight class based on total weight or bag count
             let newWeightClass = "none";
@@ -1157,6 +1234,47 @@
             console.log("Bag detached successfully");
         }
         
+        // Add camera shake variables
+        let cameraShakeActive = false;
+        let cameraShakeIntensity = 0;
+        let cameraShakeDecay = 0.9;
+        let cameraOriginalPosition = new THREE.Vector3();
+        
+        // Function to apply camera shake effect
+        function applyCameraShake() {
+            if (!thirdPersonCamera || !cameraShakeActive) return;
+            
+            // Store original position if not already stored
+            if (cameraOriginalPosition.length() === 0) {
+                cameraOriginalPosition.copy(thirdPersonCamera.position);
+            }
+            
+            // Apply random offset based on intensity
+            const shakeX = (Math.random() * 2 - 1) * cameraShakeIntensity;
+            const shakeY = (Math.random() * 2 - 1) * cameraShakeIntensity;
+            
+            // Apply shake to camera position
+            thirdPersonCamera.position.x = cameraOriginalPosition.x + shakeX;
+            thirdPersonCamera.position.y = cameraOriginalPosition.y + shakeY;
+            
+            // Reduce shake intensity over time
+            cameraShakeIntensity *= cameraShakeDecay;
+            
+            // Stop shaking when intensity gets too low
+            if (cameraShakeIntensity < 0.01) {
+                cameraShakeActive = false;
+                cameraShakeIntensity = 0;
+                cameraOriginalPosition.set(0, 0, 0);
+            }
+        }
+        
+        // Function to start camera shake with given intensity
+        function startCameraShake(intensity) {
+            cameraShakeIntensity = intensity;
+            cameraShakeActive = true;
+            cameraOriginalPosition.set(0, 0, 0); // Reset so it gets updated on next frame
+        }
+        
         // Function to update the balance system
         function updateBalanceSystem(value) {
             document.getElementById('balanceValue').textContent = value.toFixed(2);
@@ -1197,6 +1315,11 @@
                 balanceDirectionEl.style.color = '#ff4444';
                 newDirection = "left";
                 intensity = 0.4 - value; // Reduced range
+                
+                // Add camera shake for severe imbalance
+                if (intensity > 0.05 && !cameraShakeActive) {
+                    startCameraShake(Math.min(0.15, intensity * 0.5));
+                }
             } else if (value < leftModerateThreshold) {
                 // Left imbalance (moderate)
                 indicator.style.background = '#ffaa44'; // Orange for warning
@@ -1204,6 +1327,11 @@
                 balanceDirectionEl.style.color = '#ffaa44';
                 newDirection = "left";
                 intensity = 0.3 - value; // 0 to 0.3 range
+                
+                // Add slight camera shake for moderate imbalance
+                if (intensity > 0.05 && !cameraShakeActive) {
+                    startCameraShake(Math.min(0.08, intensity * 0.3));
+                }
             } else if (value > rightSevereThreshold) {
                 // Right imbalance (severe)
                 indicator.style.background = '#ff4444'; // Red for danger
@@ -1211,6 +1339,11 @@
                 balanceDirectionEl.style.color = '#ff4444';
                 newDirection = "right";
                 intensity = value - 0.5; // Reduced range
+                
+                // Add camera shake for severe imbalance
+                if (intensity > 0.05 && !cameraShakeActive) {
+                    startCameraShake(Math.min(0.15, intensity * 0.5));
+                }
             } else if (value > rightModerateThreshold) {
                 // Right imbalance (moderate)
                 indicator.style.background = '#ffaa44'; // Orange for warning
@@ -1218,7 +1351,12 @@
                 balanceDirectionEl.style.color = '#ffaa44';
                 newDirection = "right";
                 intensity = value - 0.6; // Reduced range
-                } else {
+                
+                // Add slight camera shake for moderate imbalance
+                if (intensity > 0.05 && !cameraShakeActive) {
+                    startCameraShake(Math.min(0.08, intensity * 0.3));
+                }
+            } else {
                 // Balanced
                 indicator.style.background = '#ffffff'; // White for safe
                 balanceDirectionEl.textContent = "Balanced";
@@ -1527,7 +1665,32 @@
                 moveDirection.normalize().multiplyScalar(movementAcceleration);
                 
                 // Update character position
-                characterTilt.position.add(moveDirection);
+                const oldPosition = characterTilt.position.clone();
+                const newPosition = oldPosition.clone().add(moveDirection);
+                
+                // Check for collisions before applying movement
+                if (!checkCollision(oldPosition, moveDirection)) {
+                    // No collision, move normally
+                    characterTilt.position.copy(newPosition);
+                    
+                    // Check if we need to handle step climbing
+                    handleStepClimbing(characterTilt.position, moveDirection);
+                } else {
+                    // Collision detected, try to slide along the obstacle
+                    updateDebug("Collision detected, attempting to slide");
+                    
+                    // Try moving only in X direction
+                    const xMovement = new THREE.Vector3(moveDirection.x, 0, 0);
+                    if (xMovement.length() > 0.01 && !checkCollision(oldPosition, xMovement)) {
+                        characterTilt.position.add(xMovement);
+                    }
+                    
+                    // Try moving only in Z direction
+                    const zMovement = new THREE.Vector3(0, 0, moveDirection.z);
+                    if (zMovement.length() > 0.01 && !checkCollision(oldPosition, zMovement)) {
+                        characterTilt.position.add(zMovement);
+                    }
+                }
                 
                 // If moving, rotate character mesh to face movement direction
                 if (characterModel && moveDirection.length() > 0.01) {
@@ -2054,6 +2217,11 @@
             // Update character animations
             if (mixer) mixer.update(delta);
             
+            // Apply camera shake if active
+            if (cameraShakeActive) {
+                applyCameraShake();
+            }
+            
             // Update pickup button highlight
             updatePickupButtonHighlight();
             
@@ -2376,6 +2544,83 @@
                     rangeIndicator.style.opacity = '0';
                 }
             }
+        }
+
+        // Collision detection variables
+        let collisionObjects = [];
+        
+        // Function to set up collision detection
+        function setupCollisionDetection() {
+            // Add collision objects (house, car, environment objects)
+            scene.traverse(function(object) {
+                // Add objects that should block movement to collision list
+                if (object.userData && object.userData.isCollider) {
+                    collisionObjects.push(object);
+                }
+                // Add house, car and other large objects that should be collidable
+                else if (object.name && (
+                    object.name.includes('House') || 
+                    object.name.includes('Car') ||
+                    object.name.includes('Tree') ||
+                    object.name.includes('Rocks'))) {
+                    collisionObjects.push(object);
+                    // For debugging
+                    updateDebug(`Added collision object: ${object.name}`);
+                }
+            });
+        }
+        
+        // Function to check if movement would cause a collision
+        function checkCollision(position, moveDirection, radius = 0.5) {
+            // Create a ray from the character position in the direction of movement
+            const raycaster = new THREE.Raycaster(
+                position.clone(), 
+                moveDirection.clone().normalize(),
+                0,
+                radius + moveDirection.length()
+            );
+            
+            // Check for collisions with objects
+            const intersects = raycaster.intersectObjects(collisionObjects, true);
+            
+            if (intersects.length > 0) {
+                // Check if we're close enough to consider this a collision
+                if (intersects[0].distance < radius) {
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+        
+        // Function to handle step climbing
+        function handleStepClimbing(position, moveDirection) {
+            // Only check step climbing if we're moving forward enough
+            if (moveDirection.length() < 0.01) return false;
+            
+            // Cast a ray downward from in front of the character to check for steps
+            const stepCheckPosition = position.clone().add(
+                moveDirection.clone().normalize().multiplyScalar(0.5)
+            );
+            stepCheckPosition.y += 0.5; // Raise the starting point a bit
+            
+            const raycaster = new THREE.Raycaster(
+                stepCheckPosition,
+                new THREE.Vector3(0, -1, 0), // Cast ray downward
+                0,
+                1.0 // Maximum step height
+            );
+            
+            const intersects = raycaster.intersectObjects(collisionObjects, true);
+            
+            if (intersects.length > 0) {
+                // This is a step we can climb - adjust y position
+                position.y = intersects[0].point.y;
+                updateDebug(`Climbing step: new Y = ${position.y.toFixed(2)}`);
+                return true;
+            }
+            
+            return false;
         }
     </script>
 </body>
