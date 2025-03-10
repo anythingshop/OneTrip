@@ -252,9 +252,17 @@
         let lowerBodyActions = {};
         let currentUpperBodyAction = null;
         let currentLowerBodyAction = null;
+        let currentUpperBodyAnimation = 'walk';
+        let currentLowerBodyAnimation = 'walk';
         let balanceEnabled = false;
         let balanceValue = 0.5;
         let currentBalanceDirection = "center"; // left, center, right
+        
+        // DOM elements
+        const balanceDirectionEl = document.getElementById('balanceDirection');
+        
+        // Character tilt object for leaning
+        let characterTilt = null;
         
         // Reference to hand bones for attaching bags
         let leftHand = null;
@@ -268,12 +276,6 @@
         
         // Currently attached bag
         let attachedBag = null;
-
-        // References for mirrored animations
-        let stumbleRightUpperAction = null;
-        let stumbleRightLowerAction = null;
-        let stumbleLeftUpperAction = null;
-        let stumbleLeftLowerAction = null;
 
         // Load models
         const loader = new THREE.GLTFLoader();
@@ -320,6 +322,18 @@
                     
                     // Set up character animations and bone references
                     if (model.name === 'Character') {
+                        // Create tilt container to lean the character
+                        characterTilt = new THREE.Object3D();
+                        characterTilt.position.copy(modelObj.position);
+                        scene.add(characterTilt);
+                        
+                        // Remove character from scene and add to tilt container
+                        scene.remove(modelObj);
+                        characterTilt.add(modelObj);
+                        
+                        // Reset character position since it's now relative to tilt container
+                        modelObj.position.set(0, 0, 0);
+                        
                         characterModel = modelObj;
                         
                         // Create animation mixer
@@ -367,48 +381,6 @@
                 }
             );
         });
-        
-        // Create a mirrored animation by flipping X values
-        function createMirroredAnimation(originalClip, newName) {
-            // Clone the original tracks
-            const mirroredTracks = [];
-            
-            // Process each track in the original clip
-            originalClip.tracks.forEach(track => {
-                const trackName = track.name;
-                const values = track.values.slice(); // Clone the values array
-                
-                // For position tracks, invert X values
-                if (trackName.endsWith('.position')) {
-                    // Position tracks have [x,y,z, x,y,z, ...] format
-                    for (let i = 0; i < values.length; i += 3) {
-                        values[i] = -values[i]; // Invert X position
-                    }
-                }
-                
-                // For quaternion tracks (rotations), invert W component to mirror the rotation
-                if (trackName.endsWith('.quaternion')) {
-                    for (let i = 0; i < values.length; i += 4) {
-                        values[i] = -values[i];    // Invert X component
-                        values[i + 1] = values[i + 1]; // Keep Y
-                        values[i + 2] = -values[i + 2]; // Invert Z component
-                        values[i + 3] = values[i + 3];  // Keep W
-                    }
-                }
-                
-                // Create a new track with mirrored values
-                const mirroredTrack = new THREE.KeyframeTrack(
-                    trackName,
-                    track.times.slice(),
-                    values
-                );
-                
-                mirroredTracks.push(mirroredTrack);
-            });
-            
-            // Create the mirrored animation clip
-            return new THREE.AnimationClip(newName, originalClip.duration, mirroredTracks);
-        }
         
         // Set up animation mixing system
         function setupAnimationMixing(clipsList) {
@@ -471,7 +443,7 @@
                     lowerBodyTracks
                 );
                 
-                // Store normal actions
+                // Store regular actions
                 upperBodyActions[clip.name] = mixer.clipAction(upperBodyClip);
                 lowerBodyActions[clip.name] = mixer.clipAction(lowerBodyClip);
                 
@@ -490,29 +462,6 @@
                 if (clip.name === 'walk') {
                     upperSelect.value = clip.name;
                     lowerSelect.value = clip.name;
-                }
-                
-                // Create mirrored versions of stumble animation
-                if (clip.name === 'stumble_lowerbody') {
-                    // Store original actions for right stumble
-                    stumbleRightUpperAction = upperBodyActions[clip.name];
-                    stumbleRightLowerAction = lowerBodyActions[clip.name];
-                    
-                    // Create mirrored upper body animation for left stumble
-                    const mirroredUpperClip = createMirroredAnimation(
-                        upperBodyClip, 
-                        'stumble_lowerbody_left_upper'
-                    );
-                    stumbleLeftUpperAction = mixer.clipAction(mirroredUpperClip);
-                    
-                    // Create mirrored lower body animation for left stumble
-                    const mirroredLowerClip = createMirroredAnimation(
-                        lowerBodyClip, 
-                        'stumble_lowerbody_left_lower'
-                    );
-                    stumbleLeftLowerAction = mixer.clipAction(mirroredLowerClip);
-                    
-                    console.log('Created mirrored stumble animations for left direction');
                 }
             });
             
@@ -542,6 +491,8 @@
             action.play();
             
             currentUpperBodyAction = action;
+            currentUpperBodyAnimation = name;
+            
             console.log(`Playing upper body animation: ${name}`);
         }
         
@@ -564,46 +515,62 @@
             action.play();
             
             currentLowerBodyAction = action;
+            currentLowerBodyAnimation = name;
+            
             console.log(`Playing lower body animation: ${name}`);
         }
         
-        // Function to play stumble animation based on direction
-        function playStumbleAnimation(direction) {
-            // Fade out current animations
-            if (currentUpperBodyAction) {
-                currentUpperBodyAction.fadeOut(0.3);
+        // Function to update animations based on balance direction
+        function updateAnimationsForBalance(direction, intensity) {
+            // Use stumble for lower body when imbalanced
+            if (direction !== "center") {
+                setLowerBodyAnimation('stumble_lowerbody');
+                
+                // Apply a tilt to the entire character
+                if (characterTilt) {
+                    // Calculate tilt angle based on intensity (0.0-0.3 for moderate, 0.3-0.5 for severe)
+                    const tiltAmount = Math.min(0.5, Math.max(0, (intensity - 0.3) * 2.5 + 0.15));
+                    const tiltAngle = (direction === 'left' ? -1 : 1) * tiltAmount;
+                    
+                    // Apply tilt with smooth transition
+                    gsapTilt(tiltAngle);
+                }
+            } else {
+                // Return to normal walking and no tilt
+                setLowerBodyAnimation('walk');
+                
+                if (characterTilt) {
+                    gsapTilt(0);
+                }
             }
-            if (currentLowerBodyAction) {
-                currentLowerBodyAction.fadeOut(0.3);
+        }
+        
+        // Function to animate tilt smoothly using GSAP-like approach
+        function gsapTilt(targetAngle) {
+            if (!characterTilt) return;
+            
+            // Current angle
+            const currentAngle = characterTilt.rotation.z;
+            
+            // Animation duration (in frames)
+            const duration = 30;
+            
+            // Amount to change per frame
+            const angleStep = (targetAngle - currentAngle) / duration;
+            
+            // Create a simple animation
+            let frame = 0;
+            
+            function animateTilt() {
+                if (frame >= duration) return;
+                
+                characterTilt.rotation.z += angleStep;
+                frame++;
+                
+                requestAnimationFrame(animateTilt);
             }
             
-            if (direction === 'left') {
-                // Play left stumble (mirrored) animations
-                stumbleLeftUpperAction.reset();
-                stumbleLeftUpperAction.fadeIn(0.3);
-                stumbleLeftUpperAction.play();
-                currentUpperBodyAction = stumbleLeftUpperAction;
-                
-                stumbleLeftLowerAction.reset();
-                stumbleLeftLowerAction.fadeIn(0.3);
-                stumbleLeftLowerAction.play();
-                currentLowerBodyAction = stumbleLeftLowerAction;
-                
-                console.log('Playing left stumble animations (mirrored)');
-            } else {
-                // Play right stumble animations (original)
-                stumbleRightUpperAction.reset();
-                stumbleRightUpperAction.fadeIn(0.3);
-                stumbleRightUpperAction.play();
-                currentUpperBodyAction = stumbleRightUpperAction;
-                
-                stumbleRightLowerAction.reset();
-                stumbleRightLowerAction.fadeIn(0.3);
-                stumbleRightLowerAction.play();
-                currentLowerBodyAction = stumbleRightLowerAction;
-                
-                console.log('Playing right stumble animations');
-            }
+            animateTilt();
         }
         
         // Function to attach a bag to the character's hand
@@ -617,7 +584,18 @@
                 return;
             }
             
-            console.log("Attaching bag to hand:", hand.name);
+            console.log("Attaching bag to hand...");
+            
+            // Get current world position of the bag
+            const bagWorldPos = new THREE.Vector3();
+            bag.getWorldPosition(bagWorldPos);
+            
+            // Get current world position of the hand
+            const handWorldPos = new THREE.Vector3();
+            hand.getWorldPosition(handWorldPos);
+            
+            console.log("Bag world position:", bagWorldPos);
+            console.log("Hand world position:", handWorldPos);
             
             // Store original parent and transform
             const originalParent = bag.parent;
@@ -625,86 +603,122 @@
             const originalRotation = bag.rotation.clone();
             const originalScale = bag.scale.clone();
             
-            // Remove from current parent
-            bag.parent.remove(bag);
-            
-            // Add to hand
+            // Remove from current parent and attach to hand
+            originalParent.remove(bag);
             hand.add(bag);
             
             // Position relative to hand
-            bag.position.set(0, -0.1, 0);
-            bag.rotation.set(-Math.PI/2, 0, 0);
+            bag.position.set(0, 0, 0);
+            bag.rotation.set(0, 0, 0);
             
-            // Display success message
-            document.getElementById('info').textContent = "Bag attached to hand!";
-            
-            // Return a function to detach
-            return function() {
-                hand.remove(bag);
-                originalParent.add(bag);
-                bag.position.copy(originalPosition);
-                bag.rotation.copy(originalRotation);
-                bag.scale.copy(originalScale);
-                document.getElementById('info').textContent = "Bag detached from hand!";
+            // Set attached bag data
+            attachedBag = {
+                mesh: bag,
+                originalParent: originalParent,
+                originalPosition: originalPosition,
+                originalRotation: originalRotation,
+                originalScale: originalScale
             };
+            
+            console.log("Bag attached successfully to", hand.name);
         }
         
-        // Function to update balance UI elements
-        function updateBalanceSystem(value) {
-            // Update value display
-            document.getElementById('balanceValue').textContent = value.toFixed(2);
-            
-            // Update balance indicator position (0-100%)
-            const indicator = document.getElementById('balanceIndicator');
-            indicator.style.left = (value * 100) + '%';
-            
-            // Determine balance status
-            let direction;
-            let color;
-            
-            if (value < 0.4) {
-                direction = 'left';
-                // Color from green to red based on how far from center
-                const intensity = Math.max(0, (0.4 - value) * 2.5);
-                color = `rgb(${Math.floor(255 * intensity)}, ${Math.floor(255 * (1 - intensity))}, 0)`;
-            } else if (value > 0.6) {
-                direction = 'right';
-                // Color from green to red based on how far from center
-                const intensity = Math.min(1, (value - 0.6) * 2.5);
-                color = `rgb(${Math.floor(255 * intensity)}, ${Math.floor(255 * (1 - intensity))}, 0)`;
-            } else {
-                direction = 'center';
-                color = 'rgb(0, 255, 0)';
+        // Function to detach bag
+        function detachBag() {
+            if (!attachedBag) {
+                console.warn("No bag is currently attached");
+                return;
             }
             
-            // Update indicator color
-            indicator.style.background = color;
+            console.log("Detaching bag...");
             
-            // Update direction text
-            const directionText = document.getElementById('balanceDirection');
-            directionText.textContent = direction === 'center' ? 'Balanced' : 
-                                       `${direction.charAt(0).toUpperCase() + direction.slice(1)} Imbalance`;
-            directionText.style.color = color;
+            const bag = attachedBag.mesh;
+            const originalParent = attachedBag.originalParent;
             
-            // Check if balance state changed
-            if (direction !== currentBalanceDirection) {
-                currentBalanceDirection = direction;
-                
-                // Skip animation changes if balance effect is disabled
-                if (balanceEnabled) {
-                    playStumbleAnimation(direction);
-                }
+            // Get current world position and rotation
+            const worldPos = new THREE.Vector3();
+            const worldQuat = new THREE.Quaternion();
+            bag.getWorldPosition(worldPos);
+            bag.getWorldQuaternion(worldQuat);
+            
+            // Remove from hand
+            bag.parent.remove(bag);
+            
+            // Add back to original parent
+            originalParent.add(bag);
+            
+            // Restore original transform
+            bag.position.copy(attachedBag.originalPosition);
+            bag.rotation.copy(attachedBag.originalRotation);
+            bag.scale.copy(attachedBag.originalScale);
+            
+            // Clear reference
+            attachedBag = null;
+            
+            console.log("Bag detached successfully");
+        }
+        
+        // Function to update the balance system
+        function updateBalanceSystem(value) {
+            document.getElementById('balanceValue').textContent = value.toFixed(2);
+            document.getElementById('balanceIndicator').style.left = `${value * 100}%`;
+            
+            // Change indicator color based on balance
+            const indicator = document.getElementById('balanceIndicator');
+            
+            let newDirection = "center";
+            let intensity = 0;
+            
+            if (value < 0.2) {
+                // Left imbalance (severe)
+                indicator.style.background = '#ff4444'; // Red for danger
+                balanceDirectionEl.textContent = "Severe Left Imbalance";
+                balanceDirectionEl.style.color = '#ff4444';
+                newDirection = "left";
+                intensity = 0.5 - value; // 0.3 to 0.5 range
+            } else if (value < 0.3) {
+                // Left imbalance (moderate)
+                indicator.style.background = '#ffaa44'; // Orange for warning
+                balanceDirectionEl.textContent = "Left Imbalance";
+                balanceDirectionEl.style.color = '#ffaa44';
+                newDirection = "left";
+                intensity = 0.3 - value; // 0 to 0.3 range
+            } else if (value > 0.8) {
+                // Right imbalance (severe)
+                indicator.style.background = '#ff4444'; // Red for danger
+                balanceDirectionEl.textContent = "Severe Right Imbalance";
+                balanceDirectionEl.style.color = '#ff4444';
+                newDirection = "right";
+                intensity = value - 0.5; // 0.3 to 0.5 range
+            } else if (value > 0.7) {
+                // Right imbalance (moderate)
+                indicator.style.background = '#ffaa44'; // Orange for warning
+                balanceDirectionEl.textContent = "Right Imbalance";
+                balanceDirectionEl.style.color = '#ffaa44';
+                newDirection = "right";
+                intensity = value - 0.7; // 0 to 0.3 range
+            } else {
+                // Balanced
+                indicator.style.background = '#ffffff'; // White for safe
+                balanceDirectionEl.textContent = "Balanced";
+                balanceDirectionEl.style.color = '#ffffff';
+                newDirection = "center";
+                intensity = 0;
+            }
+            
+            // Apply animation based on balance if enabled
+            if (balanceEnabled && (newDirection !== currentBalanceDirection || Math.abs(intensity) > 0.05)) {
+                updateAnimationsForBalance(newDirection, intensity);
+                currentBalanceDirection = newDirection;
             }
         }
         
         // Set up UI event listeners
         document.getElementById('upperBodyAnim').addEventListener('change', function() {
-            // Update the animation and maintain the current mirroring if needed
             setUpperBodyAnimation(this.value);
         });
         
         document.getElementById('lowerBodyAnim').addEventListener('change', function() {
-            // Only change if not in imbalance mode
             if (!balanceEnabled || currentBalanceDirection === 'center') {
                 setLowerBodyAnimation(this.value);
             } else {
@@ -734,8 +748,7 @@
         });
         
         document.getElementById('detachBagBtn').addEventListener('click', function() {
-            // This is a placeholder - detaching would need to be implemented properly
-            alert("Detach bag functionality not fully implemented yet");
+            detachBag();
         });
         
         document.getElementById('balanceSlider').addEventListener('input', function() {
