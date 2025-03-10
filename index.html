@@ -1044,9 +1044,9 @@
         
         // Simple function to create additional grass - no instancing, just clones
         function createAdditionalGrass(originalGrass, modelFile, baseScale) {
-            // Create a limited number of additional grass objects
-            const count = modelFile.includes('large') ? 15 : 
-                         modelFile.includes('medium') ? 10 : 5;
+            // Create more grass objects for better coverage
+            const count = modelFile.includes('large') ? 50 : 
+                         modelFile.includes('medium') ? 80 : 120;
             
             for (let i = 0; i < count; i++) {
                 const clone = originalGrass.clone();
@@ -2026,7 +2026,7 @@
                 
                 // Calculate movement direction relative to camera
                 moveDirection.set(0, 0, 0)
-                    .add(cameraRight.multiplyScalar(inputX))
+                    .add(cameraRight.multiplyScalar(-inputX))  // Changed from positive to negative
                     .add(cameraForward.multiplyScalar(-inputZ));
                 
                 moveDirection.normalize().multiplyScalar(movementAcceleration);
@@ -2776,7 +2776,7 @@
                         highlightBag(bag);
                         
                         // Determine if it's a ground bag or car bag
-                        if (bag === groundBag1 || bag === groundBag2) {
+                        if (bag === groundBag1 || bag === groundBag2 || bag === groundBag3 || bag === groundBag4) {
                             return { bag, isGroundBag: true };
                         } else {
                             return { bag, isGroundBag: false };
@@ -2789,8 +2789,12 @@
                 const bags = [];
                 if (groundBag1 && !attachedBags.some(b => b.mesh === groundBag1)) bags.push(groundBag1);
                 if (groundBag2 && !attachedBags.some(b => b.mesh === groundBag2)) bags.push(groundBag2);
+                if (groundBag3 && !attachedBags.some(b => b.mesh === groundBag3)) bags.push(groundBag3);
+                if (groundBag4 && !attachedBags.some(b => b.mesh === groundBag4)) bags.push(groundBag4);
                 if (carBag1 && !attachedBags.some(b => b.mesh === carBag1)) bags.push(carBag1);
                 if (carBag2 && !attachedBags.some(b => b.mesh === carBag2)) bags.push(carBag2);
+                if (carBag3 && !attachedBags.some(b => b.mesh === carBag3)) bags.push(carBag3);
+                if (carBag4 && !attachedBags.some(b => b.mesh === carBag4)) bags.push(carBag4);
                 
                 // Find all meshes in the bags
                 const bagMeshes = [];
@@ -2823,7 +2827,7 @@
                         highlightBag(bag);
                         
                         // Determine if it's a ground bag or car bag
-                        if (bag === groundBag1 || bag === groundBag2) {
+                        if (bag === groundBag1 || bag === groundBag2 || bag === groundBag3 || bag === groundBag4) {
                             return { bag, isGroundBag: true };
                         } else {
                             return { bag, isGroundBag: false };
