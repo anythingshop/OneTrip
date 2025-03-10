@@ -364,7 +364,20 @@
     <script>
         // Scene setup
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB); // Sky blue color
+        
+        // Load skyline.jpg as a sky texture instead of a solid color
+        const textureLoader = new THREE.TextureLoader();
+        textureLoader.load('skyline.jpg', function(texture) {
+            // Ensure the texture wraps properly
+            texture.wrapS = THREE.ClampToEdgeWrapping;
+            texture.wrapT = THREE.ClampToEdgeWrapping;
+            scene.background = texture;
+            console.log("Skyline texture loaded successfully");
+        }, undefined, function(err) {
+            console.error("Error loading skyline texture:", err);
+            // Fallback to the default sky blue color if texture fails to load
+            scene.background = new THREE.Color(0x87CEEB);
+        });
         
         // Add subtle atmospheric fog for depth
         scene.fog = new THREE.FogExp2(0x9dc1e0, 0.015); // Slightly increased fog density for more contained feel
@@ -738,8 +751,8 @@
             // Car positioned at the beginning of the path
             { name: 'Car', file: './car.glb', position: [-5, 0, -20], scale: 0.5, rotationY: Math.PI/2 },
             
-            // House positioned at the end of the path, rotated 45 degrees clockwise
-            { name: 'House', file: './house.glb', position: [0, 0, 30], scale: 0.5, rotationY: Math.PI - Math.PI/4 },
+            // House positioned at the end of the path, rotated 90 degrees clockwise (additional 45 degrees)
+            { name: 'House', file: './house.glb', position: [0, 0, 30], scale: 0.5, rotationY: Math.PI - Math.PI/2 },
             
             // Bags ON TOP of the car - moved further back (more negative Z)
             { name: 'Car Bag 1', file: './newbag.glb', position: [-5, 3.5, -20.5], scale: 0.4, rotationY: 0 },
@@ -883,13 +896,9 @@
         
         // Instead of using templates and instancing, modify the model loading function
         models.forEach(model => {
-            // Create label for this model
-            const labelMesh = createLabel(model.name, {
-                x: model.position[0],
-                y: model.position[1],
-                z: model.position[2]
-            });
+            // No longer creating labels for models for a cleaner look
             
+            // Load the model
             loader.load(
                 model.file,
                     (gltf) => {
@@ -2790,11 +2799,14 @@
                     if (cameraMode === "thirdPerson" && !controls.enabled && !isGameOver) {
                         // Only rotate camera if in game view mode and not in game over state
                         const dx = e.movementX || e.mozMovementX || e.webkitMovementX || 0;
-                        if (dx !== 0 && mouseLookActive) {
-                            // Store mouse movement for balance control
-                            // Use the same input for both balance and camera rotation
+                        
+                        // Always capture mouse movement for balance control when balance is enabled
+                        if (balanceEnabled && attachedBags.length > 0) {
                             lastMouseMoveX = dx;
-                            
+                        }
+                        
+                        // Only apply camera rotation if mouse look is active
+                        if (dx !== 0 && mouseLookActive) {
                             // Calculate rotation amount with sensitivity
                             const rotationAmount = -dx * mouseRotationSensitivity;
                             
@@ -3186,21 +3198,19 @@
             // Mouse input takes priority if available
             if (lastMouseMoveX !== 0) {
                 // Increased sensitivity for more responsive balance control
-                horizontalInput = lastMouseMoveX * 0.02; // Doubled from 0.01
-                // Don't reset lastMouseMoveX here - let it affect both camera and balance
+                horizontalInput = lastMouseMoveX * 0.05; // Increased from 0.02 for better control
             } 
             // Joystick rotation is another source of input
             else if (rotationJoystickActive) {
                 // Increased sensitivity for more responsive balance control
-                horizontalInput = rotationJoystickDirection.x * 0.2; // Doubled from 0.1
+                horizontalInput = rotationJoystickDirection.x * 0.5; // Increased from 0.2 for better control
             }
             
             // Apply a balance change based on the horizontal input
             // This is completely independent from movement
             if (horizontalInput !== 0) {
-                // Increased sensitivity and made sign more intuitive:
                 // Moving mouse or joystick right tilts balance right, and vice versa
-                const balanceImpact = horizontalInput * 0.08; // Increased from 0.05
+                const balanceImpact = horizontalInput * 0.15; // Increased from 0.08 for more responsive control
                 
                 // Apply the balance impact
                 balanceValue += balanceImpact;
@@ -3212,9 +3222,8 @@
                 }
             }
             
-            // Natural centering force - stronger when further from center
-            // Make the centering force weaker to make manual control more important
-            const centeringForce = (0.5 - balanceValue) * 0.005; // Reduced from 0.01
+            // Reduced natural centering force to make manual control more important
+            const centeringForce = (0.5 - balanceValue) * 0.002; // Reduced from 0.005
             balanceValue += centeringForce;
             
             // Apply random balance disturbances based on weight carried
@@ -4115,6 +4124,29 @@
         // let lastMouseMoveX = 0;
         let lastPickupFeedbackTime = 0; // Track when we last showed feedback
         let pickupTimeoutSet = false; // Flag to prevent multiple timeouts
+
+        document.addEventListener('mousedown', function(e) {
+            if (e.button === 0 && cameraMode === "thirdPerson" && !controls.enabled) { // Left mouse button
+                mouseLookActive = true;
+                document.body.requestPointerLock = document.body.requestPointerLock || 
+                                                 document.body.mozRequestPointerLock ||
+                                                 document.body.webkitRequestPointerLock;
+                document.body.requestPointerLock();
+            }
+        });
+        
+        // Also activate balance control when carrying bags, regardless of mouse look
+        document.addEventListener('keydown', function(e) {
+            // When picking up a bag, activate mouse controls for balance
+            if (e.code === 'KeyE' || e.code === 'Space') {
+                if (!mouseLookActive && balanceEnabled && attachedBags.length > 0) {
+                    document.body.requestPointerLock = document.body.requestPointerLock || 
+                                                     document.body.mozRequestPointerLock ||
+                                                     document.body.webkitRequestPointerLock;
+                    document.body.requestPointerLock();
+                }
+            }
+        });
     </script>
 </body>
 </html> 
