@@ -57,34 +57,43 @@
         }
         #balanceMeter {
             width: 200px;
-            height: 10px;
+            height: 20px;
             background: rgba(255,255,255,0.3);
-            border-radius: 5px;
-            margin-top: 5px;
+            border-radius: 10px;
+            margin-top: 10px;
+            margin-bottom: 10px;
             position: relative;
-        }
-        #balanceIndicator {
-            position: absolute;
-            width: 6px;
-            height: 100%;
-            background: white;
-            border-radius: 3px;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
+            overflow: hidden;
         }
         .balanceZone {
             position: absolute;
+            left: 40%;
             width: 20%;
             height: 100%;
-            background: rgba(76,175,80,0.3);
-            top: 0;
-            left: 40%;
+            background: rgba(0,255,0,0.3);
+            z-index: 1;
+        }
+        #balanceIndicator {
+            position: absolute;
+            left: 50%;
+            width: 6px;
+            height: 100%;
+            background: #00ff00;
+            transform: translateX(-3px);
+            z-index: 2;
         }
         #balanceDirection {
-            margin-top: 5px;
             font-weight: bold;
             text-align: center;
+            margin-top: 5px;
+        }
+        #balanceValue {
+            margin-left: 10px;
+        }
+        #balanceSlider {
+            width: 180px;
+            margin-top: 10px;
+            pointer-events: none;  /* Disable interaction with slider since it's read-only now */
         }
         #pickupFeedback {
             position: absolute;
@@ -302,10 +311,10 @@
     </div>
     
     <div id="balanceUI">
-        <h3>Balance System Preview</h3>
+        <h3>Balance Meter</h3>
         <div>
-            <label for="balanceSlider">Balance (0-1): </label>
-            <input type="range" id="balanceSlider" min="0" max="100" value="50">
+            <label for="balanceSlider">Balance: </label>
+            <input type="range" id="balanceSlider" min="0" max="100" value="50" disabled>
             <span id="balanceValue">0.5</span>
         </div>
         <div id="balanceMeter">
@@ -313,11 +322,8 @@
             <div id="balanceIndicator"></div>
         </div>
         <div id="balanceDirection">Balanced</div>
-        <div>
-            <button id="toggleBalance">Toggle Balance Effect</button>
-            </div>
-        </div>
-        
+    </div>
+    
     <div id="carryInfo">
         <div>Bags: <span id="bagCount">0</span></div>
         <div>Weight: <span id="totalWeight">0</span> kg</div>
@@ -405,7 +411,7 @@
         // Ground with enhanced visual quality
         const groundGeometry = new THREE.PlaneGeometry(200, 200, 50, 50); // Added more segments for detail
         const groundMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x4d9a42, // Richer green color
+            color: 0x2D4C31, // Updated to the specified color for better grass integration
             roughness: 0.8,
             metalness: 0.1,
         });
@@ -778,27 +784,27 @@
             { name: 'Rocks', file: './rocks.glb', position: [5, 0, -5], scale: 0.5, rotationY: 0 },
             { name: 'Leaves', file: './leaves.glb', position: [2, 0, 15], scale: 0.5, rotationY: 0 },
             
-            // Add grass around the character and car area
-            { name: 'Grass Large 1', file: './grass_large1.glb', position: [-18, 0, -18], scale: 0.6, rotationY: Math.random() * Math.PI * 2 },
-            { name: 'Grass Large 2', file: './grass_large2.glb', position: [-10, 0, -25], scale: 0.7, rotationY: Math.random() * Math.PI * 2 },
-            { name: 'Grass Large 3', file: './grass_large3.glb', position: [-8, 0, -15], scale: 0.65, rotationY: Math.random() * Math.PI * 2 },
+            // Add grass around the character and car area - Increased scale values
+            { name: 'Grass Large 1', file: './grass_large1.glb', position: [-18, 0, -18], scale: 2.5, rotationY: Math.random() * Math.PI * 2 },
+            { name: 'Grass Large 2', file: './grass_large2.glb', position: [-10, 0, -25], scale: 2.8, rotationY: Math.random() * Math.PI * 2 },
+            { name: 'Grass Large 3', file: './grass_large3.glb', position: [-8, 0, -15], scale: 2.6, rotationY: Math.random() * Math.PI * 2 },
             
-            // Add grass around the path
-            { name: 'Grass Medium 1', file: './grass_medium1.glb', position: [-3, 0, -10], scale: 0.5, rotationY: Math.random() * Math.PI * 2 },
-            { name: 'Grass Medium 2', file: './grass_medium2.glb', position: [3, 0, -5], scale: 0.45, rotationY: Math.random() * Math.PI * 2 },
-            { name: 'Grass Medium 3', file: './grass_medium3.glb', position: [-4, 0, 5], scale: 0.55, rotationY: Math.random() * Math.PI * 2 },
+            // Add grass around the path - Increased scale values
+            { name: 'Grass Medium 1', file: './grass_medium1.glb', position: [-3, 0, -10], scale: 2.2, rotationY: Math.random() * Math.PI * 2 },
+            { name: 'Grass Medium 2', file: './grass_medium2.glb', position: [3, 0, -5], scale: 2.3, rotationY: Math.random() * Math.PI * 2 },
+            { name: 'Grass Medium 3', file: './grass_medium3.glb', position: [-4, 0, 5], scale: 2.4, rotationY: Math.random() * Math.PI * 2 },
             
-            // Add grass near the house
-            { name: 'Grass Small 1', file: './grass_small1.glb', position: [-5, 0, 20], scale: 0.4, rotationY: Math.random() * Math.PI * 2 },
-            { name: 'Grass Small 2', file: './grass_small2.glb', position: [5, 0, 22], scale: 0.35, rotationY: Math.random() * Math.PI * 2 },
-            { name: 'Grass Small 3', file: './grass_small3.glb', position: [2, 0, 25], scale: 0.3, rotationY: Math.random() * Math.PI * 2 },
+            // Add grass near the house - Increased scale values
+            { name: 'Grass Small 1', file: './grass_small1.glb', position: [-5, 0, 20], scale: 2.0, rotationY: Math.random() * Math.PI * 2 },
+            { name: 'Grass Small 2', file: './grass_small2.glb', position: [5, 0, 22], scale: 1.8, rotationY: Math.random() * Math.PI * 2 },
+            { name: 'Grass Small 3', file: './grass_small3.glb', position: [2, 0, 25], scale: 1.9, rotationY: Math.random() * Math.PI * 2 },
             
-            // Add more grass clusters for visual density
-            { name: 'Grass Cluster 1', file: './grass_medium1.glb', position: [-15, 0, -5], scale: 0.5, rotationY: Math.random() * Math.PI * 2 },
-            { name: 'Grass Cluster 2', file: './grass_large1.glb', position: [12, 0, 0], scale: 0.6, rotationY: Math.random() * Math.PI * 2 },
-            { name: 'Grass Cluster 3', file: './grass_small2.glb', position: [8, 0, -15], scale: 0.4, rotationY: Math.random() * Math.PI * 2 },
-            { name: 'Grass Cluster 4', file: './grass_medium3.glb', position: [-7, 0, 15], scale: 0.5, rotationY: Math.random() * Math.PI * 2 },
-            { name: 'Grass Cluster 5', file: './grass_large3.glb', position: [15, 0, 18], scale: 0.7, rotationY: Math.random() * Math.PI * 2 }
+            // Add more grass clusters for visual density - Increased scale values
+            { name: 'Grass Cluster 1', file: './grass_medium1.glb', position: [-15, 0, -5], scale: 2.2, rotationY: Math.random() * Math.PI * 2 },
+            { name: 'Grass Cluster 2', file: './grass_large1.glb', position: [12, 0, 0], scale: 2.6, rotationY: Math.random() * Math.PI * 2 },
+            { name: 'Grass Cluster 3', file: './grass_small2.glb', position: [8, 0, -15], scale: 2.0, rotationY: Math.random() * Math.PI * 2 },
+            { name: 'Grass Cluster 4', file: './grass_medium3.glb', position: [-7, 0, 15], scale: 2.2, rotationY: Math.random() * Math.PI * 2 },
+            { name: 'Grass Cluster 5', file: './grass_large3.glb', position: [15, 0, 18], scale: 2.7, rotationY: Math.random() * Math.PI * 2 }
         ];
 
         // Animation variables
@@ -1461,8 +1467,25 @@
             const balanceUI = document.getElementById('balanceUI');
             if (attachedBags.length > 0) {
                 if (balanceUI) balanceUI.style.display = 'block';
+                
+                // Always enable balance system when carrying bags
+                if (!balanceEnabled) {
+                    balanceEnabled = true;
+                    updateDebug("Balance system enabled - carrying bags");
+                }
             } else {
                 if (balanceUI) balanceUI.style.display = 'none';
+                
+                // Disable balance system when not carrying bags
+                if (balanceEnabled) {
+                    balanceEnabled = false;
+                    updateDebug("Balance system disabled - no bags");
+                    
+                    // Reset any tilt when bags are dropped
+                    if (characterTilt) {
+                        gsapTilt(0);
+                    }
+                }
             }
             
             // Determine weight class based on total weight or bag count
@@ -1476,23 +1499,6 @@
                 } else {
                     newWeightClass = "heavy";
                 }
-                
-                // Enable balance system when carrying bags
-                if (!balanceEnabled) {
-                    balanceEnabled = true;
-                    updateDebug("Balance system enabled - carrying bags");
-                }
-            } else {
-                // Disable balance system when not carrying bags
-                if (balanceEnabled) {
-                    balanceEnabled = false;
-                    updateDebug("Balance system disabled - no bags");
-                    
-                    // Reset any tilt when bags are dropped
-                    if (characterTilt) {
-                        gsapTilt(0);
-                    }
-                }
             }
             
             // Update weight class display
@@ -1500,18 +1506,21 @@
             
             // If weight class changed, update the animation
             if (newWeightClass !== carryWeightClass) {
+                updateDebug(`Carry weight class changed: ${carryWeightClass} → ${newWeightClass}`);
                 carryWeightClass = newWeightClass;
                 
-                // Update the animation based on current state and new weight class
+                // Update animation if we're already carrying and moving
                 if (attachedBags.length > 0) {
-                    // Determine the current movement state
-                    const movementState = isMoving ? "walk" : "stand";
-                    setUpperBodyAnimation(`carry_${movementState}_${carryWeightClass}`);
-                } else {
-                    // If no bags, go back to walk or idle depending on movement
-                    setUpperBodyAnimation(isMoving ? 'walk' : 'idle');
+                    if (isMoving) {
+                        forcedAnimationUpdate(`carry_walk_${carryWeightClass}`);
+                    } else {
+                        forcedAnimationUpdate(`carry_stand_${carryWeightClass}`);
+                    }
                 }
             }
+            
+            // Update the balance UI to reflect current state
+            updateBalanceSystem(balanceValue);
         }
         
         // Function to detach bag
@@ -1630,76 +1639,64 @@
             const rightModerateThreshold = 0.6 / weightFactor; // Changed from 0.7
             const rightSevereThreshold = 0.7 / weightFactor; // Changed from 0.8
             
+            // Determine balance direction based on value
             if (value < leftSevereThreshold) {
-                // Left imbalance (severe)
-                indicator.style.background = '#ff4444'; // Red for danger
-                balanceDirectionEl.textContent = "Severe Left Imbalance";
-                balanceDirectionEl.style.color = '#ff4444';
+                // Severe left imbalance
+                indicator.style.background = '#ff0000'; // Red
                 newDirection = "left";
-                intensity = 0.4 - value; // Reduced range
+                intensity = 1.0 - (value / leftSevereThreshold);
+                balanceDirectionEl.textContent = "Severe Left Imbalance!";
+                balanceDirectionEl.style.color = '#ff0000';
                 
                 // Add camera shake for severe imbalance
-                if (intensity > 0.05 && !cameraShakeActive) {
-                    startCameraShake(Math.min(0.15, intensity * 0.5));
+                if (Math.random() < 0.05) {
+                    startCameraShake(intensity * 0.1);
                 }
             } else if (value < leftModerateThreshold) {
-                // Left imbalance (moderate)
-                indicator.style.background = '#ffaa44'; // Orange for warning
-                balanceDirectionEl.textContent = "Left Imbalance";
-                balanceDirectionEl.style.color = '#ffaa44';
+                // Moderate left imbalance
+                indicator.style.background = '#ff9900'; // Orange
                 newDirection = "left";
-                intensity = 0.3 - value; // 0 to 0.3 range
-                
-                // Add slight camera shake for moderate imbalance
-                if (intensity > 0.05 && !cameraShakeActive) {
-                    startCameraShake(Math.min(0.08, intensity * 0.3));
-                }
+                intensity = (leftModerateThreshold - value) / (leftModerateThreshold - leftSevereThreshold);
+                balanceDirectionEl.textContent = "Left Imbalance";
+                balanceDirectionEl.style.color = '#ff9900';
             } else if (value > rightSevereThreshold) {
-                // Right imbalance (severe)
-                indicator.style.background = '#ff4444'; // Red for danger
-                balanceDirectionEl.textContent = "Severe Right Imbalance";
-                balanceDirectionEl.style.color = '#ff4444';
+                // Severe right imbalance
+                indicator.style.background = '#ff0000'; // Red
                 newDirection = "right";
-                intensity = value - 0.5; // Reduced range
+                intensity = (value - rightSevereThreshold) / (1.0 - rightSevereThreshold);
+                balanceDirectionEl.textContent = "Severe Right Imbalance!";
+                balanceDirectionEl.style.color = '#ff0000';
                 
                 // Add camera shake for severe imbalance
-                if (intensity > 0.05 && !cameraShakeActive) {
-                    startCameraShake(Math.min(0.15, intensity * 0.5));
+                if (Math.random() < 0.05) {
+                    startCameraShake(intensity * 0.1);
                 }
             } else if (value > rightModerateThreshold) {
-                // Right imbalance (moderate)
-                indicator.style.background = '#ffaa44'; // Orange for warning
-                balanceDirectionEl.textContent = "Right Imbalance";
-                balanceDirectionEl.style.color = '#ffaa44';
+                // Moderate right imbalance
+                indicator.style.background = '#ff9900'; // Orange
                 newDirection = "right";
-                intensity = value - 0.6; // Reduced range
-                
-                // Add slight camera shake for moderate imbalance
-                if (intensity > 0.05 && !cameraShakeActive) {
-                    startCameraShake(Math.min(0.08, intensity * 0.3));
-                }
+                intensity = (value - rightModerateThreshold) / (rightSevereThreshold - rightModerateThreshold);
+                balanceDirectionEl.textContent = "Right Imbalance";
+                balanceDirectionEl.style.color = '#ff9900';
             } else {
                 // Balanced
-                indicator.style.background = '#ffffff'; // White for safe
-                balanceDirectionEl.textContent = "Balanced";
-                balanceDirectionEl.style.color = '#ffffff';
+                indicator.style.background = '#00ff00'; // Green
                 newDirection = "center";
-                intensity = 0;
+                balanceDirectionEl.textContent = "Balanced";
+                balanceDirectionEl.style.color = '#00ff00';
             }
             
-            // Display carrying info in balance feedback
-            if (totalBagWeight > 0) {
-                balanceDirectionEl.textContent += ` (${totalBagWeight}kg)`;
-            }
-            
-            // Apply animation based on balance if enabled
-            if (balanceEnabled && newDirection !== currentBalanceDirection) {
-                updateAnimationsForBalance(newDirection, intensity);
+            // If balance direction changed or intensity changed significantly, update animations
+            if (newDirection !== currentBalanceDirection || Math.abs(balanceIntensity - intensity) > 0.2) {
                 currentBalanceDirection = newDirection;
+                balanceIntensity = intensity;
+                
+                // Apply animation effects based on balance state
+                updateAnimationsForBalance(newDirection, intensity);
             }
         }
         
-        // Function to update animations based on balance direction
+        // Apply animation effects based on balance status
         function updateAnimationsForBalance(direction, intensity) {
             // Use stumble for lower body when imbalanced
             if (direction !== "center") {
@@ -1981,12 +1978,12 @@
                 const speedDiff = targetSpeed - movementAcceleration;
                 movementAcceleration += speedDiff * 0.08;
                 
-                // Create movement vector based on current camera perspective
+                // Always use camera direction for movement, not character direction
                 const cameraForward = new THREE.Vector3(0, 0, -1);
                 const cameraRight = new THREE.Vector3(1, 0, 0);
                 
                 if (cameraMode === "thirdPerson" && thirdPersonCamera) {
-                    // Get camera's forward and right vectors
+                    // Get camera's forward and right vectors (ignoring Y component for horizontal movement)
                     thirdPersonCamera.getWorldDirection(cameraForward);
                     cameraForward.y = 0; // Keep movement on horizontal plane
                     cameraForward.normalize();
@@ -2061,9 +2058,11 @@
                         forcedAnimationUpdate('walk');
                     }
                     
+                    // Check if we should use the stumble animation based on current balance direction
                     if (currentBalanceDirection === "center") {
                         setLowerBodyAnimation('walk');
                     } else {
+                        // Use stumble animation if we're imbalanced
                         setLowerBodyAnimation('stumble_lowerbody');
                     }
                     lastMovementState = true;
@@ -2632,8 +2631,8 @@
             hideDebugElements();
             optimizeUIForDevice();
             
-            // Start with balance system disabled
-            document.getElementById('toggleBalance').textContent = 'Enable Balance Effect';
+            // Balance system will be automatically enabled/disabled when bags are picked up/dropped
+            
             document.getElementById('helpOverlay').style.display = 'block'; // Show help on start
             
             // Set initial balance to center
@@ -2955,6 +2954,9 @@
                     updateDebug(`Added collision object: ${object.name}`);
                 }
             });
+            
+            // After setting up collision detection, create instanced grass
+            createInstancedGrass();
         }
         
         // Function to check if movement would cause a collision
@@ -3086,6 +3088,244 @@
             
             // Hide balance UI initially (will show when carrying bags)
             if (balanceUI) balanceUI.style.display = 'none';
+        }
+
+        // After all models are loaded, add instanced grass to fill the terrain
+        function createInstancedGrass() {
+            // First, we need to load the grass models to create the instance meshes
+            const grassTypes = [
+                { file: './grass_small1.glb', count: 500, scaleRange: [1.0, 1.5], heightOffset: 0.0 },
+                { file: './grass_small2.glb', count: 500, scaleRange: [1.0, 1.5], heightOffset: 0.0 },
+                { file: './grass_small3.glb', count: 500, scaleRange: [1.0, 1.5], heightOffset: 0.0 },
+                { file: './grass_medium1.glb', count: 400, scaleRange: [1.2, 1.8], heightOffset: 0.0 },
+                { file: './grass_medium2.glb', count: 400, scaleRange: [1.2, 1.8], heightOffset: 0.0 },
+                { file: './grass_medium3.glb', count: 400, scaleRange: [1.2, 1.8], heightOffset: 0.0 },
+                { file: './grass_large1.glb', count: 300, scaleRange: [1.5, 2.2], heightOffset: 0.0 },
+                { file: './grass_large2.glb', count: 300, scaleRange: [1.5, 2.2], heightOffset: 0.0 },
+                { file: './grass_large3.glb', count: 300, scaleRange: [1.5, 2.2], heightOffset: 0.0 }
+            ];
+            
+            // Show loading message
+            document.getElementById('info').textContent = 'Creating instanced grass...';
+            
+            let loadedInstances = 0;
+            let instancedObjects = [];
+            
+            grassTypes.forEach(grassType => {
+                const loader = new THREE.GLTFLoader();
+                loader.load(grassType.file, (gltf) => {
+                    // Find the mesh in the loaded model
+                    let grassMesh = null;
+                    gltf.scene.traverse(child => {
+                        if (child.isMesh) {
+                            grassMesh = child;
+                            
+                            // Ensure materials cast and receive shadows
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            
+                            // Make sure the material uses the right parameters
+                            if (child.material) {
+                                child.material.roughness = 0.8;
+                                child.material.metalness = 0.1;
+                                // Ensure the color is consistent
+                                if (grassType.file.includes('small')) {
+                                    child.material.color.setHex(0x2D4C31); // Slightly lighter
+                                } else if (grassType.file.includes('medium')) {
+                                    child.material.color.setHex(0x2A4730); // Medium shade
+                                } else {
+                                    child.material.color.setHex(0x274229); // Darker for large grass
+                                }
+                            }
+                        }
+                    });
+                    
+                    if (grassMesh) {
+                        // Create an instanced mesh
+                        const instancedMesh = new THREE.InstancedMesh(
+                            grassMesh.geometry,
+                            grassMesh.material,
+                            grassType.count
+                        );
+                        
+                        // Enable shadows for the instanced mesh
+                        instancedMesh.castShadow = true;
+                        instancedMesh.receiveShadow = true;
+                        
+                        // Create matrices for each instance
+                        const dummy = new THREE.Object3D();
+                        const groundSize = 95; // Slightly less than half of the ground plane size (200)
+                        const pathExclusionWidth = 3; // Don't place grass on the path
+                        
+                        // Create clusters of grass for more natural distribution
+                        const clusterCount = Math.floor(grassType.count / 10); // Create clusters of around 10 grass blades
+                        const clusterPositions = [];
+                        
+                        // Generate cluster center positions
+                        for (let c = 0; c < clusterCount; c++) {
+                            let x, z;
+                            let attempts = 0;
+                            let validPosition = false;
+                            
+                            while (!validPosition && attempts < 50) {
+                                x = (Math.random() * 2 - 1) * groundSize;
+                                z = (Math.random() * 2 - 1) * groundSize;
+                                
+                                // Check if position is valid (not on path, not near objects)
+                                if (Math.abs(x) < pathExclusionWidth && z > -30 && z < 30) {
+                                    attempts++;
+                                    continue;
+                                }
+                                
+                                // Check distance to important objects
+                                const distToCharacter = Math.sqrt(Math.pow(x - (-15), 2) + Math.pow(z - (-20), 2));
+                                const distToCar = Math.sqrt(Math.pow(x - (-5), 2) + Math.pow(z - (-20), 2));
+                                const distToHouse = Math.sqrt(Math.pow(x - 0, 2) + Math.pow(z - 30, 2));
+                                
+                                if (distToCharacter < 5 || distToCar < 5 || distToHouse < 10) {
+                                    attempts++;
+                                    continue;
+                                }
+                                
+                                // Check distance to other clusters for better distribution
+                                let tooClose = false;
+                                for (const pos of clusterPositions) {
+                                    const dist = Math.sqrt(Math.pow(x - pos.x, 2) + Math.pow(z - pos.z, 2));
+                                    if (dist < 8) { // Minimum distance between clusters
+                                        tooClose = true;
+                                        break;
+                                    }
+                                }
+                                
+                                if (tooClose) {
+                                    attempts++;
+                                    continue;
+                                }
+                                
+                                validPosition = true;
+                                clusterPositions.push({ x, z });
+                            }
+                            
+                            if (!validPosition) continue; // Skip this cluster if no valid position found
+                            
+                            // Create grass instances around this cluster center
+                            const grassPerCluster = Math.min(10, Math.floor(grassType.count / clusterCount));
+                            for (let g = 0; g < grassPerCluster; g++) {
+                                const index = c * grassPerCluster + g;
+                                if (index >= grassType.count) break;
+                                
+                                // Randomize position around cluster center
+                                const clusterRadius = 3 + Math.random() * 2; // 3-5 unit radius
+                                const angle = Math.random() * Math.PI * 2;
+                                const distance = Math.random() * clusterRadius;
+                                
+                                const posX = x + Math.cos(angle) * distance;
+                                const posZ = z + Math.sin(angle) * distance;
+                                
+                                // Set position
+                                dummy.position.set(
+                                    posX,
+                                    grassType.heightOffset + (Math.random() * 0.05), // Small height variation
+                                    posZ
+                                );
+                                
+                                // Random rotation
+                                dummy.rotation.y = Math.random() * Math.PI * 2;
+                                
+                                // Random scale within range, with slight variation
+                                const scale = grassType.scaleRange[0] + Math.random() * (grassType.scaleRange[1] - grassType.scaleRange[0]);
+                                const scaleVariation = 0.9 + Math.random() * 0.2; // 0.9-1.1 variation factor
+                                dummy.scale.set(
+                                    scale * scaleVariation,
+                                    scale * (0.95 + Math.random() * 0.1), // Height variation
+                                    scale * scaleVariation
+                                );
+                                
+                                // Apply matrix
+                                dummy.updateMatrix();
+                                instancedMesh.setMatrixAt(index, dummy.matrix);
+                            }
+                        }
+                        
+                        // Fill remaining instances if any
+                        const remainingCount = grassType.count - (clusterCount * Math.min(10, Math.floor(grassType.count / clusterCount)));
+                        if (remainingCount > 0) {
+                            const startIndex = grassType.count - remainingCount;
+                            
+                            for (let i = 0; i < remainingCount; i++) {
+                                let x, z;
+                                let attempts = 0;
+                                let validPosition = false;
+                                
+                                while (!validPosition && attempts < 20) {
+                                    x = (Math.random() * 2 - 1) * groundSize;
+                                    z = (Math.random() * 2 - 1) * groundSize;
+                                    
+                                    if (Math.abs(x) < pathExclusionWidth && z > -30 && z < 30) {
+                                        attempts++;
+                                        continue;
+                                    }
+                                    
+                                    const distToCharacter = Math.sqrt(Math.pow(x - (-15), 2) + Math.pow(z - (-20), 2));
+                                    const distToCar = Math.sqrt(Math.pow(x - (-5), 2) + Math.pow(z - (-20), 2));
+                                    const distToHouse = Math.sqrt(Math.pow(x - 0, 2) + Math.pow(z - 30, 2));
+                                    
+                                    if (distToCharacter < 5 || distToCar < 5 || distToHouse < 10) {
+                                        attempts++;
+                                        continue;
+                                    }
+                                    
+                                    validPosition = true;
+                                }
+                                
+                                if (!validPosition) continue; // Skip this instance if no valid position found
+                                
+                                // Set position
+                                dummy.position.set(
+                                    x,
+                                    grassType.heightOffset + (Math.random() * 0.05),
+                                    z
+                                );
+                                
+                                // Random rotation
+                                dummy.rotation.y = Math.random() * Math.PI * 2;
+                                
+                                // Random scale within range
+                                const scale = grassType.scaleRange[0] + Math.random() * (grassType.scaleRange[1] - grassType.scaleRange[0]);
+                                dummy.scale.set(scale, scale, scale);
+                                
+                                // Apply matrix
+                                dummy.updateMatrix();
+                                instancedMesh.setMatrixAt(startIndex + i, dummy.matrix);
+                            }
+                        }
+                        
+                        // Update the instance matrix
+                        instancedMesh.instanceMatrix.needsUpdate = true;
+                        
+                        // Add to scene
+                        scene.add(instancedMesh);
+                        instancedObjects.push(instancedMesh);
+                        
+                        // Update loaded count
+                        loadedInstances++;
+                        
+                        // Log progress
+                        console.log(`Loaded instanced grass ${loadedInstances}/${grassTypes.length}`);
+                        
+                        // When all are loaded, update loading message
+                        if (loadedInstances === grassTypes.length) {
+                            document.getElementById('info').textContent = 'Instanced grass added to scene!';
+                            setTimeout(() => {
+                                document.getElementById('info').textContent = '';
+                            }, 3000);
+                        }
+                    }
+                });
+            });
+            
+            // Return the array of instanced objects for future reference
+            return instancedObjects;
         }
     </script>
 </body>
