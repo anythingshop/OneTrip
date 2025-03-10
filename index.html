@@ -358,7 +358,10 @@
     <script>
         // Scene setup
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB);
+        scene.background = new THREE.Color(0x87CEEB); // Sky blue color
+        
+        // Add subtle atmospheric fog for depth
+        scene.fog = new THREE.FogExp2(0x9dc1e0, 0.012); // Subtle blue-tinted fog that increases with distance
         
         // Camera setup
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
@@ -368,6 +371,7 @@
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadow edges
         document.body.appendChild(renderer.domElement);
         
         // Controls for testing
@@ -375,27 +379,59 @@
         controls.target.set(0, 2, 0);
         controls.update();
         
-        // Lights
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        // Enhanced lighting for better visuals
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6); // Slightly brighter ambient light
         scene.add(ambientLight);
         
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-        directionalLight.position.set(5, 10, 5);
+        // Main directional light (sun)
+        const directionalLight = new THREE.DirectionalLight(0xfff0dd, 1.2); // Warmer light color and brighter
+        directionalLight.position.set(5, 12, 8);
         directionalLight.castShadow = true;
         directionalLight.shadow.mapSize.width = 2048;
         directionalLight.shadow.mapSize.height = 2048;
+        directionalLight.shadow.camera.near = 0.5;
+        directionalLight.shadow.camera.far = 50;
+        directionalLight.shadow.camera.left = -20;
+        directionalLight.shadow.camera.right = 20;
+        directionalLight.shadow.camera.top = 20;
+        directionalLight.shadow.camera.bottom = -20;
         scene.add(directionalLight);
         
-        // Ground
-        const groundGeometry = new THREE.PlaneGeometry(200, 200);
-        const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x7CFC00 });
+        // Add a secondary fill light
+        const fillLight = new THREE.DirectionalLight(0xcceeff, 0.4); // Subtle blue-ish fill light
+        fillLight.position.set(-10, 8, -10);
+        scene.add(fillLight);
+        
+        // Ground with enhanced visual quality
+        const groundGeometry = new THREE.PlaneGeometry(200, 200, 50, 50); // Added more segments for detail
+        const groundMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x4d9a42, // Richer green color
+            roughness: 0.8,
+            metalness: 0.1,
+        });
+        
+        // Add some variation to the ground vertices for a more natural look
+        const vertices = groundGeometry.attributes.position.array;
+        for (let i = 0; i < vertices.length; i += 3) {
+            // Skip the very center area where the path will be
+            const x = vertices[i];
+            const z = vertices[i + 2];
+            
+            // Don't modify terrain near the path
+            if (Math.abs(x) < 3 && z > -30 && z < 30) continue;
+            
+            // Add subtle height variation
+            vertices[i + 1] = Math.sin(x / 10) * Math.cos(z / 10) * 0.2;
+        }
+        
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         scene.add(ground);
         
-        // Grid helper
+        // Grid helper (hidden by default for better visuals)
         const gridHelper = new THREE.GridHelper(200, 200);
+        gridHelper.visible = false; // Hide grid by default for better aesthetics
         scene.add(gridHelper);
         
         // Create text labels for each model
@@ -432,26 +468,108 @@
 
         // Add a path/driveway
         function createDriveway() {
-            const pathGeometry = new THREE.PlaneGeometry(5, 50);
+            // Create a more realistic path with texture and details
+            const pathGeometry = new THREE.PlaneGeometry(5, 50, 10, 30);
             const pathMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0xBDBDBD,
-                roughness: 0.9
+                color: 0xc2b280, // Sandy color for the path
+                roughness: 0.9,
+                metalness: 0.1,
             });
+            
+            // Add subtle elevation variation to the path
+            const pathVertices = pathGeometry.attributes.position.array;
+            for (let i = 0; i < pathVertices.length; i += 3) {
+                // Get the current vertex z position (corresponds to path length)
+                const z = pathVertices[i + 2];
+                
+                // Add very subtle undulation based on position
+                // More pronounced at the edges, smoother in the center
+                const x = pathVertices[i];
+                const edgeFactor = Math.pow(Math.abs(x) / 2.5, 2); // Stronger effect at edges
+                
+                // Small random bumps along the path
+                pathVertices[i + 1] = (Math.sin(z * 0.5) * 0.03 + Math.cos(z * 0.2) * 0.02) * edgeFactor;
+            }
+            
             const path = new THREE.Mesh(pathGeometry, pathMaterial);
             path.rotation.x = -Math.PI / 2;
-            path.position.set(0, 0.02, 5); // Slightly above ground to prevent z-fighting
+            path.position.set(0, 0.03, 5); // Slightly above ground to prevent z-fighting
             path.receiveShadow = true;
             scene.add(path);
             
+            // Add path borders for more definition (small stones/pebbles along the edges)
+            const borderMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xa8a198, // Slightly darker than the path
+                roughness: 1.0,
+                metalness: 0.05,
+            });
+            
+            // Left border
+            const leftBorderGeometry = new THREE.BoxGeometry(0.3, 0.1, 50);
+            const leftBorder = new THREE.Mesh(leftBorderGeometry, borderMaterial);
+            leftBorder.position.set(-2.65, 0.05, 5);
+            leftBorder.receiveShadow = true;
+            leftBorder.castShadow = true;
+            scene.add(leftBorder);
+            
+            // Right border
+            const rightBorderGeometry = new THREE.BoxGeometry(0.3, 0.1, 50);
+            const rightBorder = new THREE.Mesh(rightBorderGeometry, borderMaterial);
+            rightBorder.position.set(2.65, 0.05, 5);
+            rightBorder.receiveShadow = true;
+            rightBorder.castShadow = true;
+            scene.add(rightBorder);
+            
+            // Add a few small stone details along the path
+            addPathStones();
+            
             // Add steps leading to the house
             createPorchSteps();
+        }
+        
+        // Add small decorative stones along the path
+        function addPathStones() {
+            const stoneMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x808080, 
+                roughness: 0.8, 
+                metalness: 0.2 
+            });
+            
+            // Create and place several small stones along the path
+            for (let i = 0; i < 15; i++) {
+                // Randomize position along path and slightly off-center
+                const zPos = -20 + (i * 3) + (Math.random() * 2 - 1);
+                const xPos = (Math.random() * 4 - 2) * 0.9; // Keep within path bounds
+                
+                const stoneSize = 0.15 + Math.random() * 0.15; // Random stone size
+                const stoneGeometry = new THREE.DodecahedronGeometry(stoneSize, 0);
+                
+                // Slightly flatten the stone
+                stoneGeometry.scale(1, 0.4, 1);
+                
+                const stone = new THREE.Mesh(stoneGeometry, stoneMaterial);
+                stone.position.set(xPos, 0.08, zPos);
+                
+                // Random rotation for natural look
+                stone.rotation.y = Math.random() * Math.PI * 2;
+                stone.rotation.x = Math.random() * 0.2;
+                stone.rotation.z = Math.random() * 0.2;
+                
+                stone.castShadow = true;
+                stone.receiveShadow = true;
+                scene.add(stone);
+            }
         }
         
         // Create porch steps leading to the house
         function createPorchSteps() {
             const stepWidth = 4;
             const stepDepth = 0.8;
-            const stepMaterial = new THREE.MeshStandardMaterial({ color: 0xA0A0A0 });
+            const stepMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xdcdcdc, // Lighter grey for concrete steps
+                roughness: 0.7,
+                metalness: 0.1 
+            });
             
             // Add three steps of increasing height
             for (let i = 0; i < 3; i++) {
@@ -470,6 +588,9 @@
                 step.userData.isCollider = true;
                 
                 scene.add(step);
+                
+                // Add subtle edge details to steps
+                addStepEdge(stepWidth, stepHeight, stepDepth, 0, stepHeight / 2, zPosition);
             }
             
             // Add a porch platform
@@ -480,7 +601,152 @@
             porch.receiveShadow = true;
             porch.userData.isCollider = true;
             scene.add(porch);
+            
+            // Add decorative planters on either side of the porch
+            addPorchPlanters();
         }
+        
+        // Function to add subtle edge detail to steps
+        function addStepEdge(width, height, depth, x, y, z) {
+            const edgeMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xb0b0b0, // Slightly darker than the steps
+                roughness: 0.9,
+                metalness: 0.05 
+            });
+            
+            // Create a thin detail along the front edge of the step
+            const edgeGeometry = new THREE.BoxGeometry(width + 0.2, height * 0.2, depth * 0.1);
+            const edge = new THREE.Mesh(edgeGeometry, edgeMaterial);
+            
+            // Position at the front edge of the step
+            edge.position.set(x, y - height * 0.4, z + depth * 0.45);
+            
+            edge.castShadow = true;
+            edge.receiveShadow = true;
+            scene.add(edge);
+        }
+        
+        // Function to add decorative planters beside the porch
+        function addPorchPlanters() {
+            // Planter box material
+            const planterMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x8b4513, // Brown color for wooden planters
+                roughness: 0.9,
+                metalness: 0.1 
+            });
+            
+            // Create two planter boxes
+            for (let side = -1; side <= 1; side += 2) {
+                // Skip if side is 0 (only want -1 and 1)
+                if (side === 0) continue;
+                
+                // Create planter box
+                const planterGeometry = new THREE.BoxGeometry(1, 0.8, 1);
+                const planter = new THREE.Mesh(planterGeometry, planterMaterial);
+                
+                // Position on either side of the steps
+                planter.position.set(side * 2.5, 0.4, 26.5);
+                
+                planter.castShadow = true;
+                planter.receiveShadow = true;
+                planter.userData.isCollider = true;
+                scene.add(planter);
+                
+                // Add plants/flowers in the planter
+                addPlanterFlowers(side * 2.5, 0.8, 26.5);
+            }
+        }
+        
+        // Function to add flowers to planters
+        function addPlanterFlowers(x, y, z) {
+            // Flower stem material
+            const stemMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x006400, // Dark green
+                roughness: 0.8,
+                metalness: 0.0 
+            });
+            
+            // Flower petal materials with different colors
+            const petalMaterials = [
+                new THREE.MeshStandardMaterial({ color: 0xff5555, roughness: 0.7, metalness: 0.0 }), // Red
+                new THREE.MeshStandardMaterial({ color: 0xffff55, roughness: 0.7, metalness: 0.0 }), // Yellow
+                new THREE.MeshStandardMaterial({ color: 0x55ff55, roughness: 0.7, metalness: 0.0 })  // Green
+            ];
+            
+            // Create a few stems with flowers
+            for (let i = 0; i < 5; i++) {
+                // Create stem
+                const stemGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.5, 8);
+                const stem = new THREE.Mesh(stemGeometry, stemMaterial);
+                
+                // Position within the planter with random offsets
+                const offsetX = (Math.random() - 0.5) * 0.7;
+                const offsetZ = (Math.random() - 0.5) * 0.7;
+                stem.position.set(x + offsetX, y + 0.25, z + offsetZ);
+                
+                stem.castShadow = true;
+                scene.add(stem);
+                
+                // Create flower petals
+                const petalMaterial = petalMaterials[Math.floor(Math.random() * petalMaterials.length)];
+                const petalGeometry = new THREE.SphereGeometry(0.1, 8, 6);
+                petalGeometry.scale(1, 0.3, 1); // Flatten the sphere to make it more petal-like
+                
+                const petal = new THREE.Mesh(petalGeometry, petalMaterial);
+                petal.position.set(x + offsetX, y + 0.5, z + offsetZ);
+                petal.castShadow = true;
+                scene.add(petal);
+            }
+        }
+        
+        // Add some ambiance sounds
+        function setupAmbientSounds() {
+            // Create an audio listener and add it to the camera
+            const listener = new THREE.AudioListener();
+            camera.add(listener);
+            
+            // Create a global ambient sound
+            const ambientSound = new THREE.Audio(listener);
+            
+            // Load a sound and set it as the Audio object's buffer
+            const audioLoader = new THREE.AudioLoader();
+            audioLoader.load('./sounds/wind.mp3', function(buffer) {
+                ambientSound.setBuffer(buffer);
+                ambientSound.setLoop(true);
+                ambientSound.setVolume(0.2);
+                // Don't autoplay - let the user initiate sound
+                // ambientSound.play();
+                
+                // Add a play sound button
+                const soundButton = document.createElement('button');
+                soundButton.innerHTML = '🔊 Sound';
+                soundButton.style.position = 'absolute';
+                soundButton.style.bottom = '20px';
+                soundButton.style.left = '20px';
+                soundButton.style.zIndex = '1002';
+                soundButton.style.padding = '8px 12px';
+                soundButton.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
+                soundButton.style.border = 'none';
+                soundButton.style.borderRadius = '4px';
+                soundButton.style.cursor = 'pointer';
+                
+                soundButton.addEventListener('click', function() {
+                    if (ambientSound.isPlaying) {
+                        ambientSound.pause();
+                        soundButton.innerHTML = '🔇 Sound';
+                    } else {
+                        ambientSound.play();
+                        soundButton.innerHTML = '🔊 Sound';
+                    }
+                });
+                
+                document.body.appendChild(soundButton);
+            });
+        }
+        
+        // Commented out sound setup until we have the sound files
+        // setupAmbientSounds();
+
         createDriveway();
 
         // Models to load with adjusted positions
@@ -510,7 +776,29 @@
             { name: 'Tree', file: './tree.glb', position: [-10, 0, 0], scale: 0.5, rotationY: 0 },
             { name: 'Tree 2', file: './tree.glb', position: [10, 0, 10], scale: 0.4, rotationY: Math.PI/3 },
             { name: 'Rocks', file: './rocks.glb', position: [5, 0, -5], scale: 0.5, rotationY: 0 },
-            { name: 'Leaves', file: './leaves.glb', position: [2, 0, 15], scale: 0.5, rotationY: 0 }
+            { name: 'Leaves', file: './leaves.glb', position: [2, 0, 15], scale: 0.5, rotationY: 0 },
+            
+            // Add grass around the character and car area
+            { name: 'Grass Large 1', file: './grass_large1.glb', position: [-18, 0, -18], scale: 0.6, rotationY: Math.random() * Math.PI * 2 },
+            { name: 'Grass Large 2', file: './grass_large2.glb', position: [-10, 0, -25], scale: 0.7, rotationY: Math.random() * Math.PI * 2 },
+            { name: 'Grass Large 3', file: './grass_large3.glb', position: [-8, 0, -15], scale: 0.65, rotationY: Math.random() * Math.PI * 2 },
+            
+            // Add grass around the path
+            { name: 'Grass Medium 1', file: './grass_medium1.glb', position: [-3, 0, -10], scale: 0.5, rotationY: Math.random() * Math.PI * 2 },
+            { name: 'Grass Medium 2', file: './grass_medium2.glb', position: [3, 0, -5], scale: 0.45, rotationY: Math.random() * Math.PI * 2 },
+            { name: 'Grass Medium 3', file: './grass_medium3.glb', position: [-4, 0, 5], scale: 0.55, rotationY: Math.random() * Math.PI * 2 },
+            
+            // Add grass near the house
+            { name: 'Grass Small 1', file: './grass_small1.glb', position: [-5, 0, 20], scale: 0.4, rotationY: Math.random() * Math.PI * 2 },
+            { name: 'Grass Small 2', file: './grass_small2.glb', position: [5, 0, 22], scale: 0.35, rotationY: Math.random() * Math.PI * 2 },
+            { name: 'Grass Small 3', file: './grass_small3.glb', position: [2, 0, 25], scale: 0.3, rotationY: Math.random() * Math.PI * 2 },
+            
+            // Add more grass clusters for visual density
+            { name: 'Grass Cluster 1', file: './grass_medium1.glb', position: [-15, 0, -5], scale: 0.5, rotationY: Math.random() * Math.PI * 2 },
+            { name: 'Grass Cluster 2', file: './grass_large1.glb', position: [12, 0, 0], scale: 0.6, rotationY: Math.random() * Math.PI * 2 },
+            { name: 'Grass Cluster 3', file: './grass_small2.glb', position: [8, 0, -15], scale: 0.4, rotationY: Math.random() * Math.PI * 2 },
+            { name: 'Grass Cluster 4', file: './grass_medium3.glb', position: [-7, 0, 15], scale: 0.5, rotationY: Math.random() * Math.PI * 2 },
+            { name: 'Grass Cluster 5', file: './grass_large3.glb', position: [15, 0, 18], scale: 0.7, rotationY: Math.random() * Math.PI * 2 }
         ];
 
         // Animation variables
