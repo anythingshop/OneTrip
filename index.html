@@ -102,9 +102,9 @@
     
     <div id="pickupControls">
         <h3>Pickup Actions</h3>
-        <button id="pickupLowBtn">Pickup Low</button>
-        <button id="pickupHighBtn">Pickup High</button>
-        <button id="attachBagBtn">Attach Bag</button>
+        <button id="pickupLowBtn">Pickup Low (Ground)</button>
+        <button id="pickupHighBtn">Pickup High (Car)</button>
+        <button id="attachBagBtn">Attach Bag to Hand</button>
         <button id="detachBagBtn">Detach Bag</button>
     </div>
     
@@ -231,12 +231,12 @@
             { name: 'House', file: './house.glb', position: [0, 0, 30], scale: 0.5, rotationY: Math.PI },
             
             // Bags ON TOP of the car - moved further back (more negative Z)
-            { name: 'Car Bag 1', file: './newbag.glb', position: [-5, 3.5, -21], scale: 0.3, rotationY: 0 },
+            { name: 'Car Bag 1', file: './newbag.glb', position: [-5, 3.5, -21], scale: 0.4, rotationY: 0 },
             { name: 'Car Bag 2', file: './bag2.glb', position: [-5, 3.5, -22], scale: 0.4, rotationY: Math.PI/4 },
             
             // Bags on the GROUND near character
             { name: 'Ground Bag 1', file: './newbag.glb', position: [-13, 0, -19], scale: 0.4, rotationY: 0 },
-            { name: 'Ground Bag 2', file: './bag2.glb', position: [-14, 0, -21], scale: 0.5, rotationY: Math.PI/4 },
+            { name: 'Ground Bag 2', file: './bag2.glb', position: [-14, 0, -21], scale: 0.4, rotationY: Math.PI/4 },
             
             // Environment objects properly spaced along the path
             { name: 'Tree', file: './tree.glb', position: [-10, 0, 0], scale: 0.5, rotationY: 0 },
@@ -250,12 +250,8 @@
         let animations = [];
         let upperBodyActions = {};
         let lowerBodyActions = {};
-        let mirroredUpperBodyActions = {};
-        let mirroredLowerBodyActions = {};
         let currentUpperBodyAction = null;
         let currentLowerBodyAction = null;
-        let currentUpperBodyAnimation = 'walk';
-        let currentLowerBodyAnimation = 'walk';
         let balanceEnabled = false;
         let balanceValue = 0.5;
         let currentBalanceDirection = "center"; // left, center, right
@@ -264,11 +260,25 @@
         let leftHand = null;
         let rightHand = null;
         
+        // References to bags for attaching
+        let groundBag1 = null;
+        let groundBag2 = null;
+        let carBag1 = null;
+        let carBag2 = null;
+        
+        // Currently attached bag
+        let attachedBag = null;
+
+        // References for mirrored animations
+        let stumbleRightUpperAction = null;
+        let stumbleRightLowerAction = null;
+        let stumbleLeftUpperAction = null;
+        let stumbleLeftLowerAction = null;
+
         // Load models
         const loader = new THREE.GLTFLoader();
         let loadedCount = 0;
         let characterModel;
-        let groundBag1, groundBag2, carBag1, carBag2;
         
         models.forEach(model => {
             // Create label for this model
@@ -376,11 +386,13 @@
                     }
                 }
                 
-                // For quaternion tracks (rotations), invert appropriate components
+                // For quaternion tracks (rotations), invert W component to mirror the rotation
                 if (trackName.endsWith('.quaternion')) {
                     for (let i = 0; i < values.length; i += 4) {
-                        values[i] = -values[i];      // Invert X component
+                        values[i] = -values[i];    // Invert X component
+                        values[i + 1] = values[i + 1]; // Keep Y
                         values[i + 2] = -values[i + 2]; // Invert Z component
+                        values[i + 3] = values[i + 3];  // Keep W
                     }
                 }
                 
@@ -459,24 +471,9 @@
                     lowerBodyTracks
                 );
                 
-                // Create mirrored versions
-                const mirroredUpperBodyClip = createMirroredAnimation(
-                    upperBodyClip,
-                    clip.name + '_upper_mirrored'
-                );
-                
-                const mirroredLowerBodyClip = createMirroredAnimation(
-                    lowerBodyClip,
-                    clip.name + '_lower_mirrored'
-                );
-                
-                // Store regular actions
+                // Store normal actions
                 upperBodyActions[clip.name] = mixer.clipAction(upperBodyClip);
                 lowerBodyActions[clip.name] = mixer.clipAction(lowerBodyClip);
-                
-                // Store mirrored actions
-                mirroredUpperBodyActions[clip.name] = mixer.clipAction(mirroredUpperBodyClip);
-                mirroredLowerBodyActions[clip.name] = mixer.clipAction(mirroredLowerBodyClip);
                 
                 // Add to dropdowns
                 const upperOption = document.createElement('option');
@@ -494,6 +491,29 @@
                     upperSelect.value = clip.name;
                     lowerSelect.value = clip.name;
                 }
+                
+                // Create mirrored versions of stumble animation
+                if (clip.name === 'stumble_lowerbody') {
+                    // Store original actions for right stumble
+                    stumbleRightUpperAction = upperBodyActions[clip.name];
+                    stumbleRightLowerAction = lowerBodyActions[clip.name];
+                    
+                    // Create mirrored upper body animation for left stumble
+                    const mirroredUpperClip = createMirroredAnimation(
+                        upperBodyClip, 
+                        'stumble_lowerbody_left_upper'
+                    );
+                    stumbleLeftUpperAction = mixer.clipAction(mirroredUpperClip);
+                    
+                    // Create mirrored lower body animation for left stumble
+                    const mirroredLowerClip = createMirroredAnimation(
+                        lowerBodyClip, 
+                        'stumble_lowerbody_left_lower'
+                    );
+                    stumbleLeftLowerAction = mixer.clipAction(mirroredLowerClip);
+                    
+                    console.log('Created mirrored stumble animations for left direction');
+                }
             });
             
             // Initialize with default animations
@@ -504,21 +524,10 @@
         }
         
         // Function to set upper body animation
-        function setUpperBodyAnimation(name, mirrored = false) {
-            let action;
-            
-            if (mirrored) {
-                action = mirroredUpperBodyActions[name];
-                if (!action) {
-                    console.warn(`Mirrored upper body animation '${name}' not found`);
-                    return;
-                }
-            } else {
-                action = upperBodyActions[name];
-                if (!action) {
-                    console.warn(`Upper body animation '${name}' not found`);
-                    return;
-                }
+        function setUpperBodyAnimation(name) {
+            if (!upperBodyActions[name]) {
+                console.warn(`Upper body animation '${name}' not found`);
+                return;
             }
             
             // Fade out current animation
@@ -527,32 +536,20 @@
             }
             
             // Play new animation
+            const action = upperBodyActions[name];
             action.reset();
             action.fadeIn(0.5);
             action.play();
             
             currentUpperBodyAction = action;
-            currentUpperBodyAnimation = name;
-            
-            console.log(`Playing upper body animation: ${name}${mirrored ? ' (mirrored)' : ''}`);
+            console.log(`Playing upper body animation: ${name}`);
         }
         
         // Function to set lower body animation
-        function setLowerBodyAnimation(name, mirrored = false) {
-            let action;
-            
-            if (mirrored) {
-                action = mirroredLowerBodyActions[name];
-                if (!action) {
-                    console.warn(`Mirrored lower body animation '${name}' not found`);
-                    return;
-                }
-            } else {
-                action = lowerBodyActions[name];
-                if (!action) {
-                    console.warn(`Lower body animation '${name}' not found`);
-                    return;
-                }
+        function setLowerBodyAnimation(name) {
+            if (!lowerBodyActions[name]) {
+                console.warn(`Lower body animation '${name}' not found`);
+                return;
             }
             
             // Fade out current animation
@@ -561,17 +558,55 @@
             }
             
             // Play new animation
+            const action = lowerBodyActions[name];
             action.reset();
             action.fadeIn(0.5);
             action.play();
             
             currentLowerBodyAction = action;
-            currentLowerBodyAnimation = name;
-            
-            console.log(`Playing lower body animation: ${name}${mirrored ? ' (mirrored)' : ''}`);
+            console.log(`Playing lower body animation: ${name}`);
         }
         
-        // Function to attach a bag to a hand (simplified)
+        // Function to play stumble animation based on direction
+        function playStumbleAnimation(direction) {
+            // Fade out current animations
+            if (currentUpperBodyAction) {
+                currentUpperBodyAction.fadeOut(0.3);
+            }
+            if (currentLowerBodyAction) {
+                currentLowerBodyAction.fadeOut(0.3);
+            }
+            
+            if (direction === 'left') {
+                // Play left stumble (mirrored) animations
+                stumbleLeftUpperAction.reset();
+                stumbleLeftUpperAction.fadeIn(0.3);
+                stumbleLeftUpperAction.play();
+                currentUpperBodyAction = stumbleLeftUpperAction;
+                
+                stumbleLeftLowerAction.reset();
+                stumbleLeftLowerAction.fadeIn(0.3);
+                stumbleLeftLowerAction.play();
+                currentLowerBodyAction = stumbleLeftLowerAction;
+                
+                console.log('Playing left stumble animations (mirrored)');
+            } else {
+                // Play right stumble animations (original)
+                stumbleRightUpperAction.reset();
+                stumbleRightUpperAction.fadeIn(0.3);
+                stumbleRightUpperAction.play();
+                currentUpperBodyAction = stumbleRightUpperAction;
+                
+                stumbleRightLowerAction.reset();
+                stumbleRightLowerAction.fadeIn(0.3);
+                stumbleRightLowerAction.play();
+                currentLowerBodyAction = stumbleRightLowerAction;
+                
+                console.log('Playing right stumble animations');
+            }
+        }
+        
+        // Function to attach a bag to the character's hand
         function attachBagToHand(bag, hand) {
             if (!bag || !hand || !characterModel) {
                 console.error("Cannot attach bag - missing references:", { 
@@ -657,35 +692,15 @@
                 
                 // Skip animation changes if balance effect is disabled
                 if (balanceEnabled) {
-                    updateAnimationsForBalance(direction);
+                    playStumbleAnimation(direction);
                 }
-            }
-        }
-        
-        // Function to update animations based on balance direction
-        function updateAnimationsForBalance(direction) {
-            if (direction === 'left') {
-                // Use mirrored animations for left imbalance
-                setLowerBodyAnimation('stumble_lowerbody', true);
-                setUpperBodyAnimation(currentUpperBodyAnimation, true);
-                console.log('Left imbalance - using mirrored animations');
-            } else if (direction === 'right') {
-                // Use regular animations for right imbalance
-                setLowerBodyAnimation('stumble_lowerbody', false);
-                setUpperBodyAnimation(currentUpperBodyAnimation, false);
-                console.log('Right imbalance - using regular animations');
-            } else {
-                // Return to walking for balance
-                setLowerBodyAnimation('walk', false);
-                setUpperBodyAnimation(currentUpperBodyAnimation, false);
-                console.log('Balanced - using regular walk animation for lower body');
             }
         }
         
         // Set up UI event listeners
         document.getElementById('upperBodyAnim').addEventListener('change', function() {
             // Update the animation and maintain the current mirroring if needed
-            setUpperBodyAnimation(this.value, currentBalanceDirection === 'left');
+            setUpperBodyAnimation(this.value);
         });
         
         document.getElementById('lowerBodyAnim').addEventListener('change', function() {
@@ -699,11 +714,11 @@
         });
         
         document.getElementById('pickupLowBtn').addEventListener('click', function() {
-            setUpperBodyAnimation('pickup_low', currentBalanceDirection === 'left');
+            setUpperBodyAnimation('pickup_low');
         });
         
         document.getElementById('pickupHighBtn').addEventListener('click', function() {
-            setUpperBodyAnimation('pickup_high', currentBalanceDirection === 'left');
+            setUpperBodyAnimation('pickup_high');
         });
         
         document.getElementById('attachBagBtn').addEventListener('click', function() {
@@ -779,5 +794,4 @@
         });
     </script>
 </body>
-</html> 
 </html> 
