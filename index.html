@@ -1563,9 +1563,13 @@
                 if (node.isMesh) {
                     node.castShadow = true;
                     node.receiveShadow = true;
+                    node.visible = true; // Explicitly set visible flag
                     
                     // Ensure materials are visible and have good rendering properties
                     if (node.material) {
+                        // Log material properties for debugging
+                        console.log("Bag material:", node.material.type, "transparent:", node.material.transparent, "visible:", node.visible);
+                        
                         // Make sure material is not transparent unless it needs to be
                         node.material.transparent = false;
                         node.material.opacity = 1.0;
@@ -2164,7 +2168,7 @@
                 // Calculate movement speed with acceleration/deceleration
                 const targetSpeed = maxMovementSpeed * Math.sqrt(inputX*inputX + inputZ*inputZ);
                 const speedDiff = targetSpeed - movementAcceleration;
-                movementAcceleration += speedDiff * 0.08;
+                movementAcceleration += speedDiff * 0.2 * (delta * 60); // Increased from 0.08, make framerate independent
                 
                 // Always use camera direction for movement, not character direction
                 const cameraForward = new THREE.Vector3(0, 0, -1);
@@ -2805,6 +2809,9 @@
                 
                 // Handle balance updates based on control input
                 updateBalanceBasedOnControls();
+                
+                // Ensure attached bags remain visible
+                ensureAttachedBagsVisibility();
             } else {
                 // Still update animations during game over
                 if (mixer) mixer.update(delta);
@@ -2956,7 +2963,7 @@
                 // Calculate movement speed with acceleration/deceleration
                 const targetSpeed = maxMovementSpeed * Math.sqrt(inputX*inputX + inputZ*inputZ);
                 const speedDiff = targetSpeed - movementAcceleration;
-                movementAcceleration += speedDiff * 0.08;
+                movementAcceleration += speedDiff * 0.2 * (delta * 60); // Increased from 0.08, make framerate independent
                 
                 // Always use camera direction for movement, not character direction
                 const cameraForward = new THREE.Vector3(0, 0, -1);
@@ -3752,6 +3759,34 @@
             while (attachedBags.length > 0) {
                 detachBag();
             }
+        }
+
+        // Function to ensure all attached bags are visible
+        function ensureAttachedBagsVisibility() {
+            // Skip if no bags are attached
+            if (attachedBags.length === 0) return;
+            
+            // Check each attached bag
+            attachedBags.forEach(bagData => {
+                const bag = bagData.mesh;
+                
+                // Ensure the bag and all its children are visible
+                bag.traverse(node => {
+                    if (node.isMesh) {
+                        // Make sure the mesh is visible
+                        node.visible = true;
+                        
+                        // Ensure material is properly set
+                        if (node.material) {
+                            node.material.transparent = false;
+                            node.material.opacity = 1.0;
+                            node.material.depthWrite = true;
+                            node.material.depthTest = true;
+                            node.material.needsUpdate = true;
+                        }
+                    }
+                });
+            });
         }
 
         // Start the main animation loop
