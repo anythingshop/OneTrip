@@ -181,8 +181,8 @@
         }
         #interactButton {
             position: absolute;
-            bottom: 100px;
-            right: 220px; /* Moved to make room for rotation joystick */
+            bottom: 230px; /* Moved higher up */
+            left: 80px; /* Positioned above the left joystick */
             width: 80px;
             height: 80px;
             background: rgba(255, 255, 255, 0.5);
@@ -190,18 +190,18 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            color: white;
-            font-size: 24px;
+            font-size: 16px;
+            color: #333;
             font-weight: bold;
             z-index: 1001;
             touch-action: none;
-            border: 2px solid rgba(255, 255, 255, 0.8);
-            text-shadow: 1px 1px 2px #000;
         }
         #interactButton.highlight {
-            background: rgba(76, 175, 80, 0.7);
-            transform: scale(1.1);
-            transition: all 0.3s;
+            background: rgba(76, 175, 80, 0.7); /* Green highlight */
+            color: white;
+            text-shadow: 1px 1px 2px #000;
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.9);
+            border: 2px solid rgba(255, 255, 255, 0.8);
         }
         #helpOverlay {
             position: absolute;
@@ -2762,8 +2762,9 @@
                 cameraForward.y = 0; // Keep movement on horizontal plane
                 cameraForward.normalize();
                 
-                // Calculate right vector correctly
-                cameraRight.copy(new THREE.Vector3(0, 1, 0)).cross(cameraForward).normalize();
+                // Calculate right vector correctly (do NOT use .copy() method here)
+                cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraForward);
+                cameraRight.normalize();
                 
                 // Calculate movement direction relative to camera
                 moveDirection.set(0, 0, 0)
@@ -2799,17 +2800,21 @@
             // Update character animations based on movement state
             if (isMoving) {
                 // Set appropriate animations for moving based on weight class
-                        if (attachedBags.length > 0) {
+                if (attachedBags.length > 0) {
                     // Use weight-based carry animations
                     const animName = `carry_walk_${carryWeightClass}`;
                     if (currentUpperBodyAnimation !== animName) {
                         forcedAnimationUpdate(animName);
                     }
-                        } else {
+                } else {
                     // Regular walking animation when not carrying
                     if (currentUpperBodyAnimation !== 'walk') {
+                        // Always set both upper and lower body explicitly
                         setUpperBodyAnimation('walk');
-                        setLowerBodyAnimation('walk');
+                        // Ensure lower body is always set for walk animation
+                        if (currentLowerBodyAnimation !== 'walk') {
+                            setLowerBodyAnimation('walk');
+                        }
                     }
                 }
             } else {
@@ -2824,7 +2829,10 @@
                     // Regular idle animation when not carrying
                     if (currentUpperBodyAnimation !== 'idle') {
                         setUpperBodyAnimation('idle');
-                        setLowerBodyAnimation('idle');
+                        // Ensure lower body is always set for idle animation
+                        if (currentLowerBodyAnimation !== 'idle') {
+                            setLowerBodyAnimation('idle');
+                        }
                     }
                 }
             }
@@ -3445,15 +3453,20 @@
             // Get horizontal input from mouse/joystick for balance
             let horizontalInput = 0;
             
-            // Use dedicated keyboard controls for balance (Q and E keys)
-            if (keysPressed['q']) {
+            // Mouse input takes priority if available
+            if (lastMouseMoveX !== 0) {
+                // Increased sensitivity for more responsive balance control
+                horizontalInput = lastMouseMoveX * 0.05; 
+            } 
+            // Keyboard controls for balance (Q and E keys)
+            else if (keysPressed['q']) {
                 // Q key - lean left
                 horizontalInput = -1.0;
             } else if (keysPressed['e']) {
                 // E key - lean right
                 horizontalInput = 1.0;
             }
-            // Joystick rotation is another source of input if keyboard isn't being used
+            // Joystick rotation is another source of input 
             else if (rotationJoystickActive) {
                 // Increased sensitivity for more responsive balance control
                 horizontalInput = rotationJoystickDirection.x * 0.5;
@@ -3462,7 +3475,7 @@
             // Apply a balance change based on the horizontal input
             // This is completely independent from movement
             if (horizontalInput !== 0) {
-                // Moving joystick right or pressing E tilts balance right, and vice versa
+                // Moving mouse/joystick right tilts balance right, and vice versa
                 const balanceImpact = horizontalInput * 0.15;
                 
                 // Apply the balance impact
@@ -3561,8 +3574,9 @@
                 cameraForward.y = 0; // Keep movement on horizontal plane
                 cameraForward.normalize();
                 
-                // Calculate right vector correctly
-                cameraRight.copy(new THREE.Vector3(0, 1, 0)).cross(cameraForward).normalize();
+                // Calculate right vector correctly (do NOT use .copy() method here)
+                cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraForward);
+                cameraRight.normalize();
                 
                 // Calculate movement direction relative to camera
                 moveDirection.set(0, 0, 0)
@@ -3607,8 +3621,12 @@
                 } else {
                     // Regular walking animation when not carrying
                     if (currentUpperBodyAnimation !== 'walk') {
+                        // Always set both upper and lower body explicitly
                         setUpperBodyAnimation('walk');
-                        setLowerBodyAnimation('walk');
+                        // Ensure lower body is always set for walk animation
+                        if (currentLowerBodyAnimation !== 'walk') {
+                            setLowerBodyAnimation('walk');
+                        }
                     }
                 }
             } else {
@@ -3623,7 +3641,10 @@
                     // Regular idle animation when not carrying
                     if (currentUpperBodyAnimation !== 'idle') {
                         setUpperBodyAnimation('idle');
-                        setLowerBodyAnimation('idle');
+                        // Ensure lower body is always set for idle animation
+                        if (currentLowerBodyAnimation !== 'idle') {
+                            setLowerBodyAnimation('idle');
+                        }
                     }
                 }
             }
