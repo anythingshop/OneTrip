@@ -2293,10 +2293,11 @@
             // Update balance based on movement and carrying
             updateMovementBasedBalance();
             
-            // Update camera if in third-person mode and following
-            if (cameraMode === "thirdPerson" && isCameraFollowing) {
-                updateThirdPersonCamera();
-            }
+            // Camera updates are now handled ONLY in the animation loop
+            // Remove this line to fix the double vision issue
+            // if (cameraMode === "thirdPerson" && isCameraFollowing) {
+            //     updateThirdPersonCamera();
+            // }
         }
         
         // Force animation update without time constraints for important state changes
@@ -2495,7 +2496,15 @@
                             // Traditional third-person control: rotate character and camera together
                             // Calculate new rotation based on mouse movement
                             const rotationAmount = -dx * mouseRotationSensitivity;
-                            characterTilt.rotation.y += rotationAmount;
+                            
+                            // Use smooth rotation to avoid jarring camera movements
+                            // This was causing part of the issue - direct rotation changes
+                            const targetRotation = characterTilt.rotation.y + rotationAmount;
+                            characterTilt.rotation.y = THREE.MathUtils.lerp(
+                                characterTilt.rotation.y,
+                                targetRotation,
+                                0.3  // Smooth but responsive transition
+                            );
                             
                             // Rotate character model to match
                             if (characterModel) {
@@ -2777,6 +2786,7 @@
         // Animation loop
         const clock = new THREE.Clock();
         let lastFrameTime = 0;
+        let cameraUpdateScheduled = false; // Flag to ensure camera only updates once per frame
         
         // A single source of truth for camera updates
         function animate(currentTime) {
@@ -2785,8 +2795,12 @@
             // Calculate delta time
             const delta = clock.getDelta();
             
-            // Process input and update character position
+            // Process input and update character position first
+            // We DO NOT update camera here
             updateCharacterMovement(delta);
+            
+            // Reset camera update flag for this frame
+            cameraUpdateScheduled = false;
             
             // Update animations
             if (mixer) mixer.update(delta);
@@ -2794,9 +2808,10 @@
             // Handle balance updates based on control input
             updateBalanceBasedOnControls();
             
-            // Only update camera once per frame - a crucial fix
+            // ONLY update the camera once per frame, and only after all movement is complete
             if (cameraMode === "thirdPerson" && thirdPersonCamera && characterTilt) {
-                updateThirdPersonCamera();
+                // Use a completely decoupled camera update system
+                updateCameraPositionSafely();
             }
             
             // Apply camera shake if active
@@ -2827,6 +2842,35 @@
             }
             
             lastFrameTime = currentTime;
+        }
+        
+        // A safer, more controlled camera update function
+        function updateCameraPositionSafely() {
+            if (!characterTilt || !thirdPersonCamera) return;
+            
+            // Get character position
+            const characterPos = new THREE.Vector3();
+            characterTilt.getWorldPosition(characterPos);
+            
+            // Store old camera position
+            const oldCameraPos = thirdPersonCamera.position.clone();
+            
+            // Calculate camera position based on character position and rotation
+            const cameraOffset = thirdPersonCameraOffset.clone();
+            cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
+            
+            // Calculate target camera position
+            const newCameraPos = characterPos.clone().add(cameraOffset);
+            
+            // Smoothly interpolate camera position for a less jarring movement
+            thirdPersonCamera.position.lerp(newCameraPos, 0.2);
+            
+            // Ensure the target is properly updated to follow character
+            thirdPersonCameraTarget.copy(characterPos);
+            thirdPersonCameraTarget.y += 1.5; // Look slightly above character's feet
+            
+            // Look at the character
+            thirdPersonCamera.lookAt(thirdPersonCameraTarget);
         }
         
         // Function for handling balance changes based on controls
@@ -3020,21 +3064,8 @@
         
         // Update third-person camera position
         function updateThirdPersonCamera() {
-            if (!characterTilt || !thirdPersonCamera) return;
-            
-            // Get character position
-            const characterPos = new THREE.Vector3();
-            characterTilt.getWorldPosition(characterPos);
-            
-            // Calculate camera position based on character position and rotation
-            const cameraOffset = thirdPersonCameraOffset.clone();
-            cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
-            
-            // Set camera position and target
-            thirdPersonCamera.position.copy(characterPos).add(cameraOffset);
-            thirdPersonCameraTarget.copy(characterPos);
-            thirdPersonCameraTarget.y += 1.5; // Look slightly above character's feet
-            thirdPersonCamera.lookAt(thirdPersonCameraTarget);
+            // Now handled by updateCameraPositionSafely() in the animation loop
+            return;
         }
         
         // Initialize controls when everything is loaded
@@ -3563,6 +3594,8 @@
                 if (characterModel) {
                     characterModel.rotation.y = characterTilt.rotation.y;
                 }
+                
+                // Never directly update camera here - camera will update in animation loop
                 
                 // Handle balance shifts from rotation
                 if (attachedBags.length > 0 && balanceEnabled) {
