@@ -859,6 +859,8 @@
         // Reference to hand bones for attaching bags
         let leftHand = null;
         let rightHand = null;
+        let leftForeArm = null;
+        let rightForeArm = null;
         
         // References to bags for attaching
         let groundBag1 = null;
@@ -958,6 +960,14 @@
                                 if (node.name === 'mixamorigRightHand') {
                                     rightHand = node;
                                     console.log('Found right hand bone:', node.name);
+                                }
+                                if (node.name === 'mixamorigLeftForeArm') {
+                                    leftForeArm = node;
+                                    console.log('Found left forearm bone:', node.name);
+                                }
+                                if (node.name === 'mixamorigRightForeArm') {
+                                    rightForeArm = node;
+                                    console.log('Found right forearm bone:', node.name);
                                 }
                             }
                         });
@@ -1488,7 +1498,7 @@
             animateTilt();
         }
         
-        // Function to attach a bag to the character's hand
+        // Function to attach bag to hand
         function attachBagToHand(bag, hand) {
             if (!bag || !hand || !characterModel) {
                 console.error("Cannot attach bag - missing references:", { 
@@ -1507,16 +1517,16 @@
                 return;
             }
             
-            console.log("Attaching bag to hand...");
+            console.log("Attaching bag to", hand.name);
             showPickupFeedback("Picked up bag!");
             
-            // Store original parent and transform for later restoration
+            // Store original parent and transform for detaching later
             const originalParent = bag.parent;
             const originalPosition = bag.position.clone();
             const originalRotation = bag.rotation.clone();
             const originalScale = bag.scale.clone();
             
-            // Remove from current parent
+            // Remove from original parent
             originalParent.remove(bag);
             
             // Create a new container for the bag to better control positioning
@@ -1529,12 +1539,34 @@
             // Reset bag position within container
             bag.position.set(0, 0, 0);
             
-            // Attach container to hand
-            hand.add(bagContainer);
-            
-            // Get offset position based on current attachedBags and which hand
+            // Determine which bone to use based on hand and current animation
             const isLeftHand = hand.name === 'mixamorigLeftHand';
-            const handOffset = getHandOffset(isLeftHand, attachedBags.length);
+            const currentAnim = currentAnimation ? currentAnimation.name : '';
+            const useCarryMode = currentAnim.includes('carry') || currentAnim.includes('run');
+            
+            // Choose appropriate attachment bone based on animation
+            let attachmentBone = hand;
+            if (useCarryMode) {
+                // Use forearm for carry animations
+                attachmentBone = isLeftHand ? leftForeArm : rightForeArm;
+                console.log(`Using ${isLeftHand ? 'left' : 'right'} forearm for carry animation`);
+            } else {
+                // Use hand for pickup animations
+                console.log(`Using ${isLeftHand ? 'left' : 'right'} hand for regular animation`);
+            }
+            
+            // Attach container to the chosen bone
+            if (attachmentBone) {
+                attachmentBone.add(bagContainer);
+                console.log(`Bag container added to ${attachmentBone.name}`);
+            } else {
+                // Fallback to hand if forearm is not available
+                hand.add(bagContainer);
+                console.log(`Fallback: Bag container added to ${hand.name}`);
+            }
+            
+            // Get offset position based on current attachedBags and which hand/bone
+            const handOffset = getHandOffset(isLeftHand, attachedBags.length, useCarryMode);
             
             // Apply offset to container
             bagContainer.position.set(handOffset.x, handOffset.y, handOffset.z);
@@ -1543,11 +1575,11 @@
             if (isLeftHand) {
                 bag.rotation.set(0, Math.PI / 2, 0); // For left hand
                 // Slightly tilt bag based on hand
-                bagContainer.rotation.set(0.2, 0, 0.1);
+                bagContainer.rotation.set(useCarryMode ? 0.1 : 0.2, 0, 0.1);
             } else {
                 bag.rotation.set(0, -Math.PI / 2, 0); // For right hand
                 // Slightly tilt bag based on hand
-                bagContainer.rotation.set(0.2, 0, -0.1);
+                bagContainer.rotation.set(useCarryMode ? 0.1 : 0.2, 0, -0.1);
             }
             
             // Adjust scale to make bags more noticeable
@@ -1612,24 +1644,46 @@
         }
         
         // Get appropriate hand offset based on which hand and how many bags are carried
-        function getHandOffset(isLeftHand, bagCount) {
-            // Base position for the first bag - moved further out and forward
-            if (bagCount === 0) {
-                return isLeftHand ? 
-                    { x: 0.5, y: 0.0, z: 0.2 } : // Left hand - first bag
-                    { x: -0.5, y: 0.0, z: 0.2 }; // Right hand - first bag
-            }
-            // Second bag position - slightly shifted from first
-            else if (bagCount === 1) {
-                return isLeftHand ? 
-                    { x: 0.4, y: 0.2, z: 0.3 } : // Left hand - second bag (slightly above and behind)
-                    { x: -0.4, y: 0.2, z: 0.3 }; // Right hand - second bag (slightly above and behind)
-            }
-            // Third bag position - on top
-            else {
-                return isLeftHand ? 
-                    { x: 0.5, y: 0.4, z: 0.0 } : // Left hand - third bag (on top)
-                    { x: -0.5, y: 0.4, z: 0.0 }; // Right hand - third bag (on top)
+        function getHandOffset(isLeftHand, bagCount, isCarryMode = false) {
+            // Different offsets for carry mode vs pickup mode
+            if (isCarryMode) {
+                // Forearm attachment positions for carry animations
+                if (bagCount === 0) {
+                    return isLeftHand ? 
+                        { x: 0.3, y: -0.1, z: 0.1 } : // Left forearm - first bag
+                        { x: -0.3, y: -0.1, z: 0.1 }; // Right forearm - first bag
+                }
+                // Second bag position - slightly shifted from first
+                else if (bagCount === 1) {
+                    return isLeftHand ? 
+                        { x: 0.2, y: 0.1, z: 0.2 } : // Left forearm - second bag
+                        { x: -0.2, y: 0.1, z: 0.2 }; // Right forearm - second bag
+                }
+                // Third bag position - on top
+                else {
+                    return isLeftHand ? 
+                        { x: 0.3, y: 0.3, z: 0.0 } : // Left forearm - third bag
+                        { x: -0.3, y: 0.3, z: 0.0 }; // Right forearm - third bag
+                }
+            } else {
+                // Original hand attachment positions for pickup animations
+                if (bagCount === 0) {
+                    return isLeftHand ? 
+                        { x: 0.5, y: 0.0, z: 0.2 } : // Left hand - first bag
+                        { x: -0.5, y: 0.0, z: 0.2 }; // Right hand - first bag
+                }
+                // Second bag position - slightly shifted from first
+                else if (bagCount === 1) {
+                    return isLeftHand ? 
+                        { x: 0.4, y: 0.2, z: 0.3 } : // Left hand - second bag
+                        { x: -0.4, y: 0.2, z: 0.3 }; // Right hand - second bag
+                }
+                // Third bag position - on top
+                else {
+                    return isLeftHand ? 
+                        { x: 0.5, y: 0.4, z: 0.0 } : // Left hand - third bag
+                        { x: -0.5, y: 0.4, z: 0.0 }; // Right hand - third bag
+                }
             }
         }
         
