@@ -2194,25 +2194,33 @@
             
             // Update character animations based on movement state
             if (isMoving) {
-                // Choose animation based on whether we're carrying bags
+                // Set appropriate animations for moving
                 if (attachedBags.length > 0) {
-                    if (currentAnimation && !currentAnimation.name.startsWith('carry')) {
-                        setAnimation("carry_walk");
+                    // Check current animation to avoid unnecessary changes
+                    if (!currentUpperBodyAnimation.startsWith('carry')) {
+                        setUpperBodyAnimation('walk'); // Will be converted to appropriate carry animation
+                        setLowerBodyAnimation('walk');
                     }
                 } else {
-                    if (currentAnimation && !currentAnimation.name.startsWith('walk')) {
-                        setAnimation("walk");
+                    // Regular walking animation when not carrying
+                    if (currentUpperBodyAnimation !== 'walk') {
+                        setUpperBodyAnimation('walk');
+                        setLowerBodyAnimation('walk');
                     }
                 }
             } else {
-                // Choose idle animation based on whether we're carrying bags
+                // Set appropriate animations for idle
                 if (attachedBags.length > 0) {
-                    if (currentAnimation && !currentAnimation.name.startsWith('carry_idle')) {
-                        setAnimation("carry_idle");
+                    // Check current animation to avoid unnecessary changes
+                    if (!currentUpperBodyAnimation.startsWith('carry')) {
+                        setUpperBodyAnimation('idle'); // Will be converted to appropriate carry animation
+                        setLowerBodyAnimation('idle');
                     }
                 } else {
-                    if (currentAnimation && !currentAnimation.name.startsWith('idle')) {
-                        setAnimation("idle");
+                    // Regular idle animation when not carrying
+                    if (currentUpperBodyAnimation !== 'idle') {
+                        setUpperBodyAnimation('idle');
+                        setLowerBodyAnimation('idle');
                     }
                 }
             }
@@ -2898,25 +2906,33 @@
             
             // Update character animations based on movement state
             if (isMoving) {
-                // Choose animation based on whether we're carrying bags
+                // Set appropriate animations for moving
                 if (attachedBags.length > 0) {
-                    if (currentAnimation && !currentAnimation.name.startsWith('carry')) {
-                        setAnimation("carry_walk");
+                    // Check current animation to avoid unnecessary changes
+                    if (!currentUpperBodyAnimation.startsWith('carry')) {
+                        setUpperBodyAnimation('walk'); // Will be converted to appropriate carry animation
+                        setLowerBodyAnimation('walk');
                     }
                 } else {
-                    if (currentAnimation && !currentAnimation.name.startsWith('walk')) {
-                        setAnimation("walk");
+                    // Regular walking animation when not carrying
+                    if (currentUpperBodyAnimation !== 'walk') {
+                        setUpperBodyAnimation('walk');
+                        setLowerBodyAnimation('walk');
                     }
                 }
             } else {
-                // Choose idle animation based on whether we're carrying bags
+                // Set appropriate animations for idle
                 if (attachedBags.length > 0) {
-                    if (currentAnimation && !currentAnimation.name.startsWith('carry_idle')) {
-                        setAnimation("carry_idle");
+                    // Check current animation to avoid unnecessary changes
+                    if (!currentUpperBodyAnimation.startsWith('carry')) {
+                        setUpperBodyAnimation('idle'); // Will be converted to appropriate carry animation
+                        setLowerBodyAnimation('idle');
                     }
                 } else {
-                    if (currentAnimation && !currentAnimation.name.startsWith('idle')) {
-                        setAnimation("idle");
+                    // Regular idle animation when not carrying
+                    if (currentUpperBodyAnimation !== 'idle') {
+                        setUpperBodyAnimation('idle');
+                        setLowerBodyAnimation('idle');
                     }
                 }
             }
