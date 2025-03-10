@@ -1015,10 +1015,10 @@
                         // Once all models are loaded, set up collision detection
                         setupCollisionDetection();
                         
-                        // Then create instanced grass AFTER collision detection is set up
-                        setTimeout(() => {
-                            createInstancedGrass();
-                        }, 1000); // Short delay to ensure everything is properly initialized
+                        // DISABLED: Instanced grass was causing the game to break
+                        // setTimeout(() => {
+                        //     createInstancedGrass();
+                        // }, 1000);
                     }
                 },
                 (xhr) => {
@@ -3093,7 +3093,9 @@
         }
 
         // After all models are loaded, add instanced grass to fill the terrain
-        function createInstancedGrass() {
+        // DISABLED: This function was causing the game to break
+        /*
+        // DISABLED function createInstancedGrass() {
             // First, we need to load the grass models to create the instance meshes
             const grassTypes = [
                 { file: './grass_small1.glb', count: 500, scaleRange: [1.0, 1.5], heightOffset: 0.0 },
