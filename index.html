@@ -2089,22 +2089,19 @@
         function updateThirdPersonCamera() {
             if (!characterTilt || !thirdPersonCamera) return;
             
-            // Create new vectors for camera calculations to avoid reference issues
+            // Get character position and rotation
             const characterPos = new THREE.Vector3();
             characterTilt.getWorldPosition(characterPos);
             
-            // Clone the offset and apply rotation
-            const tempOffset = thirdPersonCameraOffset.clone();
-            tempOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
+            // Calculate camera position based on character position and rotation
+            const cameraOffset = thirdPersonCameraOffset.clone();
+            cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
             
-            // Set camera position directly
-            thirdPersonCamera.position.copy(characterPos);
-            thirdPersonCamera.position.add(tempOffset);
-            
-            // Set camera target
-            const targetPos = new THREE.Vector3().copy(characterPos);
-            targetPos.y += 1.5; // Look slightly above character's feet
-            thirdPersonCamera.lookAt(targetPos);
+            // Set camera position and target
+            thirdPersonCamera.position.copy(characterPos).add(cameraOffset);
+            thirdPersonCameraTarget.copy(characterPos);
+            thirdPersonCameraTarget.y += 1.5; // Look slightly above character's feet
+            thirdPersonCamera.lookAt(thirdPersonCameraTarget);
         }
         
         // Update character movement and fix orientation
@@ -2801,22 +2798,10 @@
         
         // Animation loop
         const clock = new THREE.Clock();
-        let lastCameraUpdate = 0;
-        
         function animate() {
-            // Only request a new frame if one isn't already pending
-            if (!renderRequested) {
-                renderRequested = true;
-                requestAnimationFrame(frameUpdate);
-            }
-        }
-        
-        function frameUpdate() {
-            // Reset the flag at the start of the frame
-            renderRequested = false;
+            requestAnimationFrame(animate);
             
             const delta = clock.getDelta();
-            const elapsedTime = clock.getElapsedTime();
             
             // Update character movement
             updateCharacterMovement(delta);
@@ -2824,7 +2809,8 @@
             // Update character animations
             if (mixer) mixer.update(delta);
             
-            // Apply smooth character rotation in the animation loop
+            // Apply camera rotation updates here, in the main animation loop
+            // This ensures we don't get ghosting from multiple camera updates in a single frame
             if (characterTilt && Math.abs(targetRotation - characterTilt.rotation.y) > 0.01) {
                 characterTilt.rotation.y = THREE.MathUtils.lerp(
                     characterTilt.rotation.y,
@@ -2833,7 +2819,8 @@
                 );
             }
             
-            // Update camera position once per frame
+            // Always update camera position once per frame, regardless of movement
+            // This prevents the double vision effect
             if (cameraMode === "thirdPerson" && thirdPersonCamera && characterTilt) {
                 updateThirdPersonCamera();
             }
@@ -2858,18 +2845,15 @@
                 }
             });
             
-            // Render scene with appropriate camera - rendering exactly once per frame
+            // Render scene with appropriate camera
             if (cameraMode === "thirdPerson" && thirdPersonCamera) {
                 renderer.render(scene, thirdPersonCamera);
             } else {
                 renderer.render(scene, camera);
             }
-            
-            // Request the next frame
-            requestAnimationFrame(frameUpdate);
         }
         
-        // Start the animation loop - this only needs to be called once
+        // Start the animation loop
         animate();
         
         // Initialize controls when everything is loaded
