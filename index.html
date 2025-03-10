@@ -541,6 +541,16 @@
         let isDragging = false;
         let isCameraFollowing = true;
         
+        // Add device detection function
+        function isMobileDevice() {
+            return (
+                ('ontouchstart' in window) ||
+                (navigator.maxTouchPoints > 0) ||
+                (navigator.msMaxTouchPoints > 0) ||
+                (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent))
+            );
+        }
+        
         // Character tilt object for leaning
         let characterTilt = null;
         
@@ -1466,20 +1476,20 @@
                 }
             }
             
-            // Handle rotation separate from movement
-            // For rotation joystick (touch)
-            if (rotationJoystickActive) {
-                const rotationAmount = rotationJoystickDirection.x * touchRotationSensitivity;
-                characterTilt.rotation.y += rotationAmount;
-                
-                // Update target rotation for balance system
-                targetRotation = characterTilt.rotation.y;
-            }
-            // For mouse look (desktop)
-            else if (mouseLookActive && cameraMode === "thirdPerson") {
-                // Rotation handled in mouse move event
-                // Update target rotation for balance system
-                targetRotation = characterTilt.rotation.y;
+            // Handle rotation based on input device
+            if (isUsingTouch) {
+                // For touch devices, use the rotation joystick to rotate the character
+                if (rotationJoystickActive) {
+                    const rotationAmount = rotationJoystickDirection.x * touchRotationSensitivity;
+                    characterTilt.rotation.y += rotationAmount;
+                    
+                    // Update target rotation for balance system
+                    targetRotation = characterTilt.rotation.y;
+                }
+            } else {
+                // For desktop, rotation is handled by mouse movement and pointer lock
+                // This is already implemented in the mousemove event listener
+                // Character should face movement direction, not control camera rotation
             }
             
             // Process movement input (independent of rotation)
@@ -1511,7 +1521,7 @@
                 
                 // Calculate movement direction relative to camera
                 moveDirection.set(0, 0, 0)
-                    .add(cameraRight.multiplyScalar(-inputX))  // Keep the fix for left/right
+                    .add(cameraRight.multiplyScalar(inputX))
                     .add(cameraForward.multiplyScalar(-inputZ));
                 
                 moveDirection.normalize().multiplyScalar(movementAcceleration);
@@ -1519,10 +1529,13 @@
                 // Update character position
                 characterTilt.position.add(moveDirection);
                 
-                // If moving, rotate character mesh to face movement direction (keep characterTilt.rotation separate)
+                // If moving, rotate character mesh to face movement direction
                 if (characterModel && moveDirection.length() > 0.01) {
                     // Get current rotation of character mesh (not tilt container)
                     const angle = Math.atan2(moveDirection.x, moveDirection.z);
+                    
+                    // Apply the rotation to the character model, not the tilt container
+                    // This way the camera orientation and character orientation can be different
                     characterModel.rotation.y = angle;
                 }
                 
@@ -1653,6 +1666,19 @@
             const rotationJoystick = document.getElementById('rotationJoystick');
             const rotationKnob = document.getElementById('rotationJoystickKnob');
             const interact = document.getElementById('interactButton');
+            const touchControls = document.getElementById('touchControls');
+            
+            // Check if we're on mobile or desktop
+            isUsingTouch = isMobileDevice();
+            
+            // Show/hide appropriate controls based on device
+            if (isUsingTouch) {
+                // Mobile - show touch controls
+                if (touchControls) touchControls.style.display = 'block';
+            } else {
+                // Desktop - hide touch controls
+                if (touchControls) touchControls.style.display = 'none';
+            }
             
             // Get joystick positions
             const joystickRect = joystick.getBoundingClientRect();
@@ -1684,6 +1710,7 @@
             // Touch move for all joysticks
             document.addEventListener('touchmove', function(e) {
                 e.preventDefault();
+                isUsingTouch = true;
                 
                 // Handle multiple touches
                 for (let i = 0; i < e.touches.length; i++) {
@@ -1759,69 +1786,82 @@
                 }
             });
             
-            // Mouse events for testing
-            joystick.addEventListener('mousedown', function(e) {
-                e.preventDefault();
-                joystickActive = true;
-                updateJoystickPosition(e.clientX, e.clientY);
-            });
-            
-            rotationJoystick.addEventListener('mousedown', function(e) {
-                e.preventDefault();
-                rotationJoystickActive = true;
-                updateRotationJoystickPosition(e.clientX, e.clientY);
-            });
-            
-            document.addEventListener('mousemove', function(e) {
-                if (joystickActive) {
-                    e.preventDefault();
-                    updateJoystickPosition(e.clientX, e.clientY);
-                }
-                if (rotationJoystickActive) {
-                    e.preventDefault();
-                    updateRotationJoystickPosition(e.clientX, e.clientY);
-                }
+            // Desktop-specific mouse controls (only if not mobile)
+            if (!isUsingTouch) {
+                // Mouse move for camera rotation (no need to click and hold)
+                renderer.domElement.addEventListener('mousemove', function(e) {
+                    if (cameraMode === "thirdPerson" && !controls.enabled) {
+                        // Only rotate camera if in game view mode
+                        const dx = e.movementX || e.mozMovementX || e.webkitMovementX || 0;
+                        if (dx !== 0) {
+                            // Rotate the camera around the character (don't rotate character)
+                            characterTilt.rotation.y -= dx * mouseRotationSensitivity;
+                            targetRotation = characterTilt.rotation.y;
+                            updateThirdPersonCamera();
+                        }
+                    }
+                });
                 
-                // Handle mouse look if in 3rd person mode & mouse button pressed
-                if (mouseLookActive && cameraMode === "thirdPerson" && characterTilt) {
-                    const dx = e.clientX - lastMouseX;
-                    characterTilt.rotation.y -= dx * mouseRotationSensitivity;
-                    lastMouseX = e.clientX;
-                }
-            });
+                // Capture pointer for smoother mouse movement
+                renderer.domElement.addEventListener('click', function() {
+                    if (cameraMode === "thirdPerson" && !mouseLookActive) {
+                        renderer.domElement.requestPointerLock = 
+                            renderer.domElement.requestPointerLock || 
+                            renderer.domElement.mozRequestPointerLock || 
+                            renderer.domElement.webkitRequestPointerLock;
+                        
+                        renderer.domElement.requestPointerLock();
+                    }
+                });
+            } else {
+                // Mobile-specific mouse events for testing on desktop
+                joystick.addEventListener('mousedown', function(e) {
+                    e.preventDefault();
+                    joystickActive = true;
+                    updateJoystickPosition(e.clientX, e.clientY);
+                });
+                
+                rotationJoystick.addEventListener('mousedown', function(e) {
+                    e.preventDefault();
+                    rotationJoystickActive = true;
+                    updateRotationJoystickPosition(e.clientX, e.clientY);
+                });
+                
+                document.addEventListener('mousemove', function(e) {
+                    if (joystickActive) {
+                        e.preventDefault();
+                        updateJoystickPosition(e.clientX, e.clientY);
+                    }
+                    if (rotationJoystickActive) {
+                        e.preventDefault();
+                        updateRotationJoystickPosition(e.clientX, e.clientY);
+                    }
+                });
+                
+                document.addEventListener('mouseup', function() {
+                    joystickActive = false;
+                    rotationJoystickActive = false;
+                    resetJoystick();
+                    resetRotationJoystick();
+                });
+            }
             
-            document.addEventListener('mouseup', function() {
-                joystickActive = false;
-                rotationJoystickActive = false;
-                mouseLookActive = false;
-                resetJoystick();
-                resetRotationJoystick();
-            });
-            
-            // Mouse right-click for rotation
+            // Mouse right-click for rotation - disabled for new control scheme
             renderer.domElement.addEventListener('contextmenu', function(e) {
                 e.preventDefault(); // Prevent right-click menu
             });
             
-            // Mouse down for rotation (right button)
-            renderer.domElement.addEventListener('mousedown', function(e) {
-                if (e.button === 2 && cameraMode === "thirdPerson") { // Right mouse button
+            // Interact button for pickups - use keyboard for desktop, touch for mobile
+            if (isUsingTouch) {
+                interact.addEventListener('touchstart', function(e) {
                     e.preventDefault();
-                    mouseLookActive = true;
-                    lastMouseX = e.clientX;
-                }
-            });
-            
-            // Interact button for pickups
-            interact.addEventListener('touchstart', function(e) {
-                e.preventDefault();
-                attemptPickupInteraction();
-            });
-            
-            interact.addEventListener('mousedown', function(e) {
-                e.preventDefault();
-                attemptPickupInteraction();
-            });
+                    attemptPickupInteraction();
+                });
+            } else {
+                // For desktop, keyboard controls will handle pickups
+                // Hide the interact button
+                if (interact) interact.style.display = 'none';
+            }
             
             // Camera toggle button
             document.getElementById('gameViewBtn').addEventListener('click', function() {
@@ -1842,6 +1882,23 @@
                     y: rotationJoystickRect.top + rotationJoystickRect.height / 2
                 };
             });
+            
+            // Check for pointer lock change
+            document.addEventListener('pointerlockchange', handlePointerLockChange);
+            document.addEventListener('mozpointerlockchange', handlePointerLockChange);
+            document.addEventListener('webkitpointerlockchange', handlePointerLockChange);
+            
+            function handlePointerLockChange() {
+                if (document.pointerLockElement === renderer.domElement || 
+                    document.mozPointerLockElement === renderer.domElement ||
+                    document.webkitPointerLockElement === renderer.domElement) {
+                    // Pointer is locked - enable camera movement
+                    mouseLookActive = true;
+                } else {
+                    // Pointer is unlocked - disable camera movement
+                    mouseLookActive = false;
+                }
+            }
         }
         
         // Update joystick position and calculate direction
@@ -1923,17 +1980,37 @@
                 cameraMode = "orbit";
                 isCameraFollowing = false;
                 
+                // Enable orbit controls
+                controls.enabled = true;
+                
+                // Exit pointer lock if active
+                if (document.pointerLockElement === renderer.domElement ||
+                    document.mozPointerLockElement === renderer.domElement ||
+                    document.webkitPointerLockElement === renderer.domElement) {
+                    document.exitPointerLock = document.exitPointerLock || 
+                        document.mozExitPointerLock || 
+                        document.webkitExitPointerLock;
+                    document.exitPointerLock();
+                }
+                
                 // Set orbit camera
                 camera.position.set(0, 20, 30);
                 controls.target.set(0, 0, 0);
                 controls.update();
+                
+                document.getElementById('gameViewBtn').textContent = 'Game View';
             } else {
                 // Switch to third-person mode
                 cameraMode = "thirdPerson";
                 isCameraFollowing = true;
                 
+                // Disable orbit controls
+                controls.enabled = false;
+                
                 // Re-enable third-person camera
                 updateThirdPersonCamera();
+                
+                document.getElementById('gameViewBtn').textContent = 'Orbit View';
             }
         }
         
@@ -2004,6 +2081,7 @@
         // Initialize controls when everything is loaded
         window.addEventListener('load', function() {
             setupJoystickControls();
+            
             // Start with balance system disabled
             document.getElementById('toggleBalance').textContent = 'Enable Balance Effect';
             document.getElementById('helpOverlay').style.display = 'block'; // Show help on start
@@ -2013,13 +2091,34 @@
             document.getElementById('balanceSlider').value = 50;
             updateBalanceSystem(balanceValue);
             
+            // Set default camera mode
+            cameraMode = "thirdPerson";
+            isCameraFollowing = true;
+            
+            // For desktop mode, disable orbit controls by default
+            if (!isUsingTouch) {
+                controls.enabled = false;
+                document.getElementById('gameViewBtn').textContent = 'Orbit View';
+            }
+            
             // Add help button event listener
             document.getElementById('helpBtn').addEventListener('click', function() {
                 document.getElementById('helpOverlay').style.display = 'block';
             });
             
+            // Update help text based on device
+            const helpText = document.querySelector('#helpOverlay p:first-of-type');
+            if (helpText) {
+                if (isUsingTouch) {
+                    helpText.textContent = "Touch Controls: Left joystick to move, right joystick to rotate, button to pick up bags";
+                } else {
+                    helpText.textContent = "Keyboard/Mouse: WASD or arrows to move, mouse to look around, E or SPACE to pick up, Q or R to drop";
+                }
+            }
+            
             // Add a simple debug message
             updateDebug('Game loaded successfully');
+            updateDebug(isUsingTouch ? 'Using touch controls' : 'Using desktop controls');
         });
         
         // Handle window resize
