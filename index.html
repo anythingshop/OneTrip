@@ -1045,10 +1045,50 @@
         // Simple function to create additional grass - no instancing, just clones
         function createAdditionalGrass(originalGrass, modelFile, baseScale) {
             // Create more grass objects for better coverage
-            const count = modelFile.includes('large') ? 50 : 
-                         modelFile.includes('medium') ? 80 : 120;
+            const count = modelFile.includes('large') ? 200 : 
+                         modelFile.includes('medium') ? 300 : 400;
             
-            for (let i = 0; i < count; i++) {
+            // Create clusters of grass for more natural look
+            const numClusters = 25;
+            const grassPerCluster = Math.floor(count / numClusters);
+            
+            for (let cluster = 0; cluster < numClusters; cluster++) {
+                // Generate random cluster center
+                const clusterX = Math.random() * 160 - 80; // -80 to 80
+                const clusterZ = Math.random() * 160 - 80; // -80 to 80
+                
+                // Avoid the path area
+                if (Math.abs(clusterX) < 8 && clusterZ > -30 && clusterZ < 30) continue;
+                
+                // Create grass around this cluster center
+                for (let i = 0; i < grassPerCluster; i++) {
+                    const clone = originalGrass.clone();
+                    
+                    // Generate position within cluster (with gaussian-like distribution)
+                    const distFromCenter = Math.pow(Math.random(), 2) * 8; // Concentrate more grass toward center
+                    const angle = Math.random() * Math.PI * 2;
+                    const x = clusterX + Math.cos(angle) * distFromCenter;
+                    const z = clusterZ + Math.sin(angle) * distFromCenter;
+                    
+                    // Increase base scale for bigger grass
+                    const scaleFactor = modelFile.includes('large') ? 1.5 :
+                                       modelFile.includes('medium') ? 1.3 : 1.2;
+                    
+                    // Add some random scale variation
+                    const scale = baseScale * scaleFactor * (0.85 + Math.random() * 0.3);
+                    clone.scale.set(scale, scale, scale);
+                    
+                    // Set position and random rotation
+                    clone.position.set(x, 0, z);
+                    clone.rotation.y = Math.random() * Math.PI * 2;
+                    
+                    scene.add(clone);
+                }
+            }
+            
+            // Add some additional random grass
+            const randomGrassCount = Math.floor(count * 0.3);
+            for (let i = 0; i < randomGrassCount; i++) {
                 const clone = originalGrass.clone();
                 
                 // Generate random position
@@ -1058,8 +1098,10 @@
                 // Avoid the path area
                 if (Math.abs(x) < 5 && z > -25 && z < 25) continue;
                 
-                // Add some random scale variation
-                const scale = baseScale * (0.8 + Math.random() * 0.4);
+                // Add some random scale variation but keep it larger than before
+                const scaleFactor = modelFile.includes('large') ? 1.4 :
+                                   modelFile.includes('medium') ? 1.2 : 1.1;
+                const scale = baseScale * scaleFactor * (0.9 + Math.random() * 0.3);
                 clone.scale.set(scale, scale, scale);
                 
                 // Set position and random rotation
@@ -2064,8 +2106,14 @@
                     // Get current rotation of character mesh (not tilt container)
                     const angle = Math.atan2(moveDirection.x, moveDirection.z);
                     
-                    // Apply the rotation to the character model, not the tilt container
+                    // Apply the rotation to the character model to match the movement direction
                     characterModel.rotation.y = angle;
+                    
+                    // Also update the tilt container rotation to match the movement direction
+                    // This ensures the character's momentum and position align with the visual direction
+                    targetRotation = angle;
+                    // Smoothly interpolate to the target rotation
+                    characterTilt.rotation.y = THREE.MathUtils.lerp(characterTilt.rotation.y, targetRotation, 0.1);
                 }
                 
                 // Update animations based on movement state change - ONLY if state actually changed
@@ -2326,8 +2374,14 @@
                         const dx = e.movementX || e.mozMovementX || e.webkitMovementX || 0;
                         if (dx !== 0 && mouseLookActive) {
                             // Rotate the character AND camera together
-                            characterTilt.rotation.y -= dx * mouseRotationSensitivity;
-                            targetRotation = characterTilt.rotation.y;
+                            const newRotation = characterTilt.rotation.y - dx * mouseRotationSensitivity;
+                            characterTilt.rotation.y = newRotation;
+                            targetRotation = newRotation;
+                            
+                            // Also rotate the character model to match 
+                            if (characterModel) {
+                                characterModel.rotation.y = newRotation;
+                            }
                             
                             // Update camera to match character rotation
                             updateThirdPersonCamera();
