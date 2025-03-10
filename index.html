@@ -1827,8 +1827,8 @@
                     balanceIndicatorEl.style.background = '#ffffff'; // White for safe
                 }
                 if (balanceDirectionEl) {
-                    balanceDirectionEl.textContent = "Balanced";
-                    balanceDirectionEl.style.color = '#ffffff';
+                balanceDirectionEl.textContent = "Balanced";
+                balanceDirectionEl.style.color = '#ffffff';
                 }
                 return;
             }
@@ -1886,7 +1886,7 @@
                 }
                 newDirection = "right";
                 intensity = (value - rightModerateThreshold) / (rightSevereThreshold - rightModerateThreshold);
-            } else {
+                } else {
                 // Balanced
                 if (balanceIndicatorEl) {
                     balanceIndicatorEl.style.background = '#00ff00'; // Green
@@ -1895,7 +1895,7 @@
                 if (balanceDirectionEl) {
                     balanceDirectionEl.textContent = "Balanced";
                     balanceDirectionEl.style.color = '#00ff00';
-                }
+            }
             }
             
             // If balance direction changed or intensity changed significantly, update animations
@@ -1942,14 +1942,14 @@
             } else {
                 // Return to normal walking and no tilt
                 if (!isGameOver) {
-                    if (isMoving && currentLowerBodyAnimation.startsWith('stumble')) {
-                        setLowerBodyAnimation('walk');
-                    } else if (!isMoving && currentLowerBodyAnimation.startsWith('stumble')) {
-                        setLowerBodyAnimation('idle');
-                    }
-                    
-                    if (characterTilt) {
-                        gsapTilt(0);
+                if (isMoving && currentLowerBodyAnimation.startsWith('stumble')) {
+                    setLowerBodyAnimation('walk');
+                } else if (!isMoving && currentLowerBodyAnimation.startsWith('stumble')) {
+                    setLowerBodyAnimation('idle');
+                }
+                
+                if (characterTilt) {
+                    gsapTilt(0);
                     }
                 }
             }
@@ -2045,42 +2045,36 @@
             controls.update();
         });
         
-        // Function to update the balance system based on mouse/joystick control
+        // Function to update the balance system based on movement and turning
         function updateMovementBasedBalance() {
             // Only apply balance effects when carrying bags
             if (!balanceEnabled || attachedBags.length === 0) return;
             
-            // Calculate balance shifts based on input controls
+            // Calculate balance shifts based on movement and turning
             let balanceShift = 0;
             
-            // REMOVED: Movement speed no longer affects balance
-            // balanceShift += movementAcceleration * 0.15;
+            // Movement speed affects balance - reduced sensitivity
+            balanceShift += movementAcceleration * 0.15; // Reduced from 0.3
             
-            // Mouse movement is now the PRIMARY control for balance
+            // Turning affects balance - reduced sensitivity
+            if (Math.abs(targetRotation - characterTilt.rotation.y) > 0.1) { // Increased threshold from 0.05 to 0.1
+                const turnDirection = ((targetRotation - characterTilt.rotation.y) + Math.PI) % (Math.PI * 2) - Math.PI;
+                balanceShift += turnDirection * 0.005; // Reduced from 0.01
+            }
+            
+            // Mouse movement can affect balance
             if (lastMouseMoveX !== 0) {
-                // Stronger mouse influence on balance
-                balanceShift += (lastMouseMoveX * 0.0005);
+                // Use mouse movement to shift balance slightly
+                balanceShift += (lastMouseMoveX * 0.0001);
                 lastMouseMoveX = 0; // Reset after use
             }
             
-            // Rotation joystick also affects balance (for mobile/gamepad)
-            if (rotationJoystickActive && rotationJoystickDirection) {
-                if (Math.abs(rotationJoystickDirection.x) > 0.1) {
-                    // Use rotation joystick X-axis for balance control
-                    balanceShift += rotationJoystickDirection.x * 0.01;
-                }
-            }
-            
-            // Natural centering force (balance tries to return to center)
-            const centeringForce = (0.5 - balanceValue) * 0.005;
-            balanceShift += centeringForce;
-            
-            // Carrying weight affects balance sensitivity
-            const carryFactor = 1 + (totalBagWeight * 0.03);
+            // Carrying weight makes balance harder
+            const carryFactor = 1 + (totalBagWeight * 0.02); // Reduced from 0.03
             balanceShift *= carryFactor;
             
-            // Apply changes to balance value
-            balanceValue = Math.max(0, Math.min(1, balanceValue + balanceShift));
+            // Apply changes to balance value with smoothing and reduced rate of change
+            balanceValue = Math.max(0, Math.min(1, balanceValue + (balanceShift * 0.5))); // Added 0.5 multiplier to slow changes
             
             // Update the UI
             const balanceSlider = document.getElementById('balanceSlider');
@@ -2088,9 +2082,6 @@
                 balanceSlider.value = balanceValue * 100;
             }
             updateBalanceSystem(balanceValue);
-            
-            // DEBUG: Show current balance information
-            updateDebug(`Balance: ${balanceValue.toFixed(2)}, Weight: ${totalBagWeight.toFixed(1)}kg`);
         }
         
         // Set up third-person camera
@@ -2219,13 +2210,13 @@
             // Update character animations based on movement state
             if (isMoving) {
                 // Set appropriate animations for moving
-                if (attachedBags.length > 0) {
+                        if (attachedBags.length > 0) {
                     // Check current animation to avoid unnecessary changes
                     if (!currentUpperBodyAnimation.startsWith('carry')) {
                         setUpperBodyAnimation('walk'); // Will be converted to appropriate carry animation
                         setLowerBodyAnimation('walk');
                     }
-                } else {
+                        } else {
                     // Regular walking animation when not carrying
                     if (currentUpperBodyAnimation !== 'walk') {
                         setUpperBodyAnimation('walk');
@@ -2734,13 +2725,13 @@
             if (!isGameOver) {
                 // Process input and update character position first
                 // We DO NOT update camera here
-                updateCharacterMovement(delta);
-                
+            updateCharacterMovement(delta);
+            
                 // Reset camera update flag for this frame
                 cameraUpdateScheduled = false;
                 
                 // Update animations
-                if (mixer) mixer.update(delta);
+            if (mixer) mixer.update(delta);
                 
                 // Handle balance updates based on control input
                 updateBalanceBasedOnControls();
@@ -2822,30 +2813,56 @@
         
         // Function for handling balance changes based on controls
         function updateBalanceBasedOnControls() {
+            // Skip if no bags or balance not enabled
             if (!balanceEnabled || attachedBags.length === 0) return;
             
-            // Balance naturally tries to return to center
+            // Get horizontal input from mouse/joystick for balance
+            let horizontalInput = 0;
+            
+            // Mouse input takes priority if available
+            if (lastMouseMoveX !== 0) {
+                horizontalInput = lastMouseMoveX * 0.01; // Scale appropriately
+                lastMouseMoveX = 0; // Reset after use
+            } 
+            // Joystick rotation is another source of input
+            else if (rotationJoystickActive) {
+                horizontalInput = rotationJoystickDirection.x * 0.1; // Scale for joystick
+            }
+            
+            // Apply a balance change based on the horizontal input
+            // This is completely independent from movement
+            if (horizontalInput !== 0) {
+                const balanceImpact = horizontalInput * 0.05; // Adjust sensitivity
+                balanceValue += balanceImpact;
+                
+                // Log balance changes for debugging
+                if (Math.abs(balanceImpact) > 0.01) {
+                    console.log(`Balance impact: ${balanceImpact.toFixed(3)}, New balance: ${balanceValue.toFixed(2)}`);
+                }
+            }
+            
+            // Natural centering force - stronger when further from center
             const centeringForce = (0.5 - balanceValue) * 0.01;
             balanceValue += centeringForce;
             
-            // Apply the small movement contribution
-            // Movement only makes balancing slightly harder, doesn't control it directly
-            if (isMoving) {
-                // Apply a subtle random drift based on speed
-                const speedFactor = Math.min(1, movementAcceleration / maxMovementSpeed);
-                const randomDrift = (Math.random() - 0.5) * 0.008 * speedFactor;
-                balanceValue += randomDrift;
-                
-                // Weight increases imbalance effects
-                const weightEffect = totalBagWeight * 0.001;
-                balanceValue += (Math.random() - 0.5) * weightEffect;
+            // Apply random balance disturbances based on weight carried
+            if (Math.random() < 0.01 * totalBagWeight) {
+                // Random disturbance proportional to weight
+                const disturbance = (Math.random() - 0.5) * 0.05 * totalBagWeight;
+                balanceValue += disturbance;
+                console.log(`Random balance disturbance: ${disturbance.toFixed(3)}`);
             }
             
             // Clamp balance value
             balanceValue = Math.max(0, Math.min(1, balanceValue));
             
             // Update UI
-            document.getElementById('balanceSlider').value = balanceValue * 100;
+            const balanceSlider = document.getElementById('balanceSlider');
+            if (balanceSlider) {
+                balanceSlider.value = balanceValue * 100;
+            }
+            
+            // Apply visual effects based on balance
             updateBalanceSystem(balanceValue);
         }
         
@@ -3518,8 +3535,10 @@
                     characterModel.rotation.y = characterTilt.rotation.y;
                 }
                 
-                // When carrying bags, the rotationJoystick will affect balance in updateMovementBasedBalance
-                // No direct balance adjustment needed here
+                // Never directly update camera here - camera will update in animation loop
+                
+                // Note: Balance handling is now done in updateBalanceBasedOnControls
+                // This keeps rotation and balance updates separate but coordinated
             }
         }
 
