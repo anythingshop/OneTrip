@@ -842,6 +842,9 @@
         let mouseRotationSensitivity = 0.003;
         let touchRotationSensitivity = 0.05;
         
+        // Collision detection variables
+        let collisionObjects = [];
+        
         // DOM elements
         const balanceDirectionEl = document.getElementById('balanceDirection');
         const pickupFeedbackEl = document.getElementById('pickupFeedback');
@@ -2951,11 +2954,11 @@
             }
         }
 
-        // Collision detection variables
-        let collisionObjects = [];
-        
         // Function to set up collision detection
         function setupCollisionDetection() {
+            // Clear the array first (in case this function is called multiple times)
+            collisionObjects = [];
+            
             // Add collision objects (house, car, environment objects)
             scene.traverse(function(object) {
                 // Add objects that should block movement to collision list
