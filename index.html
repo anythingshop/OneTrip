@@ -152,7 +152,7 @@
             right: 100px;
             width: 80px;
             height: 80px;
-            background: rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.5);
             border-radius: 40px;
             display: flex;
             justify-content: center;
@@ -162,6 +162,13 @@
             font-weight: bold;
             z-index: 1001;
             touch-action: none;
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            text-shadow: 1px 1px 2px #000;
+        }
+        #interactButton.highlight {
+            background: rgba(76, 175, 80, 0.7);
+            transform: scale(1.1);
+            transition: all 0.3s;
         }
         #helpOverlay {
             position: absolute;
@@ -179,22 +186,31 @@
         }
         #helpOverlay h2 {
             margin-top: 0;
+            color: #4CAF50;
         }
         #helpOverlay button {
             margin-top: 10px;
             padding: 8px 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #helpOverlay button:hover {
+            background: #3e8e41;
         }
         #helpBtn {
             position: absolute;
             top: 10px;
             right: 10px;
-            background: rgba(0,0,0,0.7);
+            background: rgba(76, 175, 80, 0.7);
             color: white;
             font-size: 20px;
             width: 40px;
             height: 40px;
             border-radius: 50%;
-            border: none;
+            border: 2px solid white;
             cursor: pointer;
             z-index: 1001;
         }
@@ -220,6 +236,21 @@
             border-radius: 5px;
             z-index: 1001;
             font-size: 12px;
+        }
+        #bagInRangeIndicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(76, 175, 80, 0.7);
+            border: 2px solid white;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 1000;
         }
     </style>
 </head>
@@ -282,11 +313,14 @@
     
     <div id="debug"></div>
     
-    <div id="helpOverlay" style="display: none;">
+    <div id="bagInRangeIndicator"></div>
+    
+    <div id="helpOverlay">
         <h2>Controls</h2>
-        <p><strong>Touch Controls:</strong> Left joystick to move, right button to interact/pickup</p>
-        <p><strong>Mouse Controls:</strong> WASD or arrows to move, click objects to interact</p>
-        <p><strong>Balance:</strong> Moving quickly or turning sharply affects your balance</p>
+        <p><strong>Touch Controls:</strong> Left joystick to move, right button to pick up bags</p>
+        <p><strong>Keyboard:</strong> WASD or arrows to move, E or SPACE to pick up, Q or R to drop</p>
+        <p><strong>Balance:</strong> Moving quickly affects balance when carrying bags</p>
+        <p><strong>Tips:</strong> Get close to bags to pick them up. Ground bags use right hand, car bags use left hand.</p>
         <button id="closeHelpBtn">Got it!</button>
     </div>
 
@@ -931,6 +965,15 @@
             pickupFeedbackEl.textContent = message;
             pickupFeedbackEl.style.opacity = "1";
             
+            // Add visual indication based on message type
+            if (message.includes("Cannot") || message.includes("No bags") || message.includes("Wait")) {
+                pickupFeedbackEl.style.background = "rgba(255, 50, 50, 0.8)";
+            } else if (message.includes("Picked up") || message.includes("Grabbing") || message.includes("Picking")) {
+                pickupFeedbackEl.style.background = "rgba(76, 175, 80, 0.8)";
+            } else {
+                pickupFeedbackEl.style.background = "rgba(0, 0, 0, 0.7)";
+            }
+            
             setTimeout(() => {
                 pickupFeedbackEl.style.opacity = "0";
             }, 1500);
@@ -1571,9 +1614,19 @@
         window.addEventListener('keydown', function(e) {
             keysPressed[e.key.toLowerCase()] = true;
             
-            // Space = interact/pickup
-            if (e.key === ' ') {
+            // Space or E = interact/pickup
+            if (e.key === ' ' || e.key.toLowerCase() === 'e') {
                 attemptPickupInteraction();
+            }
+            
+            // Q or R = drop bag
+            if (e.key.toLowerCase() === 'q' || e.key.toLowerCase() === 'r') {
+                detachBag();
+            }
+            
+            // Escape = close help overlay
+            if (e.key === 'Escape') {
+                document.getElementById('helpOverlay').style.display = 'none';
             }
         });
         
@@ -1593,6 +1646,9 @@
             
             // Update character animations
             if (mixer) mixer.update(delta);
+            
+            // Update pickup button highlight
+            updatePickupButtonHighlight();
             
             // Update label orientations
             scene.children.forEach(child => {
@@ -1627,6 +1683,11 @@
             document.getElementById('balanceSlider').value = 50;
             updateBalanceSystem(balanceValue);
             
+            // Add help button event listener
+            document.getElementById('helpBtn').addEventListener('click', function() {
+                document.getElementById('helpOverlay').style.display = 'block';
+            });
+            
             // Add a simple debug message
             updateDebug('Game loaded successfully');
         });
@@ -1640,51 +1701,98 @@
 
         // Function to detect what kind of bag is in view
         function findInteractableBagInViewDirection() {
-            // Create a raycaster from camera
+            // Create a raycaster from the appropriate camera
             const raycaster = new THREE.Raycaster();
             const mousePos = new THREE.Vector2(0, 0); // Center of screen
             
-            raycaster.setFromCamera(mousePos, camera);
+            // Use the active camera (third person or orbit)
+            const activeCamera = (cameraMode === "thirdPerson" && thirdPersonCamera) ? 
+                thirdPersonCamera : camera;
             
-            // Create an array of all bags
-            const bags = [];
-            if (groundBag1 && !attachedBags.some(b => b.mesh === groundBag1)) bags.push(groundBag1);
-            if (groundBag2 && !attachedBags.some(b => b.mesh === groundBag2)) bags.push(groundBag2);
-            if (carBag1 && !attachedBags.some(b => b.mesh === carBag1)) bags.push(carBag1);
-            if (carBag2 && !attachedBags.some(b => b.mesh === carBag2)) bags.push(carBag2);
+            // Set raycaster from camera center
+            raycaster.setFromCamera(mousePos, activeCamera);
             
-            // Find all meshes in the bags
-            const bagMeshes = [];
-            bags.forEach(bag => {
-                bag.traverse(child => {
-                    if (child.isMesh) {
-                        bagMeshes.push({
-                            mesh: child,
-                            bag: bag
-                        });
-                    }
-                });
-            });
+            // Reset highlight on all bags
+            resetBagHighlights();
             
-            // Check for intersections
-            const intersects = raycaster.intersectObjects(
-                bagMeshes.map(item => item.mesh),
-                true
-            );
-            
-            if (intersects.length > 0) {
-                // Find which bag this mesh belongs to
-                const hitMesh = intersects[0].object;
-                const bagInfo = bagMeshes.find(item => item.mesh === hitMesh || item.mesh.isAncestorOf(hitMesh));
+            // If using third person camera, check if we're close enough to any bag
+            if (cameraMode === "thirdPerson" && characterTilt) {
+                const characterPos = new THREE.Vector3();
+                characterTilt.getWorldPosition(characterPos);
                 
-                if (bagInfo) {
-                    const bag = bagInfo.bag;
+                // Create an array of all bags
+                const bags = [];
+                if (groundBag1 && !attachedBags.some(b => b.mesh === groundBag1)) bags.push(groundBag1);
+                if (groundBag2 && !attachedBags.some(b => b.mesh === groundBag2)) bags.push(groundBag2);
+                if (carBag1 && !attachedBags.some(b => b.mesh === carBag1)) bags.push(carBag1);
+                if (carBag2 && !attachedBags.some(b => b.mesh === carBag2)) bags.push(carBag2);
+                
+                // Check distance to each bag
+                for (const bag of bags) {
+                    const bagPos = new THREE.Vector3();
+                    bag.getWorldPosition(bagPos);
                     
-                    // Determine if it's a ground bag or car bag
-                    if (bag === groundBag1 || bag === groundBag2) {
-                        return { bag, isGroundBag: true };
-                    } else {
-                        return { bag, isGroundBag: false };
+                    // Calculate distance
+                    const distance = characterPos.distanceTo(bagPos);
+                    
+                    // If close enough (within 2.5 units)
+                    if (distance < 2.5) {
+                        // Add highlight to this bag
+                        highlightBag(bag);
+                        
+                        // Determine if it's a ground bag or car bag
+                        if (bag === groundBag1 || bag === groundBag2) {
+                            return { bag, isGroundBag: true };
+                        } else {
+                            return { bag, isGroundBag: false };
+                        }
+                    }
+                }
+            } else {
+                // Regular raycast for orbit camera mode
+                // Create an array of all bags
+                const bags = [];
+                if (groundBag1 && !attachedBags.some(b => b.mesh === groundBag1)) bags.push(groundBag1);
+                if (groundBag2 && !attachedBags.some(b => b.mesh === groundBag2)) bags.push(groundBag2);
+                if (carBag1 && !attachedBags.some(b => b.mesh === carBag1)) bags.push(carBag1);
+                if (carBag2 && !attachedBags.some(b => b.mesh === carBag2)) bags.push(carBag2);
+                
+                // Find all meshes in the bags
+                const bagMeshes = [];
+                bags.forEach(bag => {
+                    bag.traverse(child => {
+                        if (child.isMesh) {
+                            bagMeshes.push({
+                                mesh: child,
+                                bag: bag
+                            });
+                        }
+                    });
+                });
+                
+                // Check for intersections
+                const intersects = raycaster.intersectObjects(
+                    bagMeshes.map(item => item.mesh),
+                    true
+                );
+                
+                if (intersects.length > 0) {
+                    // Find which bag this mesh belongs to
+                    const hitMesh = intersects[0].object;
+                    const bagInfo = bagMeshes.find(item => item.mesh === hitMesh || item.mesh.isAncestorOf(hitMesh));
+                    
+                    if (bagInfo) {
+                        const bag = bagInfo.bag;
+                        
+                        // Add highlight to this bag
+                        highlightBag(bag);
+                        
+                        // Determine if it's a ground bag or car bag
+                        if (bag === groundBag1 || bag === groundBag2) {
+                            return { bag, isGroundBag: true };
+                        } else {
+                            return { bag, isGroundBag: false };
+                        }
                     }
                 }
             }
@@ -1692,11 +1800,47 @@
             return null;
         }
         
+        // Function to highlight a bag by changing its material
+        function highlightBag(bag) {
+            bag.traverse(node => {
+                if (node.isMesh && node.material) {
+                    // Store original emission if not already stored
+                    if (!node.userData.originalEmissive) {
+                        node.userData.originalEmissive = node.material.emissive ? 
+                            node.material.emissive.clone() : new THREE.Color(0, 0, 0);
+                    }
+                    
+                    // Add emission for highlight
+                    if (node.material.emissive) {
+                        node.material.emissive.set(0, 0.5, 0);
+                    }
+                }
+            });
+        }
+        
+        // Function to reset all bag highlights
+        function resetBagHighlights() {
+            const allBags = [groundBag1, groundBag2, carBag1, carBag2];
+            
+            allBags.forEach(bag => {
+                if (!bag) return;
+                
+                bag.traverse(node => {
+                    if (node.isMesh && node.material && node.userData.originalEmissive) {
+                        if (node.material.emissive) {
+                            node.material.emissive.copy(node.userData.originalEmissive);
+                        }
+                    }
+                });
+            });
+        }
+        
         // Interactive pickup function for touch/click
         function attemptPickupInteraction() {
             // Don't allow pickups during pickup animations
             if (currentUpperBodyAnimation.startsWith('pickup')) {
                 updateDebug("Cannot pickup: already in pickup animation");
+                showPickupFeedback("Wait for pickup to finish");
                 return false;
             }
             
@@ -1704,6 +1848,8 @@
             
             if (bagInView) {
                 updateDebug(`Found bag to pick up: ${bagInView.isGroundBag ? 'ground' : 'car'} bag`);
+                showPickupFeedback(bagInView.isGroundBag ? "Picking up bag..." : "Grabbing from car...");
+                
                 if (bagInView.isGroundBag) {
                     // Ground pickup
                     setUpperBodyAnimation('pickup_low');
@@ -1730,6 +1876,7 @@
                 return true;
             } else {
                 updateDebug("No bag found to pick up");
+                showPickupFeedback("No bags in range");
             }
             
             return false;
@@ -1763,6 +1910,44 @@
                 });
             }
         });
+
+        // Add close button event listener
+        document.getElementById('closeHelpBtn').addEventListener('click', function() {
+            document.getElementById('helpOverlay').style.display = 'none';
+        });
+
+        // Add Escape key to close overlays
+        window.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                // Close help overlay
+                document.getElementById('helpOverlay').style.display = 'none';
+            }
+        });
+
+        // Highlight pickup button when bags are in range
+        function updatePickupButtonHighlight() {
+            const bagInView = findInteractableBagInViewDirection();
+            const interactBtn = document.getElementById('interactButton');
+            const rangeIndicator = document.getElementById('bagInRangeIndicator');
+            
+            if (bagInView && interactBtn) {
+                interactBtn.classList.add('highlight');
+                interactBtn.textContent = bagInView.isGroundBag ? 'Pickup' : 'Grab';
+                
+                // Show range indicator
+                if (rangeIndicator) {
+                    rangeIndicator.style.opacity = '1';
+                }
+            } else if (interactBtn) {
+                interactBtn.classList.remove('highlight');
+                interactBtn.textContent = 'Pick';
+                
+                // Hide range indicator
+                if (rangeIndicator) {
+                    rangeIndicator.style.opacity = '0';
+                }
+            }
+        }
     </script>
 </body>
 </html> 
