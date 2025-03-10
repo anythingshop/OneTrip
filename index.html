@@ -360,6 +360,9 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
+    <!-- Include the new optimized environment scripts -->
+    <script src="enhancedEnvironment.js"></script>
+    <script src="grassInstancing.js"></script>
 
     <script>
         // Scene setup
@@ -431,10 +434,11 @@
         
         // Add a backup darker ground plane to ensure we don't see through to the background
         const backupGroundGeometry = new THREE.PlaneGeometry(200, 200); // Larger to cover everything
-        const backupGroundMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x1A2E1D, // Much darker green for the backup ground
+        const backupGroundMaterial = new THREE.MeshStandardMaterial({
+            color: 0x0A1A0A, // Much darker green for the backup ground to match grass
             roughness: 0.9,
-            metalness: 0.0,
+            metalness: 0.1,
+            side: THREE.DoubleSide
         });
         
         // Create and add the backup ground slightly below the main ground
@@ -1032,156 +1036,412 @@
             );
         });
         
-        // Simple function to create additional grass - no instancing, just clones
+        // Optimized function to create additional grass with proper instancing - 10x more dense
         function createAdditionalGrass(originalGrass, modelFile, baseScale) {
-            // Create more grass objects for better coverage
-            const count = modelFile.includes('large') ? 150 : 
-                         modelFile.includes('medium') ? 250 : 350;
+            console.log(`Creating optimized instanced grass using ${modelFile}...`);
             
-            // Create clusters of grass for more natural look within a smaller playable area
-            const numClusters = 20;
-            const grassPerCluster = Math.floor(count / numClusters);
+            // Extract geometry and material from the original grass model
+            let templateGeometry = null;
+            let templateMaterial = null;
             
-            // Playable area is now smaller
-            const playableRadius = 35; // Reduced from 80
-            
-            for (let cluster = 0; cluster < numClusters; cluster++) {
-                // Generate random cluster center within the playable area
-                const clusterRadius = Math.random() * playableRadius;
-                const clusterAngle = Math.random() * Math.PI * 2;
-                const clusterX = Math.cos(clusterAngle) * clusterRadius;
-                const clusterZ = Math.sin(clusterAngle) * clusterRadius;
-                
-                // Avoid the path area
-                if (Math.abs(clusterX) < 8 && clusterZ > -30 && clusterZ < 30) continue;
-                
-                // Create grass around this cluster center
-                for (let i = 0; i < grassPerCluster; i++) {
-                    const clone = originalGrass.clone();
+            originalGrass.traverse(node => {
+                if (node.isMesh && !templateGeometry) {
+                    templateGeometry = node.geometry;
+                    templateMaterial = node.material.clone();
                     
-                    // Generate position within cluster (with gaussian-like distribution)
-                    const distFromCenter = Math.pow(Math.random(), 2) * 5; // Reduced from 8 for tighter clustering
-                    const angle = Math.random() * Math.PI * 2;
-                    const x = clusterX + Math.cos(angle) * distFromCenter;
-                    const z = clusterZ + Math.sin(angle) * distFromCenter;
-                    
-                    // Increase base scale for bigger grass
-                    const scaleFactor = modelFile.includes('large') ? 1.7 : // Increased scale slightly
-                                       modelFile.includes('medium') ? 1.4 : 
-                                       1.3;
-                    
-                    // Add some random scale variation
-                    const scale = baseScale * scaleFactor * (0.9 + Math.random() * 0.3);
-                    clone.scale.set(scale, scale, scale);
-                    
-                    // Set position and random rotation
-                    clone.position.set(x, 0, z);
-                    clone.rotation.y = Math.random() * Math.PI * 2;
-                    
-                    scene.add(clone);
+                    // Make sure material is properly configured for visibility
+                    templateMaterial.transparent = false;
+                    templateMaterial.opacity = 1.0;
+                    templateMaterial.depthWrite = true;
+                    templateMaterial.depthTest = true;
+                    templateMaterial.side = THREE.DoubleSide;
+                    templateMaterial.needsUpdate = true;
                 }
+            });
+            
+            if (!templateGeometry || !templateMaterial) {
+                console.error("Could not find geometry/material in grass model");
+                return;
             }
             
-            // Add some additional random grass for fill
-            const randomGrassCount = Math.floor(count * 0.2); // Reduced from 0.3
-            for (let i = 0; i < randomGrassCount; i++) {
-                const clone = originalGrass.clone();
-                
-                // Generate random position
-                const radius = Math.random() * playableRadius;
+            // 10x increased counts based on grass type
+            const count = modelFile.includes('large') ? 1500 :
+                          modelFile.includes('medium') ? 2500 : 3500;
+            
+            // Create instanced mesh
+            const grassInstances = new THREE.InstancedMesh(
+                templateGeometry,
+                templateMaterial,
+                count
+            );
+            
+            // Setup shadows
+            grassInstances.castShadow = true;
+            grassInstances.receiveShadow = true;
+            
+            // Create transformation matrices for each instance
+            const dummy = new THREE.Object3D();
+            
+            // Create clustered distribution for natural look
+            const numClusters = 12;
+            const clusterCenters = [];
+            
+            // Generate cluster centers
+            for (let i = 0; i < numClusters; i++) {
+                // Distribute clusters within the playable area
+                const radius = 5 + Math.random() * 25; // Keep within ~30 units of center
                 const angle = Math.random() * Math.PI * 2;
+                
                 const x = Math.cos(angle) * radius;
                 const z = Math.sin(angle) * radius;
                 
-                // Avoid the path area
-                if (Math.abs(x) < 5 && z > -25 && z < 25) continue;
+                // Skip areas for path, house, car, and character start
+                if ((Math.abs(x) < 6 && z > -5) || // Path to house
+                    (x < -5 && x > -25 && z < -10 && z > -25) || // Car area
+                    (x > -2 && x < 2 && z > -2 && z < 2)) // Character start
+                    continue;
                 
-                // Add some random scale variation but keep it larger than before
-                const scaleFactor = modelFile.includes('large') ? 1.6 :
-                                   modelFile.includes('medium') ? 1.3 : 1.2;
-                const scale = baseScale * scaleFactor * (0.9 + Math.random() * 0.3);
-                clone.scale.set(scale, scale, scale);
+                clusterCenters.push({ x, z });
+            }
+            
+            // Size factors based on grass type
+            const scaleFactor = modelFile.includes('large') ? 1.7 :
+                                modelFile.includes('medium') ? 1.4 : 1.2;
+            
+            // Place grass instances
+            for (let i = 0; i < count; i++) {
+                let x, z;
                 
-                // Set position and random rotation
-                clone.position.set(x, 0, z);
-                clone.rotation.y = Math.random() * Math.PI * 2;
+                if (i < count * 0.8) {
+                    // 80% of grass in clusters
+                    const clusterIndex = Math.floor(Math.random() * clusterCenters.length);
+                    const cluster = clusterCenters[clusterIndex];
+                    
+                    // Distance from cluster center, using gaussian-like distribution
+                    const distance = Math.pow(Math.random(), 2) * 8; // More dense toward center
+                    const angle = Math.random() * Math.PI * 2;
+                    
+                    x = cluster.x + Math.cos(angle) * distance;
+                    z = cluster.z + Math.sin(angle) * distance;
+                } else {
+                    // 20% completely random for fill
+                    const radius = Math.random() * 35;
+                    const angle = Math.random() * Math.PI * 2;
+                    
+                    x = Math.cos(angle) * radius;
+                    z = Math.sin(angle) * radius;
+                    
+                    // Skip areas for path, house, car, and character start
+                    if ((Math.abs(x) < 6 && z > -5) || // Path to house
+                        (x < -5 && x > -25 && z < -10 && z > -25) || // Car area
+                        (x > -2 && x < 2 && z > -2 && z < 2)) // Character start
+                        continue;
+                }
                 
-                scene.add(clone);
+                // Randomize scale around the base scale factor
+                const scale = (baseScale * scaleFactor) * (0.7 + Math.random() * 0.6);
+                
+                dummy.position.set(x, 0, z);
+                dummy.rotation.y = Math.random() * Math.PI * 2;
+                dummy.scale.set(scale, scale, scale);
+                dummy.updateMatrix();
+                
+                // Set the matrix for this instance
+                grassInstances.setMatrixAt(i, dummy.matrix);
+            }
+            
+            // Update the instance matrix
+            grassInstances.instanceMatrix.needsUpdate = true;
+            
+            // Add instance to the scene
+            scene.add(grassInstances);
+            
+            console.log(`Created ${count} instanced grass objects using ${modelFile}`);
+        }
+        
+        // Completely rewritten environment enhancement system with proper instancing
+        function enhanceEnvironment() {
+            console.log("Starting environment enhancement with optimized instancing...");
+            
+            try {
+                // If we've loaded the external scripts, use them
+                if (typeof createInstancedForest === 'function') {
+                    // Use the optimized instanced environment functions
+                    createInstancedForest(scene, loader);
+                    createInstancedRocks(scene, loader);
+                    createInstancedMountains(scene, loader);
+                    
+                    // Also use optimized grass if available
+                    if (typeof createOptimizedGrass === 'function') {
+                        createOptimizedGrass(scene, loader, models.filter(m => m.name.includes('Grass')));
+                    }
+                } else {
+                    // Fallback to old environment code just in case
+                    console.warn("Optimized environment code not loaded - falling back to basic environment");
+                    
+                    // Set a simple flat ground as backup
+                    const simpleGroundGeometry = new THREE.PlaneGeometry(100, 100);
+                    const simpleGroundMaterial = new THREE.MeshStandardMaterial({ 
+                        color: 0x3a5f3a, 
+                        roughness: 0.8,
+                        metalness: 0.1 
+                    });
+                    const simpleGround = new THREE.Mesh(simpleGroundGeometry, simpleGroundMaterial);
+                    simpleGround.rotation.x = -Math.PI / 2;
+                    simpleGround.receiveShadow = true;
+                    scene.add(simpleGround);
+                }
+                
+                console.log("Environment enhancement completed successfully.");
+            } catch (error) {
+                console.error("Error during environment enhancement:", error);
             }
         }
         
-        // Function to create forest boundary
-        function createForestBoundary() {
-            console.log("Creating forest boundary...");
+        // Create instanced forest using InstancedMesh for optimal performance
+        function createInstancedForest() {
+            console.log("Creating instanced forest boundary...");
             
-            // Create a dense forest boundary ring around the playable area
-            const numTrees = 140; // Increased from 120 for more density
-            const boundaryRadius = 40; // Just outside the playable area
-            
-            // Use the existing tree model
+            // Load tree model once to create template geometry and material
             loader.load('./tree.glb', (gltf) => {
-                console.log("Tree model loaded for forest boundary");
-                const treeModel = gltf.scene;
+                const treeScene = gltf.scene;
                 
-                // Enable shadows on tree and ensure visibility
-                treeModel.traverse(node => {
-                    if (node.isMesh) {
-                        node.castShadow = true;
-                        node.receiveShadow = true;
-                        node.visible = true;
-                        
-                        // Improve tree materials
-                        if (node.material) {
-                            // Clone material to avoid shared material issues
-                            node.material = node.material.clone();
-                            node.material.roughness = 0.8;
-                            node.material.transparent = false;
-                            node.material.opacity = 1.0;
-                            node.material.depthWrite = true;
-                            node.material.depthTest = true;
-                            node.material.side = THREE.DoubleSide;
-                            node.material.needsUpdate = true;
-                            
-                            console.log(`Set material properties for tree mesh: ${node.name}`);
-                        }
+                // Extract the first mesh from the tree model to use as template
+                let templateMesh = null;
+                treeScene.traverse(node => {
+                    if (node.isMesh && !templateMesh) {
+                        templateMesh = node;
                     }
                 });
                 
-                // Create trees in a circular formation to create the forest boundary
-                for (let i = 0; i < numTrees; i++) {
-                    const angle = (i / numTrees) * Math.PI * 2;
+                if (!templateMesh) {
+                    console.error("No mesh found in tree model!");
+                    return;
+                }
+                
+                // Use the geometry from the template mesh
+                const treeGeometry = templateMesh.geometry;
+                
+                // Clone and modify the material to ensure it's visible
+                const treeMaterial = templateMesh.material.clone();
+                treeMaterial.roughness = 0.8;
+                treeMaterial.transparent = false;
+                treeMaterial.opacity = 1.0;
+                treeMaterial.depthWrite = true;
+                treeMaterial.depthTest = true;
+                treeMaterial.side = THREE.DoubleSide;
+                treeMaterial.needsUpdate = true;
+                
+                // Create instance counts for different tree sizes
+                const largeTreeCount = 120;
+                const mediumTreeCount = 180;
+                const smallTreeCount = 240;
+                
+                // Create instanced meshes
+                const largeTreeInstances = new THREE.InstancedMesh(
+                    treeGeometry,
+                    treeMaterial,
+                    largeTreeCount
+                );
+                
+                const mediumTreeInstances = new THREE.InstancedMesh(
+                    treeGeometry,
+                    treeMaterial,
+                    mediumTreeCount
+                );
+                
+                const smallTreeInstances = new THREE.InstancedMesh(
+                    treeGeometry,
+                    treeMaterial,
+                    smallTreeCount
+                );
+                
+                // Setup shadows for instanced meshes
+                largeTreeInstances.castShadow = true;
+                largeTreeInstances.receiveShadow = true;
+                mediumTreeInstances.castShadow = true;
+                mediumTreeInstances.receiveShadow = true;
+                smallTreeInstances.castShadow = true;
+                smallTreeInstances.receiveShadow = true;
+                
+                // Create transformation matrices for each instance
+                const dummy = new THREE.Object3D();
+                const boundaryRadius = 40; // Just outside the playable area
+                
+                // Place the large trees (outer ring)
+                for (let i = 0; i < largeTreeCount; i++) {
+                    const angle = (i / largeTreeCount) * Math.PI * 2;
                     
-                    // Add some variation to the radius to make it look more natural
-                    const radius = boundaryRadius + (Math.random() * 10 - 5);
+                    // Add some randomness to the radius
+                    const radius = boundaryRadius + 10 + (Math.random() * 5);
                     
                     const x = Math.cos(angle) * radius;
                     const z = Math.sin(angle) * radius;
                     
-                    // Skip a portion to allow for the path to the house
+                    // Skip areas for path to house
                     if (Math.abs(x) < 10 && z > 5) continue;
                     
-                    const treeClone = treeModel.clone();
+                    // Randomize scale and rotation
+                    const scale = 0.5 + Math.random() * 0.3;
                     
-                    // Randomize tree size and rotation, scaled up by 1.2x as requested
-                    const baseScale = 0.4 + Math.random() * 0.2;
-                    const scale = baseScale * 1.2; // Increase size by 20%
-                    treeClone.scale.set(scale, scale, scale);
-                    treeClone.rotation.y = Math.random() * Math.PI * 2;
+                    dummy.position.set(x, 0, z);
+                    dummy.rotation.y = Math.random() * Math.PI * 2;
+                    dummy.scale.set(scale, scale, scale);
+                    dummy.updateMatrix();
                     
-                    // Position the tree
-                    treeClone.position.set(x, 0, z);
-                    
-                    // Add the tree to the scene
-                    scene.add(treeClone);
-                    console.log(`Added tree at position: ${x.toFixed(2)}, 0, ${z.toFixed(2)} with scale: ${scale.toFixed(2)}`);
+                    // Set the matrix for this instance
+                    largeTreeInstances.setMatrixAt(i, dummy.matrix);
                 }
                 
-                // Add a second row of trees for density
-                for (let i = 0; i < numTrees * 0.7; i++) {
-                    const angle = (i / (numTrees * 0.7)) * Math.PI * 2;
+                // Place medium trees (middle ring)
+                for (let i = 0; i < mediumTreeCount; i++) {
+                    const angle = (i / mediumTreeCount) * Math.PI * 2;
                     
-                    // Second row is further out
-                    const radius = boundaryRadius + 10 + (Math.random() * 8 - 4);
+                    // Add some randomness to the radius
+                    const radius = boundaryRadius + (Math.random() * 8 - 4);
+                    
+                    const x = Math.cos(angle) * radius;
+                    const z = Math.sin(angle) * radius;
+                    
+                    // Skip areas for path to house
+                    if (Math.abs(x) < 12 && z > 0) continue;
+                    
+                    // Randomize scale and rotation
+                    const scale = 0.4 + Math.random() * 0.2;
+                    
+                    dummy.position.set(x, 0, z);
+                    dummy.rotation.y = Math.random() * Math.PI * 2;
+                    dummy.scale.set(scale, scale, scale);
+                    dummy.updateMatrix();
+                    
+                    // Set the matrix for this instance
+                    mediumTreeInstances.setMatrixAt(i, dummy.matrix);
+                }
+                
+                // Place small trees (inner and scattered)
+                for (let i = 0; i < smallTreeCount; i++) {
+                    const angle = (i / smallTreeCount) * Math.PI * 2;
+                    
+                    // Add some randomness to the radius
+                    const radius = boundaryRadius - 5 + (Math.random() * 10 - 5);
+                    
+                    const x = Math.cos(angle) * radius;
+                    const z = Math.sin(angle) * radius;
+                    
+                    // Skip areas for path, house, and car
+                    if ((Math.abs(x) < 15 && z > 0) || // Path to house
+                        (x < -5 && x > -25 && z < -10 && z > -25)) // Car area
+                        continue;
+                    
+                    // Randomize scale and rotation
+                    const scale = 0.3 + Math.random() * 0.2;
+                    
+                    dummy.position.set(x, 0, z);
+                    dummy.rotation.y = Math.random() * Math.PI * 2;
+                    dummy.scale.set(scale, scale, scale);
+                    dummy.updateMatrix();
+                    
+                    // Set the matrix for this instance
+                    smallTreeInstances.setMatrixAt(i, dummy.matrix);
+                }
+                
+                // Update the instance matrices
+                largeTreeInstances.instanceMatrix.needsUpdate = true;
+                mediumTreeInstances.instanceMatrix.needsUpdate = true;
+                smallTreeInstances.instanceMatrix.needsUpdate = true;
+                
+                // Add instances to the scene
+                scene.add(largeTreeInstances);
+                scene.add(mediumTreeInstances);
+                scene.add(smallTreeInstances);
+                
+                console.log(`Created instanced forest with ${largeTreeCount + mediumTreeCount + smallTreeCount} trees`);
+            }, 
+            (xhr) => {
+                console.log(`Tree model for instancing ${(xhr.loaded / xhr.total * 100).toFixed(0)}% loaded`);
+            }, 
+            (error) => {
+                console.error('Error loading tree model for instancing:', error);
+            });
+        }
+        
+        // Create instanced rocks using InstancedMesh for optimal performance
+        function createInstancedRocks() {
+            console.log("Creating instanced rock boundary...");
+            
+            // Load rock model once to create template geometry and material
+            loader.load('./rocks.glb', (gltf) => {
+                const rockScene = gltf.scene;
+                
+                // Extract the first mesh from the rock model to use as template
+                let templateMesh = null;
+                rockScene.traverse(node => {
+                    if (node.isMesh && !templateMesh) {
+                        templateMesh = node;
+                    }
+                });
+                
+                if (!templateMesh) {
+                    console.error("No mesh found in rock model!");
+                    return;
+                }
+                
+                // Use the geometry from the template mesh
+                const rockGeometry = templateMesh.geometry;
+                
+                // Clone and modify the material to ensure it's visible
+                const rockMaterial = templateMesh.material.clone();
+                rockMaterial.roughness = 0.9;
+                rockMaterial.metalness = 0.1;
+                rockMaterial.transparent = false;
+                rockMaterial.opacity = 1.0;
+                rockMaterial.depthWrite = true;
+                rockMaterial.depthTest = true;
+                rockMaterial.side = THREE.DoubleSide;
+                rockMaterial.needsUpdate = true;
+                
+                // Create instance counts for different rock sizes and placements
+                const largeRockCount = 60;
+                const mediumRockCount = 100;
+                const smallRockCount = 150;
+                
+                // Create instanced meshes
+                const largeRockInstances = new THREE.InstancedMesh(
+                    rockGeometry,
+                    rockMaterial,
+                    largeRockCount
+                );
+                
+                const mediumRockInstances = new THREE.InstancedMesh(
+                    rockGeometry,
+                    rockMaterial,
+                    mediumRockCount
+                );
+                
+                const smallRockInstances = new THREE.InstancedMesh(
+                    rockGeometry,
+                    rockMaterial,
+                    smallRockCount
+                );
+                
+                // Setup shadows for instanced meshes
+                largeRockInstances.castShadow = true;
+                largeRockInstances.receiveShadow = true;
+                mediumRockInstances.castShadow = true;
+                mediumRockInstances.receiveShadow = true;
+                smallRockInstances.castShadow = true;
+                smallRockInstances.receiveShadow = true;
+                
+                // Create transformation matrices for each instance
+                const dummy = new THREE.Object3D();
+                const rockRadius = 55; // Outside the tree boundary
+                
+                // Place large rocks (outer boundary)
+                for (let i = 0; i < largeRockCount; i++) {
+                    const angle = (i / largeRockCount) * Math.PI * 2;
+                    
+                    // Add some randomness to the radius
+                    const radius = rockRadius + (Math.random() * 8 - 4);
                     
                     const x = Math.cos(angle) * radius;
                     const z = Math.sin(angle) * radius;
@@ -1189,292 +1449,221 @@
                     // Skip a portion to allow for the path to the house
                     if (Math.abs(x) < 12 && z > 0) continue;
                     
-                    const treeClone = treeModel.clone();
+                    // Randomize scale and rotation
+                    const scaleX = 1.0 + Math.random() * 0.6;
+                    const scaleY = scaleX * (0.8 + Math.random() * 0.4);
+                    const scaleZ = scaleX;
                     
-                    // Randomize tree size and rotation, scaled up by 1.2x as requested
-                    const baseScale = 0.4 + Math.random() * 0.3;
-                    const scale = baseScale * 1.2; // Increase size by 20%
-                    treeClone.scale.set(scale, scale, scale);
-                    treeClone.rotation.y = Math.random() * Math.PI * 2;
+                    // Partially bury the rocks
+                    const yPos = -scaleY * 0.3;
                     
-                    // Position the tree
-                    treeClone.position.set(x, 0, z);
+                    dummy.position.set(x, yPos, z);
+                    dummy.rotation.set(
+                        (Math.random() - 0.5) * 0.2,
+                        Math.random() * Math.PI * 2,
+                        (Math.random() - 0.5) * 0.2
+                    );
+                    dummy.scale.set(scaleX, scaleY, scaleZ);
+                    dummy.updateMatrix();
                     
-                    // Add the tree to the scene
-                    scene.add(treeClone);
+                    // Set the matrix for this instance
+                    largeRockInstances.setMatrixAt(i, dummy.matrix);
                 }
                 
-                console.log("Forest boundary created successfully");
-            }, 
-            // Add progress and error handlers
-            (xhr) => {
-                console.log(`Tree model ${(xhr.loaded / xhr.total * 100).toFixed(0)}% loaded`);
-            },
-            (error) => {
-                console.error('Error loading tree model:', error);
-            });
-        }
-        
-        // Function to create distant mountains on the horizon
-        function createMountainBackdrop() {
-            // Create a mountain range backdrop for distance illusion
-            const mountainGeometry = new THREE.PlaneGeometry(500, 100, 50, 25);
-            const mountainMaterial = new THREE.MeshStandardMaterial({
-                color: 0x5d8272, // Slightly darker/bluer than ground for distance effect
-                roughness: 1.0,
-                metalness: 0.0,
-                side: THREE.DoubleSide
-            });
-            
-            // Create terrain-like mountains by modifying vertices
-            const mountainVertices = mountainGeometry.attributes.position.array;
-            for (let i = 0; i < mountainVertices.length; i += 3) {
-                const idx = i / 3;
-                const x = mountainVertices[i];
-                
-                // Height is based on x position to create mountain-like shapes
-                // Use multiple frequencies of noise to create realistic mountains
-                const height = 
-                    15 * Math.pow(Math.sin(x * 0.01 + 1.2), 2) * Math.pow(Math.cos(x * 0.02 + 0.5), 2) +
-                    5 * Math.pow(Math.sin(x * 0.05 - 0.8), 2) * Math.pow(Math.cos(x * 0.06 + 0.7), 2);
-                
-                // Apply height only to top vertices (y > 0)
-                if (mountainVertices[i + 1] >= 0) {
-                    mountainVertices[i + 1] += height;
-                }
-            }
-            
-            // Need to tell Three.js to update the geometry
-            mountainGeometry.attributes.position.needsUpdate = true;
-            mountainGeometry.computeVertexNormals(); // Recalculate normals for proper lighting
-            
-            const mountains = new THREE.Mesh(mountainGeometry, mountainMaterial);
-            mountains.position.set(0, 20, -200); // Place far behind scene
-            mountains.receiveShadow = true;
-            scene.add(mountains);
-        }
-        
-        // Function to create rocks around the edge of the map
-        function createRockBoundary() {
-            console.log("Creating rock boundary...");
-            
-            // Use the rocks.glb model
-            loader.load('./rocks.glb', (gltf) => {
-                console.log("Rock model loaded for boundary");
-                const rockModel = gltf.scene;
-                
-                // Enable shadows on rocks and ensure visibility
-                rockModel.traverse(node => {
-                    if (node.isMesh) {
-                        node.castShadow = true;
-                        node.receiveShadow = true;
-                        node.visible = true;
-                        
-                        // Improve rock materials
-                        if (node.material) {
-                            // Clone material to avoid shared material issues
-                            node.material = node.material.clone();
-                            node.material.roughness = 0.9;
-                            node.material.metalness = 0.1;
-                            node.material.transparent = false;
-                            node.material.opacity = 1.0;
-                            node.material.depthWrite = true;
-                            node.material.depthTest = true;
-                            node.material.side = THREE.DoubleSide;
-                            node.material.needsUpdate = true;
-                            
-                            console.log(`Set material properties for rock mesh: ${node.name}`);
-                        }
-                    }
-                });
-                
-                // Create rocks in a circular pattern just outside the tree line
-                const numRocks = 50; // Increased from 40 for more density
-                const rockRadius = 55; // Outside the tree boundary
-                
-                for (let i = 0; i < numRocks; i++) {
-                    const angle = (i / numRocks) * Math.PI * 2;
+                // Place medium rocks (scattered between trees and boundary)
+                for (let i = 0; i < mediumRockCount; i++) {
+                    const angle = (i / mediumRockCount) * Math.PI * 2;
                     
-                    // Add variation to the radius
-                    const radius = rockRadius + (Math.random() * 8 - 4);
+                    // More randomized positions between the tree line and rock boundary
+                    const radius = 45 + (Math.random() * 15 - 7.5);
                     
                     const x = Math.cos(angle) * radius;
                     const z = Math.sin(angle) * radius;
                     
-                    // Skip a portion to allow for the path to the house
-                    if (Math.abs(x) < 15 && z > 5) continue;
+                    // Skip areas for path, house, and car
+                    if ((Math.abs(x) < 15 && z > 0) || // Path to house
+                        (x < -5 && x > -25 && z < -10 && z > -25)) // Car area
+                        continue;
                     
-                    const rockClone = rockModel.clone();
+                    // Randomize scale and rotation
+                    const scaleX = 0.7 + Math.random() * 0.4;
+                    const scaleY = scaleX * (0.8 + Math.random() * 0.4);
+                    const scaleZ = scaleX;
                     
-                    // Randomize rock size and rotation
-                    const scale = 1.0 + Math.random() * 0.6; // Larger rocks
-                    rockClone.scale.set(scale, scale * (0.8 + Math.random() * 0.4), scale);
-                    rockClone.rotation.y = Math.random() * Math.PI * 2;
+                    // Partially bury the rocks
+                    const yPos = -scaleY * 0.2;
                     
-                    // Slightly randomize tilt for natural look
-                    rockClone.rotation.x = (Math.random() - 0.5) * 0.2;
-                    rockClone.rotation.z = (Math.random() - 0.5) * 0.2;
+                    dummy.position.set(x, yPos, z);
+                    dummy.rotation.set(
+                        (Math.random() - 0.5) * 0.3,
+                        Math.random() * Math.PI * 2,
+                        (Math.random() - 0.5) * 0.3
+                    );
+                    dummy.scale.set(scaleX, scaleY, scaleZ);
+                    dummy.updateMatrix();
                     
-                    // Position the rock
-                    rockClone.position.set(x, 0, z);
-                    
-                    // Add some rocks that are partially buried
-                    if (Math.random() > 0.6) {
-                        rockClone.position.y = -scale * 0.3;
-                    }
-                    
-                    scene.add(rockClone);
-                    console.log(`Added rock at position: ${x.toFixed(2)}, ${rockClone.position.y.toFixed(2)}, ${z.toFixed(2)} with scale: ${scale.toFixed(2)}`);
-                    
-                    // Occasionally add rock clusters
-                    if (Math.random() > 0.7) {
-                        for (let j = 0; j < Math.floor(Math.random() * 3) + 1; j++) {
-                            const smallRock = rockModel.clone();
-                            const smallScale = scale * (0.3 + Math.random() * 0.3);
-                            smallRock.scale.set(smallScale, smallScale, smallScale);
-                            smallRock.rotation.y = Math.random() * Math.PI * 2;
-                            
-                            // Position near the main rock
-                            const offsetX = (Math.random() - 0.5) * 5;
-                            const offsetZ = (Math.random() - 0.5) * 5;
-                            smallRock.position.set(x + offsetX, 0, z + offsetZ);
-                            
-                            scene.add(smallRock);
-                        }
-                    }
+                    // Set the matrix for this instance
+                    mediumRockInstances.setMatrixAt(i, dummy.matrix);
                 }
                 
-                console.log("Rock boundary created successfully");
-            },
-            // Add progress and error handlers
+                // Place small rocks (scattered throughout playable area)
+                for (let i = 0; i < smallRockCount; i++) {
+                    // Completely random positions throughout the playable area
+                    const radius = Math.random() * 35;
+                    const angle = Math.random() * Math.PI * 2;
+                    
+                    const x = Math.cos(angle) * radius;
+                    const z = Math.sin(angle) * radius;
+                    
+                    // Skip areas for path, house, car and character start position
+                    if ((Math.abs(x) < 6 && z > -5) || // Path to house
+                        (x < -5 && x > -25 && z < -10 && z > -25) || // Car area
+                        (x > -2 && x < 2 && z > -2 && z < 2)) // Character start
+                        continue;
+                    
+                    // Randomize scale and rotation - smaller rocks
+                    const scaleX = 0.3 + Math.random() * 0.3;
+                    const scaleY = scaleX * (0.8 + Math.random() * 0.4);
+                    const scaleZ = scaleX;
+                    
+                    // Partially bury the rocks
+                    const yPos = -scaleY * 0.2;
+                    
+                    dummy.position.set(x, yPos, z);
+                    dummy.rotation.set(
+                        (Math.random() - 0.5) * 0.5,
+                        Math.random() * Math.PI * 2,
+                        (Math.random() - 0.5) * 0.5
+                    );
+                    dummy.scale.set(scaleX, scaleY, scaleZ);
+                    dummy.updateMatrix();
+                    
+                    // Set the matrix for this instance
+                    smallRockInstances.setMatrixAt(i, dummy.matrix);
+                }
+                
+                // Update the instance matrices
+                largeRockInstances.instanceMatrix.needsUpdate = true;
+                mediumRockInstances.instanceMatrix.needsUpdate = true;
+                smallRockInstances.instanceMatrix.needsUpdate = true;
+                
+                // Add instances to the scene
+                scene.add(largeRockInstances);
+                scene.add(mediumRockInstances);
+                scene.add(smallRockInstances);
+                
+                console.log(`Created instanced rocks with ${largeRockCount + mediumRockCount + smallRockCount} rocks`);
+            }, 
             (xhr) => {
-                console.log(`Rock model ${(xhr.loaded / xhr.total * 100).toFixed(0)}% loaded`);
-            },
+                console.log(`Rock model for instancing ${(xhr.loaded / xhr.total * 100).toFixed(0)}% loaded`);
+            }, 
             (error) => {
-                console.error('Error loading rock model:', error);
+                console.error('Error loading rock model for instancing:', error);
             });
         }
         
-        // Function to create procedural mountain barrier around the edge of the map
-        function createMountainBarrier() {
-            console.log("Creating mountain barrier using large scaled rocks...");
+        // Create mountain barrier using instanced, scaled rock models
+        function createInstancedMountains() {
+            console.log("Creating instanced mountain boundary from scaled rocks...");
             
-            // Use the rocks.glb model instead of procedural mountains
+            // Load rock model once to create template geometry and material
             loader.load('./rocks.glb', (gltf) => {
-                console.log("Rock model loaded for mountain boundary");
-                const rockModel = gltf.scene;
+                const rockScene = gltf.scene;
                 
-                // Enable shadows on rocks and ensure visibility
-                rockModel.traverse(node => {
-                    if (node.isMesh) {
-                        node.castShadow = true;
-                        node.receiveShadow = true;
-                        node.visible = true;
-                        
-                        // Improve rock materials
-                        if (node.material) {
-                            // Clone material to avoid shared material issues
-                            node.material = node.material.clone();
-                            node.material.roughness = 0.9;
-                            node.material.metalness = 0.1;
-                            node.material.transparent = false;
-                            node.material.opacity = 1.0;
-                            node.material.depthWrite = true;
-                            node.material.depthTest = true;
-                            node.material.needsUpdate = true;
-                            console.log(`Set material properties for mountain rock mesh`);
-                        }
+                // Extract the first mesh from the rock model to use as template
+                let templateMesh = null;
+                rockScene.traverse(node => {
+                    if (node.isMesh && !templateMesh) {
+                        templateMesh = node;
                     }
                 });
                 
-                // Create large rock formations in a circular pattern
-                const numSegments = 12;
+                if (!templateMesh) {
+                    console.error("No mesh found in rock model for mountains!");
+                    return;
+                }
+                
+                // Use the geometry from the template mesh
+                const mountainGeometry = templateMesh.geometry;
+                
+                // Clone and modify the material for mountains
+                const mountainMaterial = templateMesh.material.clone();
+                mountainMaterial.roughness = 0.9;
+                mountainMaterial.metalness = 0.2;
+                mountainMaterial.transparent = false;
+                mountainMaterial.opacity = 1.0;
+                mountainMaterial.depthWrite = true;
+                mountainMaterial.depthTest = true;
+                mountainMaterial.side = THREE.DoubleSide;
+                mountainMaterial.needsUpdate = true;
+                
+                // Create instance count
+                const mountainCount = 15; // Fewer, larger mountains
+                
+                // Create instanced mesh
+                const mountainInstances = new THREE.InstancedMesh(
+                    mountainGeometry,
+                    mountainMaterial,
+                    mountainCount
+                );
+                
+                // Setup shadows
+                mountainInstances.castShadow = true;
+                mountainInstances.receiveShadow = true;
+                
+                // Create transformation matrices for each instance
+                const dummy = new THREE.Object3D();
                 const barrierRadius = 65; // Outside the rock boundary
                 
-                for (let i = 0; i < numSegments; i++) {
-                    // Skip index 9 to create a gap for the entrance/exit
-                    if (i === 9) continue;
+                // Place mountains in a circular formation
+                for (let i = 0; i < mountainCount; i++) {
+                    const angle = (i / mountainCount) * Math.PI * 2;
                     
-                    const angle = (i / numSegments) * Math.PI * 2;
+                    // Skip a portion to create an entrance/exit
+                    if (i === Math.floor(mountainCount * 0.75)) continue;
+                    
+                    // Add some randomness to the radius
                     const radius = barrierRadius + (Math.random() * 5 - 2.5);
                     
                     const x = Math.cos(angle) * radius;
                     const z = Math.sin(angle) * radius;
                     
-                    // Create a large rock "mountain"
-                    const mountainRock = rockModel.clone();
+                    // Massive scale for mountains
+                    const baseScale = 8.0 + Math.random() * 4.0;
+                    const scaleX = baseScale * (0.8 + Math.random() * 0.4);
+                    const scaleY = baseScale * (1.0 + Math.random() * 0.6);
+                    const scaleZ = baseScale * (0.8 + Math.random() * 0.4);
                     
-                    // Scale it up significantly to create a mountain-like effect
-                    const baseScale = 8.0 + Math.random() * 4.0; // Much larger scale
-                    mountainRock.scale.set(
-                        baseScale * (0.8 + Math.random() * 0.4),
-                        baseScale * (1.0 + Math.random() * 0.6),
-                        baseScale * (0.8 + Math.random() * 0.4)
+                    // Partially bury the mountains
+                    const yPos = -scaleY * 0.5;
+                    
+                    dummy.position.set(x, yPos, z);
+                    dummy.rotation.set(
+                        (Math.random() - 0.5) * 0.2,
+                        Math.random() * Math.PI * 2,
+                        (Math.random() - 0.5) * 0.2
                     );
+                    dummy.scale.set(scaleX, scaleY, scaleZ);
+                    dummy.updateMatrix();
                     
-                    // Add some rotation for natural look
-                    mountainRock.rotation.y = Math.random() * Math.PI * 2;
-                    mountainRock.rotation.x = (Math.random() - 0.5) * 0.2;
-                    mountainRock.rotation.z = (Math.random() - 0.5) * 0.2;
-                    
-                    // Position the mountain rock
-                    mountainRock.position.set(x, -baseScale * 0.3, z); // Partially buried
-                    
-                    // Add to scene
-                    scene.add(mountainRock);
-                    console.log(`Added mountain rock at position: ${x.toFixed(2)}, ${mountainRock.position.y.toFixed(2)}, ${z.toFixed(2)} with scale: ${baseScale.toFixed(2)}`);
-                    
-                    // Add smaller rocks around the base of the mountain for more detail
-                    for (let j = 0; j < 3; j++) {
-                        const smallRock = rockModel.clone();
-                        const smallScale = baseScale * 0.3 * (0.8 + Math.random() * 0.4);
-                        smallRock.scale.set(smallScale, smallScale, smallScale);
-                        smallRock.rotation.y = Math.random() * Math.PI * 2;
-                        
-                        // Position near the main mountain rock
-                        const offsetAngle = Math.random() * Math.PI * 2;
-                        const offsetRadius = baseScale * 0.6;
-                        const offsetX = Math.cos(offsetAngle) * offsetRadius;
-                        const offsetZ = Math.sin(offsetAngle) * offsetRadius;
-                        
-                        smallRock.position.set(x + offsetX, -smallScale * 0.2, z + offsetZ);
-                        scene.add(smallRock);
-                    }
+                    // Set the matrix for this instance
+                    mountainInstances.setMatrixAt(i, dummy.matrix);
                 }
                 
-                console.log("Mountain barrier created successfully using rock models");
-            },
-            // Progress handler
+                // Update the instance matrix
+                mountainInstances.instanceMatrix.needsUpdate = true;
+                
+                // Add instance to the scene
+                scene.add(mountainInstances);
+                
+                console.log(`Created instanced mountains with ${mountainCount} large mountains`);
+            }, 
             (xhr) => {
                 console.log(`Rock model for mountains ${(xhr.loaded / xhr.total * 100).toFixed(0)}% loaded`);
-            },
-            // Error handler
+            }, 
             (error) => {
                 console.error('Error loading rock model for mountains:', error);
             });
-        }
-        
-        // Call the functions to create forest and mountains after all models are loaded
-        function enhanceEnvironment() {
-            console.log("Starting environment enhancement...");
-            
-            try {
-                console.log("Creating forest boundary...");
-                createForestBoundary();
-                
-                console.log("Creating mountain backdrop...");
-                createMountainBackdrop();
-                
-                console.log("Creating rock boundary...");
-                createRockBoundary();
-                
-                console.log("Creating mountain barrier...");
-                createMountainBarrier();
-                
-                console.log("Environment enhancement completed successfully.");
-            } catch (error) {
-                console.error("Error during environment enhancement:", error);
-            }
         }
         
         // Set up animation mixing system
@@ -2163,106 +2352,158 @@
         
         // Function to update the balance system
         function updateBalanceSystem(value) {
-            // Make sure UI elements exist before updating them
-            const balanceValueEl = document.getElementById('balanceValue');
-            const balanceIndicatorEl = document.getElementById('balanceIndicator');
-            const balanceDirectionEl = document.getElementById('balanceDirection');
+            // Skip if game over
+            if (isGameOver) return;
             
-            // Update balance value display
-            if (balanceValueEl) {
-                balanceValueEl.textContent = value.toFixed(2);
-            }
+            // Update the balance visuals
+            const balanceIndicator = document.getElementById('balanceIndicator');
+            const balancePercentage = Math.round(value * 100);
             
-            // Update indicator position
-            if (balanceIndicatorEl) {
-                balanceIndicatorEl.style.left = `${value * 100}%`;
-            }
-            
-            // If not carrying bags, always stay balanced
-            if (attachedBags.length === 0) {
-                if (balanceIndicatorEl) {
-                    balanceIndicatorEl.style.background = '#ffffff'; // White for safe
-                }
-                if (balanceDirectionEl) {
-                balanceDirectionEl.textContent = "Balanced";
-                balanceDirectionEl.style.color = '#ffffff';
-                }
-                return;
-            }
-            
-            // Make sure the balance UI is visible when carrying bags
-            const balanceUI = document.getElementById('balanceUI');
-            if (balanceUI) {
-                balanceUI.style.display = 'block';
-            }
-            
-            // Apply visual effects based on balance value
-            let newDirection = "center";
-            let intensity = 0;
-            
-            // Apply weight-based balance adjustments
-            // The more bags the player carries, the more sensitive their balance becomes
-            let weightFactor = 1.0;
-            if (totalBagWeight > 0) {
-                // Each kg makes balance 8% more sensitive (reduced from 10%)
-                weightFactor = 1.0 + (totalBagWeight * 0.08);
-            }
-            
-            // Define balance thresholds with weight-based adjustments
-            // These determine how far from center before imbalance effects start
-            const leftSevereThreshold = 0.1 / weightFactor;
-            const leftModerateThreshold = 0.3 / weightFactor;
-            const rightModerateThreshold = 0.7 / weightFactor;
-            const rightSevereThreshold = 0.9 / weightFactor;
-            
-            if (value < leftSevereThreshold) {
-                // Severe left imbalance
-                if (balanceIndicatorEl) {
-                    balanceIndicatorEl.style.background = '#ff0000'; // Red
-                }
-                newDirection = "left";
-                intensity = 1.0 - (value / leftSevereThreshold);
-            } else if (value < leftModerateThreshold) {
-                // Moderate left imbalance
-                if (balanceIndicatorEl) {
-                    balanceIndicatorEl.style.background = '#ff9900'; // Orange
-                }
-                newDirection = "left";
-                intensity = (leftModerateThreshold - value) / (leftModerateThreshold - leftSevereThreshold);
-            } else if (value > rightSevereThreshold) {
-                // Severe right imbalance
-                if (balanceIndicatorEl) {
-                    balanceIndicatorEl.style.background = '#ff0000'; // Red
-                }
-                newDirection = "right";
-                intensity = (value - rightSevereThreshold) / (1.0 - rightSevereThreshold);
-            } else if (value > rightModerateThreshold) {
-                // Moderate right imbalance
-                if (balanceIndicatorEl) {
-                    balanceIndicatorEl.style.background = '#ff9900'; // Orange
-                }
-                newDirection = "right";
-                intensity = (value - rightModerateThreshold) / (rightSevereThreshold - rightModerateThreshold);
-                } else {
-                // Balanced
-                if (balanceIndicatorEl) {
-                    balanceIndicatorEl.style.background = '#00ff00'; // Green
-                }
-                newDirection = "center";
-                if (balanceDirectionEl) {
-                    balanceDirectionEl.textContent = "Balanced";
-                    balanceDirectionEl.style.color = '#00ff00';
-            }
-            }
-            
-            // If balance direction changed or intensity changed significantly, update animations
-            if (newDirection !== currentBalanceDirection || Math.abs(balanceIntensity - intensity) > 0.2) {
-                currentBalanceDirection = newDirection;
-                balanceIntensity = intensity;
+            if (balanceIndicator) {
+                const position = `${balancePercentage}%`;
+                balanceIndicator.style.left = position;
                 
-                // Apply animation effects based on balance state
-                updateAnimationsForBalance(newDirection, intensity);
+                // Update the displayed value
+                const balanceValue = document.getElementById('balanceValue');
+                if (balanceValue) {
+                    balanceValue.textContent = value.toFixed(2);
+                }
             }
+            
+            // Update the balance direction text
+            const balanceDirection = document.getElementById('balanceDirection');
+            if (balanceDirection) {
+                let newDirection = "center";
+                let intensity = 0;
+                
+                if (value < 0.4) {
+                    newDirection = "left";
+                    intensity = (0.4 - value) / 0.4; // 0 to 1 scale
+                } else if (value > 0.6) {
+                    newDirection = "right";
+                    intensity = (value - 0.6) / 0.4; // 0 to 1 scale
+                }
+                
+                // Update direction text based on intensity
+                if (newDirection === "center") {
+                    balanceDirection.textContent = "Balanced";
+                    balanceIndicatorEl.style.background = '#ffffff'; // White for safe
+                } else {
+                    const intensityText = intensity < 0.3 ? "Slightly" : 
+                                         intensity < 0.7 ? "Moderately" : "Severely";
+                    balanceDirection.textContent = `${intensityText} Unbalanced (${newDirection})`;
+                    
+                    // Color coding based on intensity
+                    if (intensity > 0.7) {
+                        balanceIndicatorEl.style.background = '#ff0000'; // Red
+                    } else if (intensity > 0.3) {
+                        balanceIndicatorEl.style.background = '#ff9900'; // Orange
+                    } else {
+                        balanceIndicatorEl.style.background = '#00ff00'; // Green
+                    }
+                }
+                
+                // Check for fall condition - if intensity is very high, trigger a fall
+                if (intensity > 0.9 && attachedBags.length > 0) {
+                    // High intensity imbalance triggers a fall
+                    triggerGameOver();
+                }
+                
+                // If direction changed, update animations
+                if (newDirection !== currentBalanceDirection) {
+                    updateAnimationsForBalance(newDirection, intensity);
+                    currentBalanceDirection = newDirection;
+                }
+            }
+        }
+        
+        // Function to handle game over state when player falls
+        function triggerGameOver() {
+            if (isGameOver) return; // Prevent multiple triggers
+            
+            isGameOver = true;
+            console.log("GAME OVER - Player fell due to imbalance!");
+            
+            // Show feedback
+            showPickupFeedback("GAME OVER - You fell! Recovering in 3 seconds...");
+            
+            // Drop all bags
+            detachAllBags();
+            
+            // Play fall animation
+            if (upperBodyActions['stumble_fall']) {
+                forcedAnimationUpdate('stumble_fall');
+            } else {
+                // Fall back to idle if stumble animation not available
+                forcedAnimationUpdate('idle');
+            }
+            
+            // Set a timer to recover
+            if (fallRecoveryTimer) clearTimeout(fallRecoveryTimer);
+            fallRecoveryTimer = setTimeout(() => {
+                // Reset game state
+                isGameOver = false;
+                
+                // Reset balance
+                balanceValue = 0.5;
+                currentBalanceDirection = "center";
+                
+                // Reset character position if needed
+                enforceGroundCollision();
+                
+                // Show recovery message
+                showPickupFeedback("Recovered! Be more careful next time!");
+                
+                // Reset to idle animation
+                forcedAnimationUpdate('idle');
+            }, 3000); // 3 second recovery time
+        }
+        
+        // Function to detach all bags on fall
+        function detachAllBags() {
+            console.log("Detaching all bags due to fall");
+            
+            // Make a copy of the array since we'll be modifying it during iteration
+            const bagsToDetach = [...attachedBags];
+            
+            // Detach each bag
+            bagsToDetach.forEach(bag => {
+                // Get the original parent and position
+                const originalParent = bag.originalParent;
+                const originalPosition = bag.originalPosition;
+                const originalRotation = bag.originalRotation;
+                const originalScale = bag.originalScale;
+                
+                // First, remove the bag from the container
+                const bagMesh = bag.mesh;
+                const bagContainer = bag.container;
+                bagContainer.remove(bagMesh);
+                
+                // Remove container from hand
+                const hand = bag.hand;
+                bagContainer.parent.remove(bagContainer);
+                
+                // Add bag back to original parent
+                originalParent.add(bagMesh);
+                
+                // Reset position, rotation, and scale
+                bagMesh.position.copy(originalPosition);
+                bagMesh.rotation.copy(originalRotation);
+                bagMesh.scale.copy(originalScale);
+                
+                // Make sure it's visible
+                bagMesh.traverse(node => {
+                    if (node.isMesh) {
+                        node.visible = true;
+                    }
+                });
+            });
+            
+            // Clear the attached bags array
+            attachedBags = [];
+            
+            // Update carrying stats
+            updateCarryingStats();
         }
         
         // Apply animation effects based on balance status
@@ -2504,11 +2745,11 @@
                 }
                 // A or Left Arrow - Strafe left relative to camera
                 if (keysPressed['a'] || keysPressed['ArrowLeft']) {
-                    inputX = -1;
+                    inputX = 1; // Inverted to fix direction - this seems counter-intuitive but works with our camera system
                 }
                 // D or Right Arrow - Strafe right relative to camera
                 if (keysPressed['d'] || keysPressed['ArrowRight']) {
-                    inputX = 1;
+                    inputX = -1; // Inverted to fix direction - this seems counter-intuitive but works with our camera system
                 }
             }
             
@@ -3304,11 +3545,11 @@
                 }
                 // A or Left Arrow - Strafe left relative to camera
                 if (keysPressed['a'] || keysPressed['ArrowLeft']) {
-                    inputX = -1;
+                    inputX = 1; // Inverted to fix direction - this seems counter-intuitive but works with our camera system
                 }
                 // D or Right Arrow - Strafe right relative to camera
                 if (keysPressed['d'] || keysPressed['ArrowRight']) {
-                    inputX = 1;
+                    inputX = -1; // Inverted to fix direction - this seems counter-intuitive but works with our camera system
                 }
             }
             
@@ -4066,88 +4307,6 @@
                 }
             }
         }
-        
-        // Function to handle game over state
-        function triggerGameOver() {
-            if (isGameOver) return; // Prevent multiple triggers
-            
-            isGameOver = true;
-            
-            // Show game over message
-            showPickupFeedback("GAME OVER - You fell! Recovering in 3 seconds...");
-            
-            // Drop all bags
-            dropAllBags();
-            
-            // Play fall animation
-            if (upperBodyActions['stumble_fall']) {
-                forcedAnimationUpdate('stumble_fall');
-            }
-            
-            // Disable controls temporarily
-            balanceEnabled = false;
-            
-            // Set a timer to recover
-            fallRecoveryTimer = setTimeout(() => {
-                // Reset game state
-                isGameOver = false;
-                balanceEnabled = true;
-                balanceValue = 0.5; // Reset balance to center
-                
-                // Reset character tilt
-                gsapTilt(0);
-                
-                // Show recovery message
-                showPickupFeedback("Recovered! Be more careful next time!");
-                
-                // Reset animations
-                forcedAnimationUpdate('idle');
-            }, 3000); // 3 second recovery time
-        }
-        
-        // Function to drop all bags at once
-        function dropAllBags() {
-            // Drop bags one by one until none are left
-            while (attachedBags.length > 0) {
-                detachBag();
-            }
-        }
-
-        // Function to ensure all attached bags are visible
-        function ensureAttachedBagsVisibility() {
-            // Skip if no bags are attached
-            if (attachedBags.length === 0) return;
-            
-            // Check each attached bag
-            attachedBags.forEach(bagData => {
-                const bag = bagData.mesh;
-                
-                // Ensure the bag and all its children are visible
-                bag.traverse(node => {
-                    if (node.isMesh) {
-                        // Make sure the mesh is visible
-                        node.visible = true;
-                        
-                        // Ensure material is properly set
-                        if (node.material) {
-                            node.material.transparent = false;
-                            node.material.opacity = 1.0;
-                            node.material.depthWrite = true;
-                            node.material.depthTest = true;
-                            node.material.needsUpdate = true;
-                        }
-                    }
-                });
-            });
-        }
-
-        // Start the main animation loop
-        animate(0);
-
-        // Variable is already declared at line 789
-        // let lastMouseMoveX = 0;
-        let lastPickupFeedbackTime = 0; // Track when we last showed feedback
-        let pickupTimeoutSet = false; // Flag to prevent multiple timeouts
 
         document.addEventListener('mousedown', function(e) {
             if (e.button === 0 && cameraMode === "thirdPerson" && !controls.enabled) { // Left mouse button
