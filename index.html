@@ -2045,33 +2045,41 @@
             controls.update();
         });
         
-        // Function to update the balance system based on movement and turning
+        // Function to update the balance system based on mouse/joystick control
         function updateMovementBasedBalance() {
             // Only apply balance effects when carrying bags
             if (!balanceEnabled || attachedBags.length === 0) return;
             
-            // Calculate balance shifts based on movement and turning
+            // Calculate balance shifts based on input controls
             let balanceShift = 0;
             
-            // Movement speed affects balance
-            if (isMoving) {
-                balanceShift += 0.01; // Small constant shift when moving
-            }
+            // REMOVED: Movement speed no longer affects balance
+            // balanceShift += movementAcceleration * 0.15;
             
-            // Mouse/joystick can be used to control balance directly
+            // Mouse movement is now the PRIMARY control for balance
             if (lastMouseMoveX !== 0) {
-                // Use mouse movement to shift balance
-                balanceShift += (lastMouseMoveX * 0.0003);
-                
-                // Reset mouse movement after applying (avoids continuous drift)
-                lastMouseMoveX = 0;
+                // Stronger mouse influence on balance
+                balanceShift += (lastMouseMoveX * 0.0005);
+                lastMouseMoveX = 0; // Reset after use
             }
             
-            // Carrying weight makes balance harder
-            const carryFactor = 1 + (totalBagWeight * 0.02);
+            // Rotation joystick also affects balance (for mobile/gamepad)
+            if (rotationJoystickActive && rotationJoystickDirection) {
+                if (Math.abs(rotationJoystickDirection.x) > 0.1) {
+                    // Use rotation joystick X-axis for balance control
+                    balanceShift += rotationJoystickDirection.x * 0.01;
+                }
+            }
+            
+            // Natural centering force (balance tries to return to center)
+            const centeringForce = (0.5 - balanceValue) * 0.005;
+            balanceShift += centeringForce;
+            
+            // Carrying weight affects balance sensitivity
+            const carryFactor = 1 + (totalBagWeight * 0.03);
             balanceShift *= carryFactor;
             
-            // Apply changes to balance value with smoothing
+            // Apply changes to balance value
             balanceValue = Math.max(0, Math.min(1, balanceValue + balanceShift));
             
             // Update the UI
@@ -2079,9 +2087,10 @@
             if (balanceSlider) {
                 balanceSlider.value = balanceValue * 100;
             }
-            
-            // Apply visual effects based on balance
             updateBalanceSystem(balanceValue);
+            
+            // DEBUG: Show current balance information
+            updateDebug(`Balance: ${balanceValue.toFixed(2)}, Weight: ${totalBagWeight.toFixed(1)}kg`);
         }
         
         // Set up third-person camera
@@ -2117,72 +2126,87 @@
         function updateCharacterMovement(delta) {
             if (!characterTilt) return;
             
+            // Store previous movement state to detect changes
+            const wasMoving = isMoving;
+            isMoving = false;
+            
             // Get joystick or keyboard input for movement
             let inputX = 0;
             let inputZ = 0;
             
-            // Process joystick input if active with deadzone
+            // Process joystick input if active
             if (joystickActive && joystickDirection) {
-                if (Math.abs(joystickDirection.x) > 0.1) {
+                // Add a small deadzone to prevent tiny movements
+                if (Math.abs(joystickDirection.x) > 0.15) {
                     inputX = joystickDirection.x;
                 }
-                if (Math.abs(joystickDirection.y) > 0.1) {
+                if (Math.abs(joystickDirection.y) > 0.15) {
                     inputZ = joystickDirection.y;
                 }
             } 
-            // Otherwise process keyboard input - simple cardinal directions
+            // Otherwise process keyboard input
             else {
+                // W or Up Arrow - Forward movement relative to camera
                 if (keysPressed['w'] || keysPressed['ArrowUp']) {
-                    inputZ = -1; // Forward
+                    inputZ = -1;
                 }
+                // S or Down Arrow - Backward movement relative to camera
                 if (keysPressed['s'] || keysPressed['ArrowDown']) {
-                    inputZ = 1;  // Backward
+                    inputZ = 1;
                 }
+                // A or Left Arrow - Strafe left relative to camera
                 if (keysPressed['a'] || keysPressed['ArrowLeft']) {
-                    inputX = -1; // Strafe left
+                    inputX = -1;
                 }
+                // D or Right Arrow - Strafe right relative to camera
                 if (keysPressed['d'] || keysPressed['ArrowRight']) {
-                    inputX = 1;  // Strafe right
+                    inputX = 1;
                 }
             }
             
-            // Determine if we're moving this frame
-            isMoving = (Math.abs(inputX) > 0.1 || Math.abs(inputZ) > 0.1);
-            
-            if (isMoving) {
-                // Simple direct speed calculation - no acceleration for smoother response
-                const currentSpeed = maxMovementSpeed;
+            // Process movement input (independent of rotation)
+            if (Math.abs(inputX) > 0.1 || Math.abs(inputZ) > 0.1) {
+                isMoving = true;
                 
-                // Get camera direction vectors
+                // Calculate movement speed with acceleration/deceleration
+                const targetSpeed = maxMovementSpeed * Math.sqrt(inputX*inputX + inputZ*inputZ);
+                const speedDiff = targetSpeed - movementAcceleration;
+                movementAcceleration += speedDiff * 0.1 * (delta * 60); // Make framerate independent
+                
+                // Always use camera direction for movement, not character direction
                 const cameraForward = new THREE.Vector3(0, 0, -1);
                 const cameraRight = new THREE.Vector3(1, 0, 0);
                 
                 if (cameraMode === "thirdPerson" && thirdPersonCamera) {
-                    // Get camera's forward direction
+                    // Get camera's forward and right vectors (ignoring Y component for horizontal movement)
                     thirdPersonCamera.getWorldDirection(cameraForward);
                     cameraForward.y = 0; // Keep movement on horizontal plane
                     cameraForward.normalize();
                     
-                    // Calculate right vector from forward
+                    // Right is perpendicular to forward in horizontal plane
                     cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraForward);
                 }
                 
-                // Calculate movement direction based on input
+                // Calculate movement direction relative to camera
                 moveDirection.set(0, 0, 0)
-                    .add(cameraRight.multiplyScalar(inputX))
+                    .add(cameraRight.multiplyScalar(inputX))  // Use regular input sign
                     .add(cameraForward.multiplyScalar(-inputZ));
                 
-                // Normalize and scale by speed
-                if (moveDirection.length() > 0) {
-                    moveDirection.normalize().multiplyScalar(currentSpeed * delta);
-                }
+                moveDirection.normalize().multiplyScalar(movementAcceleration);
                 
                 // Update character position
                 characterTilt.position.add(moveDirection);
                 
-                // Rotate character to face movement direction
-                if (moveDirection.length() > 0) {
+                // If moving, rotate character mesh to face movement direction
+                if (moveDirection.length() > 0.01) {
+                    // Get angle for direction of movement
                     targetRotation = Math.atan2(moveDirection.x, moveDirection.z);
+                }
+            } else {
+                // Character is not moving, slow down gradually
+                movementAcceleration *= 0.8;
+                if (movementAcceleration < 0.001) {
+                    movementAcceleration = 0;
                 }
             }
             
@@ -2829,72 +2853,87 @@
         function updateCharacterMovement(delta) {
             if (!characterTilt) return;
             
+            // Store previous movement state to detect changes
+            const wasMoving = isMoving;
+            isMoving = false;
+            
             // Get joystick or keyboard input for movement
             let inputX = 0;
             let inputZ = 0;
             
-            // Process joystick input if active with deadzone
+            // Process joystick input if active
             if (joystickActive && joystickDirection) {
-                if (Math.abs(joystickDirection.x) > 0.1) {
+                // Add a small deadzone to prevent tiny movements
+                if (Math.abs(joystickDirection.x) > 0.15) {
                     inputX = joystickDirection.x;
                 }
-                if (Math.abs(joystickDirection.y) > 0.1) {
+                if (Math.abs(joystickDirection.y) > 0.15) {
                     inputZ = joystickDirection.y;
                 }
             } 
-            // Otherwise process keyboard input - simple cardinal directions
+            // Otherwise process keyboard input
             else {
+                // W or Up Arrow - Forward movement relative to camera
                 if (keysPressed['w'] || keysPressed['ArrowUp']) {
-                    inputZ = -1; // Forward
+                    inputZ = -1;
                 }
+                // S or Down Arrow - Backward movement relative to camera
                 if (keysPressed['s'] || keysPressed['ArrowDown']) {
-                    inputZ = 1;  // Backward
+                    inputZ = 1;
                 }
+                // A or Left Arrow - Strafe left relative to camera
                 if (keysPressed['a'] || keysPressed['ArrowLeft']) {
-                    inputX = -1; // Strafe left
+                    inputX = -1;
                 }
+                // D or Right Arrow - Strafe right relative to camera
                 if (keysPressed['d'] || keysPressed['ArrowRight']) {
-                    inputX = 1;  // Strafe right
+                    inputX = 1;
                 }
             }
             
-            // Determine if we're moving this frame
-            isMoving = (Math.abs(inputX) > 0.1 || Math.abs(inputZ) > 0.1);
-            
-            if (isMoving) {
-                // Simple direct speed calculation - no acceleration for smoother response
-                const currentSpeed = maxMovementSpeed;
+            // Process movement input (independent of rotation)
+            if (Math.abs(inputX) > 0.1 || Math.abs(inputZ) > 0.1) {
+                isMoving = true;
                 
-                // Get camera direction vectors
+                // Calculate movement speed with acceleration/deceleration
+                const targetSpeed = maxMovementSpeed * Math.sqrt(inputX*inputX + inputZ*inputZ);
+                const speedDiff = targetSpeed - movementAcceleration;
+                movementAcceleration += speedDiff * 0.1 * (delta * 60); // Make framerate independent
+                
+                // Always use camera direction for movement, not character direction
                 const cameraForward = new THREE.Vector3(0, 0, -1);
                 const cameraRight = new THREE.Vector3(1, 0, 0);
                 
                 if (cameraMode === "thirdPerson" && thirdPersonCamera) {
-                    // Get camera's forward direction
+                    // Get camera's forward and right vectors (ignoring Y component for horizontal movement)
                     thirdPersonCamera.getWorldDirection(cameraForward);
                     cameraForward.y = 0; // Keep movement on horizontal plane
                     cameraForward.normalize();
                     
-                    // Calculate right vector from forward
+                    // Right is perpendicular to forward in horizontal plane
                     cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraForward);
                 }
                 
-                // Calculate movement direction based on input
+                // Calculate movement direction relative to camera
                 moveDirection.set(0, 0, 0)
-                    .add(cameraRight.multiplyScalar(inputX))
+                    .add(cameraRight.multiplyScalar(inputX))  // Use regular input sign
                     .add(cameraForward.multiplyScalar(-inputZ));
                 
-                // Normalize and scale by speed
-                if (moveDirection.length() > 0) {
-                    moveDirection.normalize().multiplyScalar(currentSpeed * delta);
-                }
+                moveDirection.normalize().multiplyScalar(movementAcceleration);
                 
                 // Update character position
                 characterTilt.position.add(moveDirection);
                 
-                // Rotate character to face movement direction
-                if (moveDirection.length() > 0) {
+                // If moving, rotate character mesh to face movement direction
+                if (moveDirection.length() > 0.01) {
+                    // Get angle for direction of movement
                     targetRotation = Math.atan2(moveDirection.x, moveDirection.z);
+                }
+            } else {
+                // Character is not moving, slow down gradually
+                movementAcceleration *= 0.8;
+                if (movementAcceleration < 0.001) {
+                    movementAcceleration = 0;
                 }
             }
             
@@ -3479,21 +3518,8 @@
                     characterModel.rotation.y = characterTilt.rotation.y;
                 }
                 
-                // Never directly update camera here - camera will update in animation loop
-                
-                // Handle balance shifts from rotation
-                if (attachedBags.length > 0 && balanceEnabled) {
-                    // Joystick rotation directly affects balance - main control for balance
-                    const balanceDisruption = Math.min(0.03, Math.abs(rotationAmount) * 3);
-                    
-                    // Fix: Swap directions - rotating right shifts balance right
-                    if (rotationAmount > 0) { // Rotate right
-                        balanceValue = Math.min(1, balanceValue + balanceDisruption);
-                    } 
-                    else if (rotationAmount < 0) { // Rotate left
-                        balanceValue = Math.max(0, balanceValue - balanceDisruption);
-                    }
-                }
+                // When carrying bags, the rotationJoystick will affect balance in updateMovementBasedBalance
+                // No direct balance adjustment needed here
             }
         }
 
