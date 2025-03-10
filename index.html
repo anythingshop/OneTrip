@@ -2109,12 +2109,13 @@
                     // Apply the rotation to the character model to match the movement direction
                     characterModel.rotation.y = angle;
                     
-                    // Also update the tilt container rotation to match the movement direction
-                    // This ensures the character's momentum and position align with the visual direction
+                    // Update target rotation - but don't directly update characterTilt rotation here
+                    // This prevents visual artifacts with camera ghosting
                     targetRotation = angle;
-                    // Smoothly interpolate to the target rotation
-                    characterTilt.rotation.y = THREE.MathUtils.lerp(characterTilt.rotation.y, targetRotation, 0.1);
                 }
+                
+                // Rotation and camera updates are now handled in the main animation loop
+                // to prevent visual artifacts when pressing W
                 
                 // Update animations based on movement state change - ONLY if state actually changed
                 if (!wasMoving || !lastMovementState) {
@@ -2375,16 +2376,17 @@
                         if (dx !== 0 && mouseLookActive) {
                             // Rotate the character AND camera together
                             const newRotation = characterTilt.rotation.y - dx * mouseRotationSensitivity;
-                            characterTilt.rotation.y = newRotation;
+                            
+                            // Only update the target rotation, don't update the character directly
+                            // This prevents visual artifacts when rotating with mouse
                             targetRotation = newRotation;
                             
-                            // Also rotate the character model to match 
+                            // However, we do need to update the character model immediately for user feedback
                             if (characterModel) {
                                 characterModel.rotation.y = newRotation;
                             }
                             
-                            // Update camera to match character rotation
-                            updateThirdPersonCamera();
+                            // Camera updates will be handled in the animation loop
                             
                             // When carrying bags, use mouse movement to affect balance
                             if (attachedBags.length > 0 && balanceEnabled) {
@@ -2675,6 +2677,19 @@
             
             // Update character animations
             if (mixer) mixer.update(delta);
+            
+            // Apply camera rotation updates here, in the main animation loop
+            // This ensures we don't get ghosting from multiple camera updates in a single frame
+            if (characterTilt && Math.abs(targetRotation - characterTilt.rotation.y) > 0.01) {
+                characterTilt.rotation.y = THREE.MathUtils.lerp(
+                    characterTilt.rotation.y,
+                    targetRotation,
+                    0.05 // Slower rotation for smoother camera movement
+                );
+                
+                // Update camera position based on character rotation
+                updateThirdPersonCamera();
+            }
             
             // Apply camera shake if active
             if (cameraShakeActive) {
