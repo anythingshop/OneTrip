@@ -1006,8 +1006,28 @@
                         document.getElementById('info').textContent = 
                             `All models loaded - Ready to play!`;
                         
-                        // Once all models are loaded, set up collision detection
+                        // Once all models are loaded, set up collision detection and start the game
                         setupCollisionDetection();
+                        
+                        // Make sure we're in third-person camera mode for gameplay
+                        cameraMode = "thirdPerson";
+                        isCameraFollowing = true;
+                        
+                        // Ensure camera is properly set up
+                        if (thirdPersonCamera) {
+                            updateThirdPersonCamera();
+                        }
+                        
+                        // Ensure character is at the correct position
+                        if (characterTilt) {
+                            updateDebug("Character position set to: " + 
+                                characterTilt.position.x.toFixed(2) + ", " + 
+                                characterTilt.position.y.toFixed(2) + ", " + 
+                                characterTilt.position.z.toFixed(2));
+                        }
+                        
+                        // Make sure everything is ready for the game to run
+                        console.log("Game is ready to play!");
                     }
                 },
                 (xhr) => {
@@ -1829,20 +1849,6 @@
             detachBag();
         });
         
-        document.getElementById('balanceSlider').addEventListener('input', function() {
-            balanceValue = this.value / 100;
-            updateBalanceSystem(balanceValue);
-        });
-        
-        document.getElementById('toggleBalance').addEventListener('click', function() {
-            balanceEnabled = !balanceEnabled;
-            this.textContent = balanceEnabled ? 
-                'Disable Balance Effect' : 'Enable Balance Effect';
-            
-            // Apply current balance state immediately when toggled
-            updateBalanceSystem(balanceValue);
-        });
-        
         document.getElementById('gameView').addEventListener('click', () => {
             camera.position.set(-17, 2, -25);
             controls.target.set(-15, 1, -20);
@@ -2643,6 +2649,8 @@
                 renderer.render(scene, camera);
             }
         }
+        
+        // Start the animation loop
         animate();
         
         // Initialize controls when everything is loaded
@@ -2672,6 +2680,16 @@
                 document.getElementById('gameViewBtn').textContent = 'Orbit View';
             }
             
+            // Make sure the camera is positioned correctly at start
+            if (thirdPersonCamera && characterTilt) {
+                updateThirdPersonCamera();
+                // Log the camera position for debugging
+                console.log('Camera position set to:', 
+                    thirdPersonCamera.position.x.toFixed(2),
+                    thirdPersonCamera.position.y.toFixed(2),
+                    thirdPersonCamera.position.z.toFixed(2));
+            }
+            
             // Add help button event listener
             document.getElementById('helpBtn').addEventListener('click', function() {
                 document.getElementById('helpOverlay').style.display = 'block';
@@ -2685,6 +2703,19 @@
                 } else {
                     helpText.textContent = "Keyboard/Mouse: WASD or arrows to move, mouse to look around, E or SPACE to pick up, Q or R to drop";
                 }
+            }
+            
+            // Ensure initial camera and character positions are in sync
+            if (characterTilt) {
+                // Set up initial animation state
+                if (mixer) {
+                    // Make sure mixer is updated on first frame
+                    mixer.update(0);
+                }
+                console.log('Character position:', 
+                    characterTilt.position.x.toFixed(2),
+                    characterTilt.position.y.toFixed(2),
+                    characterTilt.position.z.toFixed(2));
             }
             
             // Add a simple debug message
@@ -2976,10 +3007,17 @@
                     updateDebug(`Added collision object: ${object.name}`);
                 }
             });
+            
+            console.log(`Added ${collisionObjects.length} collision objects to the scene`);
         }
         
-        // Function to check if movement would cause a collision
+        // Function to check if movement would cause a collision - make sure it handles empty collisionObjects
         function checkCollision(position, moveDirection, radius = 0.5) {
+            // If no collision objects, return false
+            if (!collisionObjects || collisionObjects.length === 0) {
+                return false;
+            }
+            
             // Create a ray from the character position in the direction of movement
             const raycaster = new THREE.Raycaster(
                 position.clone(), 
