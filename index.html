@@ -497,10 +497,14 @@
             // Bags ON TOP of the car - moved further back (more negative Z)
             { name: 'Car Bag 1', file: './newbag.glb', position: [-5, 3.5, -20.5], scale: 0.4, rotationY: 0 },
             { name: 'Car Bag 2', file: './bag2.glb', position: [-5, 3.5, -21.5], scale: 0.4, rotationY: Math.PI/4 },
+            { name: 'Car Bag 3', file: './newbag.glb', position: [-5.5, 3.5, -20], scale: 0.4, rotationY: Math.PI/6 },
+            { name: 'Car Bag 4', file: './bag2.glb', position: [-4.5, 3.5, -19.5], scale: 0.4, rotationY: -Math.PI/6 },
             
             // Bags on the GROUND near character
             { name: 'Ground Bag 1', file: './newbag.glb', position: [-13, 0, -19], scale: 0.4, rotationY: 0 },
             { name: 'Ground Bag 2', file: './bag2.glb', position: [-14, 0, -21], scale: 0.4, rotationY: Math.PI/4 },
+            { name: 'Ground Bag 3', file: './newbag.glb', position: [-15, 0, -17], scale: 0.4, rotationY: Math.PI/2 },
+            { name: 'Ground Bag 4', file: './bag2.glb', position: [-12, 0, -22], scale: 0.4, rotationY: -Math.PI/4 },
             
             // Environment objects properly spaced along the path
             { name: 'Tree', file: './tree.glb', position: [-10, 0, 0], scale: 0.5, rotationY: 0 },
@@ -604,8 +608,12 @@
         // References to bags for attaching
         let groundBag1 = null;
         let groundBag2 = null;
+        let groundBag3 = null;
+        let groundBag4 = null;
         let carBag1 = null;
         let carBag2 = null;
+        let carBag3 = null;
+        let carBag4 = null;
         
         // Currently attached bags with their metadata
         let attachedBags = [];
@@ -651,8 +659,12 @@
                     // Store references to bags
                     if (model.name === 'Ground Bag 1') groundBag1 = modelObj;
                     if (model.name === 'Ground Bag 2') groundBag2 = modelObj;
+                    if (model.name === 'Ground Bag 3') groundBag3 = modelObj;
+                    if (model.name === 'Ground Bag 4') groundBag4 = modelObj;
                     if (model.name === 'Car Bag 1') carBag1 = modelObj;
                     if (model.name === 'Car Bag 2') carBag2 = modelObj;
+                    if (model.name === 'Car Bag 3') carBag3 = modelObj;
+                    if (model.name === 'Car Bag 4') carBag4 = modelObj;
                     
                     // Set up character animations and bone references
                     if (model.name === 'Character') {
@@ -1010,59 +1022,75 @@
             console.log("Attaching bag to hand...");
             showPickupFeedback("Picked up bag!");
             
-            // Get current world position of the bag
-            const bagWorldPos = new THREE.Vector3();
-            bag.getWorldPosition(bagWorldPos);
-            
-            // Get current world position of the hand
-            const handWorldPos = new THREE.Vector3();
-            hand.getWorldPosition(handWorldPos);
-            
-            console.log("Bag world position:", bagWorldPos);
-            console.log("Hand world position:", handWorldPos);
-            
-            // Store original parent and transform
+            // Store original parent and transform for later restoration
             const originalParent = bag.parent;
             const originalPosition = bag.position.clone();
             const originalRotation = bag.rotation.clone();
             const originalScale = bag.scale.clone();
             
-            // Remove from current parent and attach to hand
+            // Remove from current parent
             originalParent.remove(bag);
-            hand.add(bag);
             
-            // Set bag position relative to hand based on which hand it is
-            // and how many bags are already being carried
+            // Create a new container for the bag to better control positioning
+            const bagContainer = new THREE.Object3D();
+            bagContainer.name = "BagContainer_" + attachedBags.length;
+            
+            // Add bag to container
+            bagContainer.add(bag);
+            
+            // Reset bag position within container
+            bag.position.set(0, 0, 0);
+            
+            // Attach container to hand
+            hand.add(bagContainer);
+            
+            // Get offset position based on current attachedBags and which hand
             const isLeftHand = hand.name === 'mixamorigLeftHand';
             const handOffset = getHandOffset(isLeftHand, attachedBags.length);
             
-            // Position relative to hand with offset
-            bag.position.set(handOffset.x, handOffset.y, handOffset.z);
+            // Apply offset to container
+            bagContainer.position.set(handOffset.x, handOffset.y, handOffset.z);
             
-            // Adjust rotation to make bag appear natural in hand
+            // Set bag rotation appropriate for carrying
             if (isLeftHand) {
-                bag.rotation.set(0, Math.PI / 2, 0); // Adjust rotation for left hand
+                bag.rotation.set(0, Math.PI / 2, 0); // For left hand
+                // Slightly tilt bag based on hand
+                bagContainer.rotation.set(0.2, 0, 0.1);
             } else {
-                bag.rotation.set(0, -Math.PI / 2, 0); // Adjust rotation for right hand
+                bag.rotation.set(0, -Math.PI / 2, 0); // For right hand
+                // Slightly tilt bag based on hand
+                bagContainer.rotation.set(0.2, 0, -0.1);
             }
             
-            // Adjust scale if needed to make bags look right in hand
-            const handScale = 0.8; // Slightly smaller scale for held bags
+            // Adjust scale to make bags more noticeable
+            const handScale = 1.0; // Increased from 0.8 for better visibility
             bag.scale.set(
                 originalScale.x * handScale,
                 originalScale.y * handScale,
                 originalScale.z * handScale
             );
             
-            // Make sure bag is visible
+            // Make sure the bag is visible and has proper materials
             bag.traverse(node => {
                 if (node.isMesh) {
                     node.castShadow = true;
                     node.receiveShadow = true;
-                    // Ensure materials are visible
+                    
+                    // Ensure materials are visible and have good rendering properties
                     if (node.material) {
+                        // Make sure material is not transparent unless it needs to be
                         node.material.transparent = false;
                         node.material.opacity = 1.0;
+                        node.material.depthWrite = true;
+                        node.material.depthTest = true;
+                        
+                        // If it's a standard material, set good rendering properties
+                        if (node.material.isMeshStandardMaterial) {
+                            node.material.roughness = 0.7;
+                            node.material.metalness = 0.3;
+                        }
+                        
+                        // Ensure material updates
                         node.material.needsUpdate = true;
                     }
                 }
@@ -1071,9 +1099,10 @@
             // Generate random weight between 1-5 kg
             const weight = Math.floor(Math.random() * 5) + 1;
             
-            // Add to attached bags list
+            // Add to attached bags list with the container reference
             attachedBags.push({
                 mesh: bag,
+                container: bagContainer,
                 originalParent: originalParent,
                 originalPosition: originalPosition,
                 originalRotation: originalRotation,
@@ -1085,28 +1114,30 @@
             // Update carrying stats
             updateCarryingStats();
             
+            // Log success
             console.log("Bag attached successfully to", hand.name);
+            updateDebug(`Bag attached to ${hand.name} with offset: x=${handOffset.x}, y=${handOffset.y}, z=${handOffset.z}`);
         }
         
         // Get appropriate hand offset based on which hand and how many bags are carried
         function getHandOffset(isLeftHand, bagCount) {
-            // Base position for the first bag
+            // Base position for the first bag - moved further out and forward
             if (bagCount === 0) {
                 return isLeftHand ? 
-                    { x: 0.4, y: 0.1, z: 0 } : // Left hand - moved further out
-                    { x: -0.4, y: 0.1, z: 0 }; // Right hand - moved further out
+                    { x: 0.5, y: 0.0, z: 0.2 } : // Left hand - first bag
+                    { x: -0.5, y: 0.0, z: 0.2 }; // Right hand - first bag
             }
-            // Second bag position
+            // Second bag position - slightly shifted from first
             else if (bagCount === 1) {
                 return isLeftHand ? 
-                    { x: 0.3, y: 0.1, z: 0.3 } : // Left hand - second bag slightly above and behind
-                    { x: -0.3, y: 0.1, z: 0.3 }; // Right hand - second bag slightly above and behind
+                    { x: 0.4, y: 0.2, z: 0.3 } : // Left hand - second bag (slightly above and behind)
+                    { x: -0.4, y: 0.2, z: 0.3 }; // Right hand - second bag (slightly above and behind)
             }
-            // Third bag position
+            // Third bag position - on top
             else {
                 return isLeftHand ? 
-                    { x: 0.3, y: 0.3, z: -0.1 } : // Left hand - third bag on top
-                    { x: -0.3, y: 0.3, z: -0.1 }; // Right hand - third bag on top
+                    { x: 0.5, y: 0.4, z: 0.0 } : // Left hand - third bag (on top)
+                    { x: -0.5, y: 0.4, z: 0.0 }; // Right hand - third bag (on top)
             }
         }
         
@@ -1209,18 +1240,20 @@
             // Get the last attached bag
             const bagData = attachedBags.pop();
             const bag = bagData.mesh;
+            const bagContainer = bagData.container;
             const originalParent = bagData.originalParent;
             
-            // Get current world position and rotation
-            const worldPos = new THREE.Vector3();
-            const worldQuat = new THREE.Quaternion();
-            bag.getWorldPosition(worldPos);
-            bag.getWorldQuaternion(worldQuat);
+            // First, remove the bag from the container
+            if (bagContainer) {
+                bagContainer.remove(bag);
+            }
             
-            // Remove from hand
-            bag.parent.remove(bag);
+            // Remove container from hand
+            if (bagContainer && bagContainer.parent) {
+                bagContainer.parent.remove(bagContainer);
+            }
             
-            // Add back to original parent
+            // Add bag back to original parent
             originalParent.add(bag);
             
             // Restore original transform
@@ -1232,6 +1265,7 @@
             updateCarryingStats();
             
             console.log("Bag detached successfully");
+            updateDebug("Bag dropped, returned to original position");
         }
         
         // Add camera shake variables
@@ -1616,13 +1650,16 @@
             
             // Handle rotation based on input device
             if (isUsingTouch) {
-                // For touch devices, use the rotation joystick to rotate the character
+                // For touch devices, use the rotation joystick to rotate the character and camera together
                 if (rotationJoystickActive) {
                     const rotationAmount = rotationJoystickDirection.x * touchRotationSensitivity;
                     characterTilt.rotation.y += rotationAmount;
                     
                     // Update target rotation for balance system
                     targetRotation = characterTilt.rotation.y;
+                    
+                    // Update camera to follow character rotation
+                    updateThirdPersonCamera();
                     
                     // When carrying bags, use joystick rotation to affect balance
                     if (attachedBags.length > 0 && balanceEnabled) {
@@ -1644,10 +1681,8 @@
                         updateBalanceSystem(balanceValue);
                     }
                 }
-            } else {
-                // For desktop, rotation is handled by mouse movement and pointer lock
-                // Character should face movement direction, but camera orientation is separate
             }
+            // For desktop, rotation is handled by mouse movement in the mousemove event handler
             
             // Process movement input (independent of rotation)
             if (Math.abs(inputX) > 0.1 || Math.abs(inputZ) > 0.1) {
@@ -1711,33 +1746,13 @@
                     }
                 }
                 
-                // If moving, rotate character mesh to face movement direction
+                // If moving, rotate character mesh to face movement direction (always face the way you're moving)
                 if (characterModel && moveDirection.length() > 0.01) {
                     // Get current rotation of character mesh (not tilt container)
                     const angle = Math.atan2(moveDirection.x, moveDirection.z);
                     
                     // Apply the rotation to the character model, not the tilt container
-                    // This way the camera orientation and character orientation can be different
                     characterModel.rotation.y = angle;
-                    
-                    // If we're not using touch controls, also adjust the character and camera
-                    // orientation to match the movement direction more naturally
-                    if (!isUsingTouch && Math.abs(inputZ) > 0.5 && Math.abs(inputX) < 0.2) {
-                        // If moving mostly forward/backward, gradually rotate the character to face movement
-                        const targetAngle = inputZ > 0 ? 
-                            characterTilt.rotation.y + Math.PI : // Face backward if moving backward
-                            characterTilt.rotation.y;            // Face forward if moving forward
-                            
-                        // Calculate angle difference
-                        const angleDiff = (targetAngle - characterTilt.rotation.y) % (Math.PI * 2);
-                        
-                        // Apply a small rotation to gradually align with movement direction
-                        if (Math.abs(angleDiff) > 0.05) {
-                            characterTilt.rotation.y += angleDiff * 0.05;
-                            targetRotation = characterTilt.rotation.y;
-                            updateThirdPersonCamera();
-                        }
-                    }
                 }
                 
                 // Update animations based on movement state change - ONLY if state actually changed
@@ -1998,6 +2013,8 @@
                             // Rotate the character AND camera together
                             characterTilt.rotation.y -= dx * mouseRotationSensitivity;
                             targetRotation = characterTilt.rotation.y;
+                            
+                            // Update camera to match character rotation
                             updateThirdPersonCamera();
                             
                             // When carrying bags, use mouse movement to affect balance
@@ -2398,8 +2415,12 @@
                 const bags = [];
                 if (groundBag1 && !attachedBags.some(b => b.mesh === groundBag1)) bags.push(groundBag1);
                 if (groundBag2 && !attachedBags.some(b => b.mesh === groundBag2)) bags.push(groundBag2);
+                if (groundBag3 && !attachedBags.some(b => b.mesh === groundBag3)) bags.push(groundBag3);
+                if (groundBag4 && !attachedBags.some(b => b.mesh === groundBag4)) bags.push(groundBag4);
                 if (carBag1 && !attachedBags.some(b => b.mesh === carBag1)) bags.push(carBag1);
                 if (carBag2 && !attachedBags.some(b => b.mesh === carBag2)) bags.push(carBag2);
+                if (carBag3 && !attachedBags.some(b => b.mesh === carBag3)) bags.push(carBag3);
+                if (carBag4 && !attachedBags.some(b => b.mesh === carBag4)) bags.push(carBag4);
                 
                 // Check distance to each bag
                 for (const bag of bags) {
