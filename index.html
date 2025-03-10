@@ -1506,7 +1506,7 @@
                 
                 // Calculate movement direction relative to camera
                 moveDirection.set(0, 0, 0)
-                    .add(cameraRight.multiplyScalar(inputX))
+                    .add(cameraRight.multiplyScalar(-inputX))  // FIX: Negate inputX to correct left/right movement
                     .add(cameraForward.multiplyScalar(-inputZ));
                 
                 moveDirection.normalize().multiplyScalar(movementAcceleration);
