@@ -987,6 +987,7 @@
                         setupCollisionDetection();
                         
                         // Enhance the environment with forest and mountains
+                        console.log("All models loaded. Enhancing environment...");
                         enhanceEnvironment();
                         
                         // Make sure we're in third-person camera mode for gameplay
@@ -1102,12 +1103,15 @@
         
         // Function to create forest boundary
         function createForestBoundary() {
+            console.log("Creating forest boundary...");
+            
             // Create a dense forest boundary ring around the playable area
-            const numTrees = 120;
+            const numTrees = 140; // Increased from 120 for more density
             const boundaryRadius = 40; // Just outside the playable area
             
             // Use the existing tree model
             loader.load('./tree.glb', (gltf) => {
+                console.log("Tree model loaded for forest boundary");
                 const treeModel = gltf.scene;
                 
                 // Enable shadows on tree
@@ -1115,6 +1119,14 @@
                     if (node.isMesh) {
                         node.castShadow = true;
                         node.receiveShadow = true;
+                        
+                        // Improve tree materials
+                        if (node.material) {
+                            // Clone material to avoid shared material issues
+                            node.material = node.material.clone();
+                            node.material.roughness = 0.8;
+                            node.material.needsUpdate = true;
+                        }
                     }
                 });
                 
@@ -1142,7 +1154,9 @@
                     // Position the tree
                     treeClone.position.set(x, 0, z);
                     
+                    // Add the tree to the scene
                     scene.add(treeClone);
+                    console.log(`Added tree at position: ${x.toFixed(2)}, 0, ${z.toFixed(2)} with scale: ${scale.toFixed(2)}`);
                 }
                 
                 // Add a second row of trees for density
@@ -1169,8 +1183,18 @@
                     // Position the tree
                     treeClone.position.set(x, 0, z);
                     
+                    // Add the tree to the scene
                     scene.add(treeClone);
                 }
+                
+                console.log("Forest boundary created successfully");
+            }, 
+            // Add progress and error handlers
+            (xhr) => {
+                console.log(`Tree model ${(xhr.loaded / xhr.total * 100).toFixed(0)}% loaded`);
+            },
+            (error) => {
+                console.error('Error loading tree model:', error);
             });
         }
         
@@ -1215,8 +1239,11 @@
         
         // Function to create rocks around the edge of the map
         function createRockBoundary() {
+            console.log("Creating rock boundary...");
+            
             // Use the rocks.glb model
             loader.load('./rocks.glb', (gltf) => {
+                console.log("Rock model loaded for boundary");
                 const rockModel = gltf.scene;
                 
                 // Enable shadows on rocks
@@ -1227,14 +1254,17 @@
                         
                         // Improve rock materials
                         if (node.material) {
+                            // Clone material to avoid shared material issues
+                            node.material = node.material.clone();
                             node.material.roughness = 0.9;
                             node.material.metalness = 0.1;
+                            node.material.needsUpdate = true;
                         }
                     }
                 });
                 
                 // Create rocks in a circular pattern just outside the tree line
-                const numRocks = 40; // Fewer rocks than trees
+                const numRocks = 50; // Increased from 40 for more density
                 const rockRadius = 55; // Outside the tree boundary
                 
                 for (let i = 0; i < numRocks; i++) {
@@ -1252,7 +1282,7 @@
                     const rockClone = rockModel.clone();
                     
                     // Randomize rock size and rotation
-                    const scale = 0.8 + Math.random() * 0.6; // Larger rocks
+                    const scale = 1.0 + Math.random() * 0.6; // Larger rocks
                     rockClone.scale.set(scale, scale * (0.8 + Math.random() * 0.4), scale);
                     rockClone.rotation.y = Math.random() * Math.PI * 2;
                     
@@ -1269,6 +1299,7 @@
                     }
                     
                     scene.add(rockClone);
+                    console.log(`Added rock at position: ${x.toFixed(2)}, ${rockClone.position.y.toFixed(2)}, ${z.toFixed(2)} with scale: ${scale.toFixed(2)}`);
                     
                     // Occasionally add rock clusters
                     if (Math.random() > 0.7) {
@@ -1287,11 +1318,22 @@
                         }
                     }
                 }
+                
+                console.log("Rock boundary created successfully");
+            },
+            // Add progress and error handlers
+            (xhr) => {
+                console.log(`Rock model ${(xhr.loaded / xhr.total * 100).toFixed(0)}% loaded`);
+            },
+            (error) => {
+                console.error('Error loading rock model:', error);
             });
         }
         
         // Function to create procedural mountain barrier around the edge of the map
         function createMountainBarrier() {
+            console.log("Creating procedural mountain barrier...");
+            
             // Create procedural mountains that encircle the play area
             const numSegments = 12; // Divide the circle into segments
             const barrierRadius = 65; // Outside the rock boundary
@@ -1374,6 +1416,7 @@
                 const indexBuffer = new Uint32Array(indices);
                 const uvBuffer = new Float32Array(uvs);
                 
+                // Set the attributes for the geometry
                 mountainGeometry.setAttribute('position', new THREE.BufferAttribute(positionBuffer, 3));
                 mountainGeometry.setAttribute('uv', new THREE.BufferAttribute(uvBuffer, 2));
                 mountainGeometry.setIndex(new THREE.BufferAttribute(indexBuffer, 1));
@@ -1394,16 +1437,35 @@
                 mountain.castShadow = true;
                 mountain.receiveShadow = true;
                 
+                // Add the mountain to the scene
                 scene.add(mountain);
+                console.log(`Added mountain segment ${i} with ${vertices.length / 3} vertices and ${indices.length / 3} triangles`);
             }
+            
+            console.log("Mountain barrier created successfully");
         }
         
         // Call the functions to create forest and mountains after all models are loaded
         function enhanceEnvironment() {
-            createForestBoundary();
-            createMountainBackdrop();
-            createRockBoundary();
-            createMountainBarrier(); // Add the new mountain barrier
+            console.log("Starting environment enhancement...");
+            
+            try {
+                console.log("Creating forest boundary...");
+                createForestBoundary();
+                
+                console.log("Creating mountain backdrop...");
+                createMountainBackdrop();
+                
+                console.log("Creating rock boundary...");
+                createRockBoundary();
+                
+                console.log("Creating mountain barrier...");
+                createMountainBarrier();
+                
+                console.log("Environment enhancement completed successfully.");
+            } catch (error) {
+                console.error("Error during environment enhancement:", error);
+            }
         }
         
         // Set up animation mixing system
@@ -1791,7 +1853,7 @@
             }
             
             // Adjust scale to make bags more noticeable
-            const handScale = 1.0; // Increased from 0.8 for better visibility
+            const handScale = 1.2; // Increased from 1.0 for better visibility
             bag.scale.set(
                 originalScale.x * handScale,
                 originalScale.y * handScale,
@@ -1806,9 +1868,8 @@
                     node.visible = true; // Explicitly set visible flag
                     console.log(`Mesh found in bag: ${node.name}, visible: ${node.visible}`);
                     
-                    // Ensure materials are visible and have good rendering properties
+                    // Force material to non-transparent
                     if (node.material) {
-                        // Log more detailed material properties for debugging
                         console.log("Bag material details:", {
                             type: node.material.type,
                             transparent: node.material.transparent,
@@ -1819,21 +1880,39 @@
                             colorHex: node.material.color ? '#' + node.material.color.getHexString() : 'N/A'
                         });
                         
-                        // Make sure material is not transparent unless it needs to be
-                        node.material.transparent = false;
-                        node.material.opacity = 1.0;
-                        node.material.depthWrite = true;
-                        node.material.depthTest = true;
-                        node.material.visible = true; // Ensure material visibility flag is set
-                        
-                        // If it's a standard material, set good rendering properties
-                        if (node.material.isMeshStandardMaterial) {
-                            node.material.roughness = 0.7;
-                            node.material.metalness = 0.3;
+                        // IMPORTANT: Create a clone of the material to avoid modifying shared materials
+                        if (Array.isArray(node.material)) {
+                            node.material = node.material.map(mat => mat.clone());
+                        } else {
+                            node.material = node.material.clone();
                         }
                         
-                        // Ensure material updates
-                        node.material.needsUpdate = true;
+                        // Apply aggressive visibility settings
+                        if (Array.isArray(node.material)) {
+                            node.material.forEach(mat => {
+                                mat.transparent = false;
+                                mat.opacity = 1.0;
+                                mat.depthWrite = true;
+                                mat.depthTest = true;
+                                mat.visible = true;
+                                mat.needsUpdate = true;
+                            });
+                        } else {
+                            node.material.transparent = false;
+                            node.material.opacity = 1.0;
+                            node.material.depthWrite = true;
+                            node.material.depthTest = true;
+                            node.material.visible = true;
+                            
+                            // If it's a standard material, set good rendering properties
+                            if (node.material.isMeshStandardMaterial) {
+                                node.material.roughness = 0.7;
+                                node.material.metalness = 0.3;
+                            }
+                            
+                            // Ensure material updates
+                            node.material.needsUpdate = true;
+                        }
                     }
                 }
             });
@@ -3538,10 +3617,30 @@
         
         // Interactive pickup function for touch/click
         function attemptPickupInteraction() {
-            // Don't allow pickups during pickup animations
+            // Don't allow pickups during pickup animations but with a timeout to prevent stuck state
             if (currentUpperBodyAnimation.startsWith('pickup')) {
-                updateDebug("Cannot pickup: already in pickup animation");
-                showPickupFeedback("Wait for pickup to finish");
+                // Only show message if we haven't shown it recently to avoid spam
+                const now = Date.now();
+                if (!lastPickupFeedbackTime || now - lastPickupFeedbackTime > 1500) {
+                    updateDebug("Cannot pickup: already in pickup animation");
+                    showPickupFeedback("Wait for pickup to finish");
+                    lastPickupFeedbackTime = now;
+                }
+                
+                // Add a failsafe to prevent getting stuck in pickup animation
+                if (!pickupTimeoutSet) {
+                    pickupTimeoutSet = true;
+                    setTimeout(() => {
+                        // If we're still in pickup animation after timeout, force reset
+                        if (currentUpperBodyAnimation.startsWith('pickup')) {
+                            updateDebug("Pickup animation timed out, forcing reset");
+                            setUpperBodyAnimation('idle');
+                            setLowerBodyAnimation('idle');
+                        }
+                        pickupTimeoutSet = false;
+                    }, 3000); // 3 second timeout
+                }
+                
                 return false;
             }
             
@@ -3555,24 +3654,36 @@
                     // Ground pickup
                     setUpperBodyAnimation('pickup_low');
                     
+                    // Reduced timeout for more responsive gameplay
                     setTimeout(() => {
                         if (rightHand && bagInView.bag && !attachedBags.some(b => b.mesh === bagInView.bag)) {
                             attachBagToHand(bagInView.bag, rightHand);
-                        } else {
-                            showPickupFeedback("Cannot pick up this bag");
                         }
-                    }, 500);
+                        // Force animation to end and transition to carry state
+                        if (attachedBags.length > 0) {
+                            const animName = `carry_idle_${carryWeightClass}`;
+                            forcedAnimationUpdate(animName);
+                        } else {
+                            setUpperBodyAnimation('idle');
+                        }
+                    }, 500); // Reduced from longer time for more responsive feel
                 } else {
                     // Car pickup
                     setUpperBodyAnimation('pickup_high');
                     
+                    // Reduced timeout for more responsive gameplay
                     setTimeout(() => {
                         if (leftHand && bagInView.bag && !attachedBags.some(b => b.mesh === bagInView.bag)) {
                             attachBagToHand(bagInView.bag, leftHand);
-                        } else {
-                            showPickupFeedback("Cannot pick up this bag");
                         }
-                    }, 500);
+                        // Force animation to end and transition to carry state
+                        if (attachedBags.length > 0) {
+                            const animName = `carry_idle_${carryWeightClass}`;
+                            forcedAnimationUpdate(animName);
+                        } else {
+                            setUpperBodyAnimation('idle');
+                        }
+                    }, 500); // Reduced from longer time for more responsive feel
                 }
                 return true;
             } else {
@@ -4002,6 +4113,8 @@
 
         // Variable is already declared at line 789
         // let lastMouseMoveX = 0;
+        let lastPickupFeedbackTime = 0; // Track when we last showed feedback
+        let pickupTimeoutSet = false; // Flag to prevent multiple timeouts
     </script>
 </body>
 </html> 
