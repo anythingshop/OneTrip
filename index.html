@@ -787,6 +787,7 @@
         let isMoving = false;
         let targetRotation = 0;
         let movementAcceleration = 0;
+        let lastMouseMoveX = 0; // For balance control
         let maxMovementSpeed = 0.08; // Reduced from 0.1
         let cameraMode = "thirdPerson"; // thirdPerson or orbit
         
@@ -1687,53 +1688,37 @@
                 }
                 
                 // Show balance UI
-                document.getElementById('balanceUI').style.display = 'block';
+                const balanceUI = document.getElementById('balanceUI');
+                if (balanceUI) {
+                    balanceUI.style.display = 'block';
+                    
+                    // Reset balance slider to middle position (50%)
+                    const balanceSlider = document.getElementById('balanceSlider');
+                    if (balanceSlider) {
+                        balanceSlider.value = 50;
+                        balanceValue = 0.5; // Reset to middle
+                    }
+                }
             } else {
                 // Disable balance system when not carrying bags
                 if (balanceEnabled) {
                     balanceEnabled = false;
-                    updateDebug("Balance system disabled - no bags");
-                    
-                    // Reset any tilt when bags are dropped
-                    if (characterTilt) {
-                        gsapTilt(0);
-                    }
+                    document.getElementById('balanceToggle').textContent = "Balance: OFF";
+                    document.getElementById('balanceToggle').classList.remove('active');
                 }
-            }
-            
-            // Determine weight class based on total weight or bag count
-            let newWeightClass = "none";
-            
-            if (attachedBags.length > 0) {
-                if (totalBagWeight <= 3) {
-                    newWeightClass = "light";
-                } else if (totalBagWeight <= 7) {
-                    newWeightClass = "medium";
-                } else {
-                    newWeightClass = "heavy";
-                }
-            }
-            
-            // Update weight class display
-            if (weightClassEl) weightClassEl.textContent = newWeightClass.charAt(0).toUpperCase() + newWeightClass.slice(1);
-            
-            // If weight class changed, update the animation
-            if (newWeightClass !== carryWeightClass) {
-                updateDebug(`Carry weight class changed: ${carryWeightClass} → ${newWeightClass}`);
-                carryWeightClass = newWeightClass;
                 
-                // Update animation if we're already carrying and moving
-                if (attachedBags.length > 0) {
-                    if (isMoving) {
-                        forcedAnimationUpdate(`carry_walk_${carryWeightClass}`);
-                } else {
-                        forcedAnimationUpdate(`carry_stand_${carryWeightClass}`);
+                // Hide balance UI
+                const balanceUI = document.getElementById('balanceUI');
+                if (balanceUI) balanceUI.style.display = 'none';
+                
+                // Reset balance to neutral when not carrying
+                balanceValue = 0.5;
+                
+                // Switch back to regular animations
+                if (currentAnimation && currentAnimation.name.startsWith('carry')) {
+                    setAnimation("idle");
                 }
             }
-            }
-            
-            // Update the balance UI to reflect current state
-            updateBalanceSystem(balanceValue);
         }
         
         // Function to detach bag
@@ -1821,22 +1806,42 @@
         
         // Function to update the balance system
         function updateBalanceSystem(value) {
-            document.getElementById('balanceValue').textContent = value.toFixed(2);
-            document.getElementById('balanceIndicator').style.left = `${value * 100}%`;
+            // Make sure UI elements exist before updating them
+            const balanceValueEl = document.getElementById('balanceValue');
+            const balanceIndicatorEl = document.getElementById('balanceIndicator');
+            const balanceDirectionEl = document.getElementById('balanceDirection');
             
-            // Change indicator color based on balance
-            const indicator = document.getElementById('balanceIndicator');
+            // Update balance value display
+            if (balanceValueEl) {
+                balanceValueEl.textContent = value.toFixed(2);
+            }
             
-            let newDirection = "center";
-            let intensity = 0;
+            // Update indicator position
+            if (balanceIndicatorEl) {
+                balanceIndicatorEl.style.left = `${value * 100}%`;
+            }
             
             // If not carrying bags, always stay balanced
             if (attachedBags.length === 0) {
-                indicator.style.background = '#ffffff'; // White for safe
-                balanceDirectionEl.textContent = "Balanced";
-                balanceDirectionEl.style.color = '#ffffff';
+                if (balanceIndicatorEl) {
+                    balanceIndicatorEl.style.background = '#ffffff'; // White for safe
+                }
+                if (balanceDirectionEl) {
+                    balanceDirectionEl.textContent = "Balanced";
+                    balanceDirectionEl.style.color = '#ffffff';
+                }
                 return;
             }
+            
+            // Make sure the balance UI is visible when carrying bags
+            const balanceUI = document.getElementById('balanceUI');
+            if (balanceUI) {
+                balanceUI.style.display = 'block';
+            }
+            
+            // Apply visual effects based on balance value
+            let newDirection = "center";
+            let intensity = 0;
             
             // Apply weight-based balance adjustments
             // The more bags the player carries, the more sensitive their balance becomes
@@ -1846,57 +1851,51 @@
                 weightFactor = 1.0 + (totalBagWeight * 0.08);
             }
             
-            // Adjust thresholds based on weight
-            const leftSevereThreshold = 0.3 * weightFactor; // Increased from 0.2
-            const leftModerateThreshold = 0.4 * weightFactor; // Increased from 0.3
-            const rightModerateThreshold = 0.6 / weightFactor; // Changed from 0.7
-            const rightSevereThreshold = 0.7 / weightFactor; // Changed from 0.8
+            // Define balance thresholds with weight-based adjustments
+            // These determine how far from center before imbalance effects start
+            const leftSevereThreshold = 0.1 / weightFactor;
+            const leftModerateThreshold = 0.3 / weightFactor;
+            const rightModerateThreshold = 0.7 / weightFactor;
+            const rightSevereThreshold = 0.9 / weightFactor;
             
-            // Determine balance direction based on value
             if (value < leftSevereThreshold) {
                 // Severe left imbalance
-                indicator.style.background = '#ff0000'; // Red
+                if (balanceIndicatorEl) {
+                    balanceIndicatorEl.style.background = '#ff0000'; // Red
+                }
                 newDirection = "left";
                 intensity = 1.0 - (value / leftSevereThreshold);
-                balanceDirectionEl.textContent = "Severe Left Imbalance!";
-                balanceDirectionEl.style.color = '#ff0000';
-                
-                // Add camera shake for severe imbalance
-                if (Math.random() < 0.05) {
-                    startCameraShake(intensity * 0.1);
-                }
             } else if (value < leftModerateThreshold) {
                 // Moderate left imbalance
-                indicator.style.background = '#ff9900'; // Orange
+                if (balanceIndicatorEl) {
+                    balanceIndicatorEl.style.background = '#ff9900'; // Orange
+                }
                 newDirection = "left";
                 intensity = (leftModerateThreshold - value) / (leftModerateThreshold - leftSevereThreshold);
-                balanceDirectionEl.textContent = "Left Imbalance";
-                balanceDirectionEl.style.color = '#ff9900';
             } else if (value > rightSevereThreshold) {
                 // Severe right imbalance
-                indicator.style.background = '#ff0000'; // Red
+                if (balanceIndicatorEl) {
+                    balanceIndicatorEl.style.background = '#ff0000'; // Red
+                }
                 newDirection = "right";
                 intensity = (value - rightSevereThreshold) / (1.0 - rightSevereThreshold);
-                balanceDirectionEl.textContent = "Severe Right Imbalance!";
-                balanceDirectionEl.style.color = '#ff0000';
-                
-                // Add camera shake for severe imbalance
-                if (Math.random() < 0.05) {
-                    startCameraShake(intensity * 0.1);
-                }
             } else if (value > rightModerateThreshold) {
                 // Moderate right imbalance
-                indicator.style.background = '#ff9900'; // Orange
+                if (balanceIndicatorEl) {
+                    balanceIndicatorEl.style.background = '#ff9900'; // Orange
+                }
                 newDirection = "right";
                 intensity = (value - rightModerateThreshold) / (rightSevereThreshold - rightModerateThreshold);
-                balanceDirectionEl.textContent = "Right Imbalance";
-                balanceDirectionEl.style.color = '#ff9900';
-                } else {
+            } else {
                 // Balanced
-                indicator.style.background = '#00ff00'; // Green
+                if (balanceIndicatorEl) {
+                    balanceIndicatorEl.style.background = '#00ff00'; // Green
+                }
                 newDirection = "center";
-                balanceDirectionEl.textContent = "Balanced";
-                balanceDirectionEl.style.color = '#00ff00';
+                if (balanceDirectionEl) {
+                    balanceDirectionEl.textContent = "Balanced";
+                    balanceDirectionEl.style.color = '#00ff00';
+                }
             }
             
             // If balance direction changed or intensity changed significantly, update animations
@@ -2054,24 +2053,34 @@
             // Calculate balance shifts based on movement and turning
             let balanceShift = 0;
             
-            // Movement speed affects balance - reduced sensitivity
-            balanceShift += movementAcceleration * 0.15; // Reduced from 0.3
+            // Movement speed affects balance
+            if (isMoving) {
+                balanceShift += 0.01; // Small constant shift when moving
+            }
             
-            // Turning affects balance - reduced sensitivity
-            if (Math.abs(targetRotation - characterTilt.rotation.y) > 0.1) { // Increased threshold from 0.05 to 0.1
-                const turnDirection = ((targetRotation - characterTilt.rotation.y) + Math.PI) % (Math.PI * 2) - Math.PI;
-                balanceShift += turnDirection * 0.005; // Reduced from 0.01
+            // Mouse/joystick can be used to control balance directly
+            if (lastMouseMoveX !== 0) {
+                // Use mouse movement to shift balance
+                balanceShift += (lastMouseMoveX * 0.0003);
+                
+                // Reset mouse movement after applying (avoids continuous drift)
+                lastMouseMoveX = 0;
             }
             
             // Carrying weight makes balance harder
-            const carryFactor = 1 + (totalBagWeight * 0.02); // Reduced from 0.03
+            const carryFactor = 1 + (totalBagWeight * 0.02);
             balanceShift *= carryFactor;
             
-            // Apply changes to balance value with smoothing and reduced rate of change
-            balanceValue = Math.max(0, Math.min(1, balanceValue + (balanceShift * 0.5))); // Added 0.5 multiplier to slow changes
+            // Apply changes to balance value with smoothing
+            balanceValue = Math.max(0, Math.min(1, balanceValue + balanceShift));
             
             // Update the UI
-            document.getElementById('balanceSlider').value = balanceValue * 100;
+            const balanceSlider = document.getElementById('balanceSlider');
+            if (balanceSlider) {
+                balanceSlider.value = balanceValue * 100;
+            }
+            
+            // Apply visual effects based on balance
             updateBalanceSystem(balanceValue);
         }
         
@@ -2104,212 +2113,117 @@
             thirdPersonCamera.lookAt(thirdPersonCameraTarget);
         }
         
-        // Update character movement and fix orientation
+        // Update character movement and fix orientation - completely revised
         function updateCharacterMovement(delta) {
             if (!characterTilt) return;
-            
-            // Store previous movement state to detect changes
-            const wasMoving = isMoving;
-            isMoving = false;
             
             // Get joystick or keyboard input for movement
             let inputX = 0;
             let inputZ = 0;
             
-            // Process joystick input if active
-            if (joystickActive) {
-                // Add a small deadzone to prevent tiny movements
-                if (Math.abs(joystickDirection.x) > 0.15) {
+            // Process joystick input if active with deadzone
+            if (joystickActive && joystickDirection) {
+                if (Math.abs(joystickDirection.x) > 0.1) {
                     inputX = joystickDirection.x;
                 }
-                if (Math.abs(joystickDirection.y) > 0.15) {
+                if (Math.abs(joystickDirection.y) > 0.1) {
                     inputZ = joystickDirection.y;
                 }
             } 
-            // Otherwise process keyboard input
+            // Otherwise process keyboard input - simple cardinal directions
             else {
-                // W or Up Arrow - Forward movement relative to camera
                 if (keysPressed['w'] || keysPressed['ArrowUp']) {
-                    inputZ = -1;
+                    inputZ = -1; // Forward
                 }
-                // S or Down Arrow - Backward movement relative to camera
                 if (keysPressed['s'] || keysPressed['ArrowDown']) {
-                    inputZ = 1;
+                    inputZ = 1;  // Backward
                 }
-                // A or Left Arrow - Strafe left relative to camera
                 if (keysPressed['a'] || keysPressed['ArrowLeft']) {
-                    inputX = -1;
+                    inputX = -1; // Strafe left
                 }
-                // D or Right Arrow - Strafe right relative to camera
                 if (keysPressed['d'] || keysPressed['ArrowRight']) {
-                    inputX = 1;
+                    inputX = 1;  // Strafe right
                 }
             }
             
-            // Handle rotation based on input device
-            if (isUsingTouch) {
-                // For touch devices, use the rotation joystick to rotate the character and camera together
+            // Determine if we're moving this frame
+            isMoving = (Math.abs(inputX) > 0.1 || Math.abs(inputZ) > 0.1);
             
-                const rotationAmount = rotationJoystickDirection.x * touchRotationSensitivity;
-                // We update targetRotation instead of directly updating characterTilt
-                targetRotation += rotationAmount;
-                    
-                // When carrying bags, use joystick rotation to affect balance
-                if (attachedBags.length > 0 && balanceEnabled) {
-                    // Rotation joystick movements add subtle balance shifts
-                    // Speed of rotation causes more balance disruption
-                    const balanceDisruption = Math.min(0.01, Math.abs(rotationAmount) * 0.3);
-                    
-                    // If rotation is to the right, shift balance left
-                    if (rotationAmount > 0) {
-                        balanceValue = Math.max(0, balanceValue - balanceDisruption);
-                    } 
-                    // If rotation is to the left, shift balance right
-                    else if (rotationAmount < 0) {
-                        balanceValue = Math.min(1, balanceValue + balanceDisruption);
-                    }
-                    
-                    // Update the UI and apply effects
-                    document.getElementById('balanceSlider').value = balanceValue * 100;
-                    updateBalanceSystem(balanceValue);
-                }
-            }
-            // For desktop, rotation is handled by mouse movement in the mousemove event handler
-            
-            // Process movement input (independent of rotation)
-            if (Math.abs(inputX) > 0.1 || Math.abs(inputZ) > 0.1) {
-                isMoving = true;
+            if (isMoving) {
+                // Simple direct speed calculation - no acceleration for smoother response
+                const currentSpeed = maxMovementSpeed;
                 
-                // Calculate movement speed with acceleration/deceleration
-                const targetSpeed = maxMovementSpeed * Math.sqrt(inputX*inputX + inputZ*inputZ);
-                const speedDiff = targetSpeed - movementAcceleration;
-                // Use a lower acceleration value to make movement smoother
-                movementAcceleration += speedDiff * 0.1 * (delta * 60); // Reduced from 0.2 for smoother control
-                
-                // Always use camera direction for movement, not character direction
+                // Get camera direction vectors
                 const cameraForward = new THREE.Vector3(0, 0, -1);
                 const cameraRight = new THREE.Vector3(1, 0, 0);
                 
                 if (cameraMode === "thirdPerson" && thirdPersonCamera) {
-                    // Get camera's forward and right vectors (ignoring Y component for horizontal movement)
+                    // Get camera's forward direction
                     thirdPersonCamera.getWorldDirection(cameraForward);
                     cameraForward.y = 0; // Keep movement on horizontal plane
                     cameraForward.normalize();
                     
-                    // Right is perpendicular to forward in horizontal plane
+                    // Calculate right vector from forward
                     cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraForward);
                 }
                 
-                // Calculate movement direction relative to camera
+                // Calculate movement direction based on input
                 moveDirection.set(0, 0, 0)
-                    .add(cameraRight.multiplyScalar(inputX))  // Fixed sign for correct A and D movement
+                    .add(cameraRight.multiplyScalar(inputX))
                     .add(cameraForward.multiplyScalar(-inputZ));
                 
-                moveDirection.normalize().multiplyScalar(movementAcceleration);
+                // Normalize and scale by speed
+                if (moveDirection.length() > 0) {
+                    moveDirection.normalize().multiplyScalar(currentSpeed * delta);
+                }
                 
                 // Update character position
-                const oldPosition = characterTilt.position.clone();
-                const newPosition = oldPosition.clone().add(moveDirection);
+                characterTilt.position.add(moveDirection);
                 
-                // Check for collisions before applying movement
-                if (!checkCollision(oldPosition, moveDirection)) {
-                    // No collision, move normally
-                    characterTilt.position.copy(newPosition);
-                    
-                    // Check if we need to handle step climbing
-                    handleStepClimbing(characterTilt.position, moveDirection);
-                } else {
-                    // Collision detected, try to slide along the obstacle
-                    updateDebug("Collision detected, attempting to slide");
-                    
-                    // Try moving only in X direction
-                    const xMovement = new THREE.Vector3(moveDirection.x, 0, 0);
-                    if (xMovement.length() > 0.01 && !checkCollision(oldPosition, xMovement)) {
-                        characterTilt.position.add(xMovement);
-                    }
-                    
-                    // Try moving only in Z direction
-                    const zMovement = new THREE.Vector3(0, 0, moveDirection.z);
-                    if (zMovement.length() > 0.01 && !checkCollision(oldPosition, zMovement)) {
-                        characterTilt.position.add(zMovement);
-                    }
-                }
-                
-                // If moving, rotate character mesh to face movement direction
-                if (characterModel && moveDirection.length() > 0.01) {
-                    // Get current rotation of character mesh (not tilt container)
-                    const angle = Math.atan2(moveDirection.x, moveDirection.z);
-                    
-                    // Apply the rotation to the character model to match the movement direction
-                    characterModel.rotation.y = angle;
-                    
-                    // Update target rotation - NOT directly updating characterTilt rotation here
-                    targetRotation = angle;
-                }
-                
-                // Update animations based on movement state change - ONLY if state actually changed
-                if (!wasMoving || !lastMovementState) {
-                    // Just started moving or continuing to move
-                    if (!wasMoving) {
-                        updateDebug("State change: idle → moving");
-                    }
-                    
-                    // Force animation update on movement state change, overriding the time check
-                    if (attachedBags.length > 0) {
-                        const animName = `carry_walk_${carryWeightClass}`;
-                        updateDebug(`Forcing animation update to: ${animName}`);
-                        
-                        // Bypass the time check in setUpperBodyAnimation
-                        forcedAnimationUpdate(animName);
-                    } else {
-                        forcedAnimationUpdate('walk');
-                    }
-                    
-                    // Check if we should use the stumble animation based on current balance direction
-                    if (currentBalanceDirection === "center") {
-                        setLowerBodyAnimation('walk');
-                    } else {
-                        // Use stumble animation if we're imbalanced
-                        setLowerBodyAnimation('stumble_lowerbody');
-                    }
-                    lastMovementState = true;
-                }
-            } else {
-                // Character is not moving, slow down gradually
-                movementAcceleration *= 0.8;
-                if (movementAcceleration < 0.001) {
-                    movementAcceleration = 0;
-                }
-                
-                // Update animations for idle state ONLY if we were previously moving
-                if (wasMoving && lastMovementState) {
-                    // Just stopped moving
-                    updateDebug("State change: moving → idle");
-                    
-                    if (!currentUpperBodyAnimation.startsWith('pickup')) {
-                        if (attachedBags.length > 0) {
-                            // Force animation update, bypassing the time check
-                            forcedAnimationUpdate(`carry_stand_${carryWeightClass}`);
-                        } else {
-                            forcedAnimationUpdate('idle');
-                        }
-                    }
-                    
-                    if (!currentLowerBodyAnimation.startsWith('stumble') && currentLowerBodyAnimation !== 'idle') {
-                        setLowerBodyAnimation('idle');
-                    }
-                    lastMovementState = false;
+                // Rotate character to face movement direction
+                if (moveDirection.length() > 0) {
+                    targetRotation = Math.atan2(moveDirection.x, moveDirection.z);
                 }
             }
             
-            // Update balance based on movement and carrying
-            updateMovementBasedBalance();
+            // Smooth rotation towards target direction
+            if (characterTilt.rotation.y !== targetRotation) {
+                const rotDiff = ((targetRotation - characterTilt.rotation.y + Math.PI) % (Math.PI * 2)) - Math.PI;
+                characterTilt.rotation.y += rotDiff * 0.1;
+            }
             
-            // Camera updates are now handled ONLY in the animation loop
-            // Remove this line to fix the double vision issue
-            // if (cameraMode === "thirdPerson" && isCameraFollowing) {
-            //     updateThirdPersonCamera();
-            // }
+            // Update character animations based on movement state
+            if (isMoving) {
+                // Choose animation based on whether we're carrying bags
+                if (attachedBags.length > 0) {
+                    if (currentAnimation && !currentAnimation.name.startsWith('carry')) {
+                        setAnimation("carry_walk");
+                    }
+                } else {
+                    if (currentAnimation && !currentAnimation.name.startsWith('walk')) {
+                        setAnimation("walk");
+                    }
+                }
+            } else {
+                // Choose idle animation based on whether we're carrying bags
+                if (attachedBags.length > 0) {
+                    if (currentAnimation && !currentAnimation.name.startsWith('carry_idle')) {
+                        setAnimation("carry_idle");
+                    }
+                } else {
+                    if (currentAnimation && !currentAnimation.name.startsWith('idle')) {
+                        setAnimation("idle");
+                    }
+                }
+            }
+            
+            // Enforce ground collision
+            enforceGroundCollision();
+            
+            // Update balance if carrying bags
+            if (attachedBags.length > 0 && balanceEnabled) {
+                updateMovementBasedBalance();
+            }
         }
         
         // Force animation update without time constraints for important state changes
@@ -2505,38 +2419,15 @@
                         // Only rotate camera if in game view mode and not in game over state
                         const dx = e.movementX || e.mozMovementX || e.webkitMovementX || 0;
                         if (dx !== 0 && mouseLookActive) {
+                            // Store mouse movement for balance control
+                            lastMouseMoveX = dx;
+                            
                             // Traditional third-person control: rotate character and camera together
                             // Calculate new rotation based on mouse movement
                             const rotationAmount = -dx * mouseRotationSensitivity;
                             
-                            // Use smooth rotation to avoid jarring camera movements
-                            // This was causing part of the issue - direct rotation changes
-                            const targetRotation = characterTilt.rotation.y + rotationAmount;
-                            characterTilt.rotation.y = THREE.MathUtils.lerp(
-                                characterTilt.rotation.y,
-                                targetRotation,
-                                0.3  // Smooth but responsive transition
-                            );
-                            
-                            // Rotate character model to match
-                            if (characterModel) {
-                                characterModel.rotation.y = characterTilt.rotation.y;
-                            }
-                            
-                            // When carrying bags, mouse movement directly affects balance
-                            if (attachedBags.length > 0 && balanceEnabled) {
-                                // Mouse movements shift balance - main control for balance
-                                // Faster mouse movements cause more balance disruption
-                                const balanceDisruption = Math.min(0.03, Math.abs(dx) * 0.001);
-                                
-                                // Fix: Swap directions - moving mouse right (dx > 0) shifts balance right
-                                if (dx > 0) { // Right movement
-                                    balanceValue = Math.min(1, balanceValue + balanceDisruption);
-                                } 
-                                else if (dx < 0) { // Left movement
-                                    balanceValue = Math.max(0, balanceValue - balanceDisruption);
-                                }
-                            }
+                            // Update the target rotation for smooth application in the update loop
+                            targetRotation += rotationAmount;
                         }
                     }
                 });
@@ -2930,161 +2821,113 @@
         function updateCharacterMovement(delta) {
             if (!characterTilt) return;
             
-            // Store previous movement state to detect changes
-            const wasMoving = isMoving;
-            isMoving = false;
-            
             // Get joystick or keyboard input for movement
             let inputX = 0;
             let inputZ = 0;
             
-            // Process joystick input if active
-            if (joystickActive) {
-                // Add a small deadzone to prevent tiny movements
-                if (Math.abs(joystickDirection.x) > 0.15) {
+            // Process joystick input if active with deadzone
+            if (joystickActive && joystickDirection) {
+                if (Math.abs(joystickDirection.x) > 0.1) {
                     inputX = joystickDirection.x;
                 }
-                if (Math.abs(joystickDirection.y) > 0.15) {
+                if (Math.abs(joystickDirection.y) > 0.1) {
                     inputZ = joystickDirection.y;
                 }
             } 
-            // Otherwise process keyboard input
+            // Otherwise process keyboard input - simple cardinal directions
             else {
-                // W or Up Arrow - Forward movement relative to camera
                 if (keysPressed['w'] || keysPressed['ArrowUp']) {
-                    inputZ = -1;
+                    inputZ = -1; // Forward
                 }
-                // S or Down Arrow - Backward movement relative to camera
                 if (keysPressed['s'] || keysPressed['ArrowDown']) {
-                    inputZ = 1;
+                    inputZ = 1;  // Backward
                 }
-                // A or Left Arrow - Strafe left relative to camera
                 if (keysPressed['a'] || keysPressed['ArrowLeft']) {
-                    inputX = -1;
+                    inputX = -1; // Strafe left
                 }
-                // D or Right Arrow - Strafe right relative to camera
                 if (keysPressed['d'] || keysPressed['ArrowRight']) {
-                    inputX = 1;
+                    inputX = 1;  // Strafe right
                 }
             }
             
-            // Process movement input (independent of rotation)
-            if (Math.abs(inputX) > 0.1 || Math.abs(inputZ) > 0.1) {
-                isMoving = true;
+            // Determine if we're moving this frame
+            isMoving = (Math.abs(inputX) > 0.1 || Math.abs(inputZ) > 0.1);
+            
+            if (isMoving) {
+                // Simple direct speed calculation - no acceleration for smoother response
+                const currentSpeed = maxMovementSpeed;
                 
-                // Calculate movement speed with acceleration/deceleration
-                const targetSpeed = maxMovementSpeed * Math.sqrt(inputX*inputX + inputZ*inputZ);
-                const speedDiff = targetSpeed - movementAcceleration;
-                // Use a lower acceleration value to make movement smoother
-                movementAcceleration += speedDiff * 0.1 * (delta * 60); // Reduced from 0.2 for smoother control
-                
-                // Always use camera direction for movement, not character direction
+                // Get camera direction vectors
                 const cameraForward = new THREE.Vector3(0, 0, -1);
                 const cameraRight = new THREE.Vector3(1, 0, 0);
                 
                 if (cameraMode === "thirdPerson" && thirdPersonCamera) {
-                    // Get camera's forward and right vectors (ignoring Y component for horizontal movement)
+                    // Get camera's forward direction
                     thirdPersonCamera.getWorldDirection(cameraForward);
                     cameraForward.y = 0; // Keep movement on horizontal plane
                     cameraForward.normalize();
                     
-                    // Right is perpendicular to forward in horizontal plane
+                    // Calculate right vector from forward
                     cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraForward);
                 }
                 
-                // Calculate movement direction relative to camera
+                // Calculate movement direction based on input
                 moveDirection.set(0, 0, 0)
-                    .add(cameraRight.multiplyScalar(inputX))  // Fixed sign for correct A and D movement
+                    .add(cameraRight.multiplyScalar(inputX))
                     .add(cameraForward.multiplyScalar(-inputZ));
                 
-                moveDirection.normalize().multiplyScalar(movementAcceleration);
+                // Normalize and scale by speed
+                if (moveDirection.length() > 0) {
+                    moveDirection.normalize().multiplyScalar(currentSpeed * delta);
+                }
                 
                 // Update character position
-                const oldPosition = characterTilt.position.clone();
-                const newPosition = oldPosition.clone().add(moveDirection);
+                characterTilt.position.add(moveDirection);
                 
-                // Check for collisions before applying movement
-                if (!checkCollision(oldPosition, moveDirection)) {
-                    // No collision, move normally
-                    characterTilt.position.copy(newPosition);
-                    
-                    // Check if we need to handle step climbing
-                    handleStepClimbing(characterTilt.position, moveDirection);
-                } else {
-                    // Collision detected, try to slide along the obstacle
-                    updateDebug("Collision detected, attempting to slide");
-                    
-                    // Try moving only in X direction
-                    const xMovement = new THREE.Vector3(moveDirection.x, 0, 0);
-                    if (xMovement.length() > 0.01 && !checkCollision(oldPosition, xMovement)) {
-                        characterTilt.position.add(xMovement);
-                    }
-                    
-                    // Try moving only in Z direction
-                    const zMovement = new THREE.Vector3(0, 0, moveDirection.z);
-                    if (zMovement.length() > 0.01 && !checkCollision(oldPosition, zMovement)) {
-                        characterTilt.position.add(zMovement);
-                    }
-                }
-                
-                // If moving, rotate character mesh to face movement direction
-                if (characterModel && moveDirection.length() > 0.01) {
-                    // Get angle for the direction of movement
-                    const angle = Math.atan2(moveDirection.x, moveDirection.z);
-                    
-                    // Apply the rotation to the character model
-                    characterModel.rotation.y = angle;
-                    
-                    // In a true third-person system, the character rotation also affects camera
-                    // Only apply this when moving to maintain control
-                    characterTilt.rotation.y = THREE.MathUtils.lerp(
-                        characterTilt.rotation.y, 
-                        angle, 
-                        0.1 // Smooth transition
-                    );
-                }
-                
-                // Update animations based on movement state change - ONLY if state actually changed
-                if (!wasMoving || !lastMovementState) {
-                    // Just started moving or continuing to move
-                    if (!wasMoving) {
-                        updateDebug("State change: idle → moving");
-                    }
-                    
-                    // Force animation update on movement state change, overriding the time check
-                    if (attachedBags.length > 0) {
-                        const animName = `carry_walk_${carryWeightClass}`;
-                        switchAnimation(animName, true, animName, true);
-                    } else {
-                        switchAnimation("walk", true, "walk", true);
-                    }
-                    
-                    lastMovementState = "moving";
-                }
-            } else {
-                // Not moving - decelerate
-                movementAcceleration *= 0.8;
-                
-                // Character has stopped moving
-                if (wasMoving || lastMovementState !== "idle") {
-                    if (wasMoving) {
-                        updateDebug("State change: moving → idle");
-                    }
-                    
-                    // Force animation update
-                    if (attachedBags.length > 0) {
-                        const animName = `carry_idle_${carryWeightClass}`;
-                        switchAnimation(animName, true, animName, true);
-                    } else {
-                        switchAnimation("idle", true, "idle", true);
-                    }
-                    
-                    lastMovementState = "idle";
+                // Rotate character to face movement direction
+                if (moveDirection.length() > 0) {
+                    targetRotation = Math.atan2(moveDirection.x, moveDirection.z);
                 }
             }
             
-            // Update weight class for carrying
-            updateCarryingEffects();
+            // Smooth rotation towards target direction
+            if (characterTilt.rotation.y !== targetRotation) {
+                const rotDiff = ((targetRotation - characterTilt.rotation.y + Math.PI) % (Math.PI * 2)) - Math.PI;
+                characterTilt.rotation.y += rotDiff * 0.1;
+            }
+            
+            // Update character animations based on movement state
+            if (isMoving) {
+                // Choose animation based on whether we're carrying bags
+                if (attachedBags.length > 0) {
+                    if (currentAnimation && !currentAnimation.name.startsWith('carry')) {
+                        setAnimation("carry_walk");
+                    }
+                } else {
+                    if (currentAnimation && !currentAnimation.name.startsWith('walk')) {
+                        setAnimation("walk");
+                    }
+                }
+            } else {
+                // Choose idle animation based on whether we're carrying bags
+                if (attachedBags.length > 0) {
+                    if (currentAnimation && !currentAnimation.name.startsWith('carry_idle')) {
+                        setAnimation("carry_idle");
+                    }
+                } else {
+                    if (currentAnimation && !currentAnimation.name.startsWith('idle')) {
+                        setAnimation("idle");
+                    }
+                }
+            }
+            
+            // Enforce ground collision
+            enforceGroundCollision();
+            
+            // Update balance if carrying bags
+            if (attachedBags.length > 0 && balanceEnabled) {
+                updateMovementBasedBalance();
+            }
         }
         
         // Update third-person camera position
@@ -3804,6 +3647,9 @@
 
         // Start the main animation loop
         animate(0);
+
+        // Variable is already declared at line 789
+        // let lastMouseMoveX = 0;
     </script>
 </body>
 </html> 
