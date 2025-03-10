@@ -291,14 +291,14 @@
         <div id="balanceDirection">Balanced</div>
         <div>
             <button id="toggleBalance">Toggle Balance Effect</button>
+            </div>
         </div>
-    </div>
-    
+        
     <div id="carryInfo">
         <div>Bags: <span id="bagCount">0</span></div>
         <div>Weight: <span id="totalWeight">0</span> kg</div>
-    </div>
-    
+        </div>
+        
     <div id="pickupFeedback"></div>
     
     <div id="touchControls">
@@ -307,7 +307,7 @@
         </div>
         <div id="interactButton">Pick</div>
     </div>
-    
+
     <button id="helpBtn">?</button>
     <button id="gameViewBtn">Toggle Camera</button>
     
@@ -421,7 +421,7 @@
         // Models to load with adjusted positions
         const models = [
             // Character positioned near the car
-            { name: 'Character', file: './onetrip_maincharacter.glb', position: [-15, 0, -20], scale: 0.5, rotationY: 0 },
+            { name: 'Character', file: './onetrip_maincharacter.glb', position: [-15, 0, -20], scale: 0.5, rotationY: Math.PI },
             
             // Car positioned at the beginning of the path
             { name: 'Car', file: './car.glb', position: [-5, 0, -20], scale: 0.5, rotationY: Math.PI/2 },
@@ -505,7 +505,7 @@
         // Third-person camera setup
         let thirdPersonCamera = null;
         let thirdPersonCameraTarget = new THREE.Vector3();
-        let thirdPersonCameraOffset = new THREE.Vector3(0, 2, 8);
+        let thirdPersonCameraOffset = new THREE.Vector3(0, 3, 6);
         
         // Reference to hand bones for attaching bags
         let leftHand = null;
@@ -536,7 +536,7 @@
             
             loader.load(
                 model.file,
-                (gltf) => {
+                    (gltf) => {
                     const modelObj = gltf.scene;
                     
                     // Apply scale and position
@@ -550,12 +550,12 @@
                     
                     // Enable shadows
                     modelObj.traverse(node => {
-                        if (node.isMesh) {
-                            node.castShadow = true;
-                            node.receiveShadow = true;
-                        }
-                    });
-                    
+                            if (node.isMesh) {
+                                node.castShadow = true;
+                                node.receiveShadow = true;
+                            }
+                        });
+                        
                     scene.add(modelObj);
                     
                     // Store references to bags
@@ -616,11 +616,11 @@
                         document.getElementById('info').textContent = 
                             `All models loaded - Use controls to test animations and balance system`;
                     }
-                },
-                (xhr) => {
+                    },
+                    (xhr) => {
                     console.log(`${model.name} ${Math.round(xhr.loaded / xhr.total * 100)}% loaded`);
-                },
-                (error) => {
+                    },
+                    (error) => {
                     console.error(`Error loading ${model.name}:`, error);
                     loadedCount++;
                     document.getElementById('info').textContent += 
@@ -719,6 +719,30 @@
             console.log(`Set up ${clipsList.length} animations for mixing`);
         }
         
+        // Update the animation selection and carrying code to use correct animation naming pattern
+        function getAnimationNameForCarrying(baseAnimation, weightClass) {
+            // If we're carrying something
+            if (weightClass !== "none") {
+                // Determine the movement state (walk, stand, run)
+                let movementState = "stand";
+                if (isMoving) {
+                    // For now we only have walk, but could check speed for run later
+                    movementState = "walk";
+                    
+                    // If we're moving fast enough, use run animation
+                    if (movementAcceleration > maxMovementSpeed * 0.7) {
+                        movementState = "run";
+                    }
+                }
+                
+                // Format follows: carry_[movement]_[weight] (e.g., carry_walk_medium)
+                return `carry_${movementState}_${weightClass}`;
+            }
+            
+            // Not carrying, return regular animation
+            return baseAnimation;
+        }
+
         // Function to set upper body animation
         function setUpperBodyAnimation(name) {
             // Prevent rapid animation changes
@@ -731,18 +755,23 @@
             updateDebug(`Setting upper body anim: ${name}`);
             
             // Check if we should use a carry animation based on weight class
-            if (attachedBags.length > 0 && name.startsWith('carry')) {
-                // Use weight-appropriate carry animation
-                const baseAnimName = name.includes('_') ? 
-                    name.substring(0, name.indexOf('_')) : name;
-                
-                name = `${baseAnimName}_${carryWeightClass}`;
-                updateDebug(`Using weight-specific animation: ${name}`);
+            if (attachedBags.length > 0 && (name === 'walk' || name === 'idle' || name === 'run' || name.startsWith('carry'))) {
+                // For carrying, we use the special format: carry_[movement]_[weight]
+                name = getAnimationNameForCarrying(name, carryWeightClass);
+                updateDebug(`Using carry animation: ${name}`);
             }
             
             if (!upperBodyActions[name]) {
                 updateDebug(`Upper body animation '${name}' not found, falling back to walk`);
-                name = 'walk';
+                
+                // Try to find a similar animation if the exact one isn't available
+                const simplifiedName = name.split('_')[0]; // Get base animation name
+                
+                if (simplifiedName === 'carry' && upperBodyActions['carry_walk_medium']) {
+                    name = 'carry_walk_medium'; // Fallback to a default carry animation
+                } else {
+                    name = 'walk'; // Fallback to basic walk
+                }
             }
             
             // If already playing this animation, don't restart it
@@ -974,12 +1003,12 @@
                 pickupFeedbackEl.style.background = "rgba(0, 0, 0, 0.7)";
             }
             
-            setTimeout(() => {
+                setTimeout(() => {
                 pickupFeedbackEl.style.opacity = "0";
             }, 1500);
         }
         
-        // Update carrying statistics
+        // Update carrying statistics with new animation naming
         function updateCarryingStats() {
             // Count bags
             bagCountEl.textContent = attachedBags.length;
@@ -1025,23 +1054,14 @@
             if (newWeightClass !== carryWeightClass) {
                 carryWeightClass = newWeightClass;
                 
-                // If current animation is a carry animation, update it
-                if (currentUpperBodyAnimation.startsWith('carry')) {
-                    // Extract base animation name
-                    const baseAnimName = currentUpperBodyAnimation.includes('_') ? 
-                        currentUpperBodyAnimation.substring(0, currentUpperBodyAnimation.indexOf('_')) : 
-                        currentUpperBodyAnimation;
-                    
-                    // Apply the new weight class
-                    if (carryWeightClass !== "none") {
-                        setUpperBodyAnimation(`${baseAnimName}_${carryWeightClass}`);
-                    } else {
-                        // If no bags, go back to walk or idle depending on movement
-                        setUpperBodyAnimation(isMoving ? 'walk' : 'idle');
-                    }
-                } else if (attachedBags.length > 0) {
-                    // If we picked up our first bag, switch to carry animation
-                    setUpperBodyAnimation(`carry_${carryWeightClass}`);
+                // Update the animation based on current state and new weight class
+                if (attachedBags.length > 0) {
+                    // Determine the current movement state
+                    const movementState = isMoving ? "walk" : "stand";
+                    setUpperBodyAnimation(`carry_${movementState}_${carryWeightClass}`);
+                } else {
+                    // If no bags, go back to walk or idle depending on movement
+                    setUpperBodyAnimation(isMoving ? 'walk' : 'idle');
                 }
             }
         }
@@ -1146,7 +1166,7 @@
                 balanceDirectionEl.style.color = '#ffaa44';
                 newDirection = "right";
                 intensity = value - 0.6; // Reduced range
-            } else {
+                } else {
                 // Balanced
                 indicator.style.background = '#ffffff'; // White for safe
                 balanceDirectionEl.textContent = "Balanced";
@@ -1218,7 +1238,7 @@
             setUpperBodyAnimation('pickup_low');
             
             // After a short delay, attempt to pick up a ground bag
-            setTimeout(() => {
+                    setTimeout(() => {
                 if (rightHand && groundBag1 && !attachedBags.some(b => b.mesh === groundBag1)) {
                     attachBagToHand(groundBag1, rightHand);
                 } else if (rightHand && groundBag2 && !attachedBags.some(b => b.mesh === groundBag2)) {
@@ -1336,10 +1356,14 @@
         // Set up third-person camera
         function setupThirdPersonCamera() {
             thirdPersonCamera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+            
+            // Adjust the camera offset for a better view behind the character
+            thirdPersonCameraOffset = new THREE.Vector3(0, 3, 6); // Position camera slightly higher and closer
+            
             updateThirdPersonCamera();
         }
         
-        // Update third-person camera position and target
+        // Update third-person camera position for better view
         function updateThirdPersonCamera() {
             if (!characterTilt || !thirdPersonCamera) return;
             
@@ -1358,7 +1382,7 @@
             thirdPersonCamera.lookAt(thirdPersonCameraTarget);
         }
         
-        // Update character movement and rotation based on controls
+        // Update character movement and fix orientation
         function updateCharacterMovement(delta) {
             if (!characterTilt) return;
             
@@ -1436,8 +1460,10 @@
                 if (!wasMoving && !lastMovementState) {
                     // Just started moving
                     updateDebug("State change: idle → moving");
+                    
                     if (attachedBags.length > 0) {
-                        setUpperBodyAnimation(`carry_${carryWeightClass}`);
+                        // Use carry_walk_weight instead of a generic carry animation
+                        setUpperBodyAnimation(`carry_walk_${carryWeightClass}`);
                     } else {
                         setUpperBodyAnimation('walk');
                     }
@@ -1460,9 +1486,11 @@
                 if (wasMoving && lastMovementState) {
                     // Just stopped moving
                     updateDebug("State change: moving → idle");
+                    
                     if (!currentUpperBodyAnimation.startsWith('pickup')) {
                         if (attachedBags.length > 0) {
-                            setUpperBodyAnimation(`carry_${carryWeightClass}`);
+                            // Use carry_stand_weight for standing still with bags
+                            setUpperBodyAnimation(`carry_stand_${carryWeightClass}`);
                         } else {
                             setUpperBodyAnimation('idle');
                         }
