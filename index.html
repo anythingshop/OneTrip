@@ -928,7 +928,7 @@
             
             loader.load(
                 model.file,
-                    (gltf) => {
+                (gltf) => {
                     const modelObj = gltf.scene;
                     
                     // Apply scale and position
@@ -942,12 +942,12 @@
                     
                     // Enable shadows
                     modelObj.traverse(node => {
-                            if (node.isMesh) {
-                                node.castShadow = true;
-                                node.receiveShadow = true;
-                            }
-                        });
-                        
+                        if (node.isMesh) {
+                            node.castShadow = true;
+                            node.receiveShadow = true;
+                        }
+                    });
+                    
                     scene.add(modelObj);
                     
                     // Store references to bags
@@ -1014,19 +1014,24 @@
                         
                         // Once all models are loaded, set up collision detection
                         setupCollisionDetection();
+                        
+                        // Then create instanced grass AFTER collision detection is set up
+                        setTimeout(() => {
+                            createInstancedGrass();
+                        }, 1000); // Short delay to ensure everything is properly initialized
                     }
-                    },
-                    (xhr) => {
-                    console.log(`${model.name} ${Math.round(xhr.loaded / xhr.total * 100)}% loaded`);
-                    },
-                    (error) => {
-                    console.error(`Error loading ${model.name}:`, error);
-                    loadedCount++;
-                    document.getElementById('info').textContent += 
-                        `\nError loading ${model.name}`;
-                }
-            );
-        });
+                },
+                (xhr) => {
+                console.log(`${model.name} ${Math.round(xhr.loaded / xhr.total * 100)}% loaded`);
+                },
+                (error) => {
+                console.error(`Error loading ${model.name}:`, error);
+                loadedCount++;
+                document.getElementById('info').textContent += 
+                    `\nError loading ${model.name}`;
+            }
+        );
+    });
         
         // Set up animation mixing system
         function setupAnimationMixing(clipsList) {
@@ -2931,12 +2936,12 @@
                 }
             }
         }
-
-        // Collision detection variables
-        let collisionObjects = [];
         
         // Function to set up collision detection
         function setupCollisionDetection() {
+            // Reset the collision objects array
+            collisionObjects = [];
+            
             // Add collision objects (house, car, environment objects)
             scene.traverse(function(object) {
                 // Add objects that should block movement to collision list
@@ -2954,9 +2959,6 @@
                     updateDebug(`Added collision object: ${object.name}`);
                 }
             });
-            
-            // After setting up collision detection, create instanced grass
-            createInstancedGrass();
         }
         
         // Function to check if movement would cause a collision
