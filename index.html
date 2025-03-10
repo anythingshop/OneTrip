@@ -2134,35 +2134,29 @@
             // Handle rotation based on input device
             if (isUsingTouch) {
                 // For touch devices, use the rotation joystick to rotate the character and camera together
-            if (rotationJoystickActive) {
+            
                 const rotationAmount = rotationJoystickDirection.x * touchRotationSensitivity;
-                characterTilt.rotation.y += rotationAmount;
-                
-                // Update target rotation for balance system
-                targetRotation = characterTilt.rotation.y;
+                // We update targetRotation instead of directly updating characterTilt
+                targetRotation += rotationAmount;
                     
-                    // Update camera to follow character rotation
-                    updateThirdPersonCamera();
+                // When carrying bags, use joystick rotation to affect balance
+                if (attachedBags.length > 0 && balanceEnabled) {
+                    // Rotation joystick movements add subtle balance shifts
+                    // Speed of rotation causes more balance disruption
+                    const balanceDisruption = Math.min(0.01, Math.abs(rotationAmount) * 0.3);
                     
-                    // When carrying bags, use joystick rotation to affect balance
-                    if (attachedBags.length > 0 && balanceEnabled) {
-                        // Rotation joystick movements add subtle balance shifts
-                        // Speed of rotation causes more balance disruption
-                        const balanceDisruption = Math.min(0.01, Math.abs(rotationAmount) * 0.3);
-                        
-                        // If rotation is to the right, shift balance left
-                        if (rotationAmount > 0) {
-                            balanceValue = Math.max(0, balanceValue - balanceDisruption);
-                        } 
-                        // If rotation is to the left, shift balance right
-                        else if (rotationAmount < 0) {
-                            balanceValue = Math.min(1, balanceValue + balanceDisruption);
-                        }
-                        
-                        // Update the UI and apply effects
-                        document.getElementById('balanceSlider').value = balanceValue * 100;
-                        updateBalanceSystem(balanceValue);
+                    // If rotation is to the right, shift balance left
+                    if (rotationAmount > 0) {
+                        balanceValue = Math.max(0, balanceValue - balanceDisruption);
+                    } 
+                    // If rotation is to the left, shift balance right
+                    else if (rotationAmount < 0) {
+                        balanceValue = Math.min(1, balanceValue + balanceDisruption);
                     }
+                    
+                    // Update the UI and apply effects
+                    document.getElementById('balanceSlider').value = balanceValue * 100;
+                    updateBalanceSystem(balanceValue);
                 }
             }
             // For desktop, rotation is handled by mouse movement in the mousemove event handler
@@ -2229,7 +2223,7 @@
                     }
                 }
                 
-                // If moving, rotate character mesh to face movement direction (always face the way you're moving)
+                // If moving, rotate character mesh to face movement direction
                 if (characterModel && moveDirection.length() > 0.01) {
                     // Get current rotation of character mesh (not tilt container)
                     const angle = Math.atan2(moveDirection.x, moveDirection.z);
@@ -2237,13 +2231,9 @@
                     // Apply the rotation to the character model to match the movement direction
                     characterModel.rotation.y = angle;
                     
-                    // Update target rotation - but don't directly update characterTilt rotation here
-                    // This prevents visual artifacts with camera ghosting
+                    // Update target rotation - NOT directly updating characterTilt rotation here
                     targetRotation = angle;
                 }
-                
-                // Rotation and camera updates are now handled in the main animation loop
-                // to prevent visual artifacts when pressing W
                 
                 // Update animations based on movement state change - ONLY if state actually changed
                 if (!wasMoving || !lastMovementState) {
@@ -2502,11 +2492,9 @@
                         // Only rotate camera if in game view mode
                         const dx = e.movementX || e.mozMovementX || e.webkitMovementX || 0;
                         if (dx !== 0 && mouseLookActive) {
-                            // Rotate the character AND camera together
-                            const newRotation = characterTilt.rotation.y - dx * mouseRotationSensitivity;
-                            
-                            // Only update the target rotation, don't update the character directly
+                            // Only update target rotation, don't update the character directly
                             // This prevents visual artifacts when rotating with mouse
+                            const newRotation = characterTilt.rotation.y - dx * mouseRotationSensitivity;
                             targetRotation = newRotation;
                             
                             // However, we do need to update the character model immediately for user feedback
@@ -2814,8 +2802,11 @@
                     targetRotation,
                     0.05 // Slower rotation for smoother camera movement
                 );
-                
-                // Update camera position based on character rotation
+            }
+            
+            // Always update camera position once per frame, regardless of movement
+            // This prevents the double vision effect
+            if (cameraMode === "thirdPerson" && thirdPersonCamera && characterTilt) {
                 updateThirdPersonCamera();
             }
             
