@@ -416,6 +416,21 @@
             metalness: 0.1,
         });
         
+        // Add a backup darker ground plane to ensure we don't see through to the background
+        const backupGroundGeometry = new THREE.PlaneGeometry(200, 200); // Larger to cover everything
+        const backupGroundMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x1A2E1D, // Much darker green for the backup ground
+            roughness: 0.9,
+            metalness: 0.0,
+        });
+        
+        // Create and add the backup ground slightly below the main ground
+        const backupGround = new THREE.Mesh(backupGroundGeometry, backupGroundMaterial);
+        backupGround.rotation.x = -Math.PI / 2;
+        backupGround.position.y = -0.02; // Slightly below main ground
+        backupGround.receiveShadow = true;
+        scene.add(backupGround);
+        
         // Add some variation to the ground vertices for a more natural look
         const vertices = groundGeometry.attributes.position.array;
         for (let i = 0; i < vertices.length; i += 3) {
@@ -477,7 +492,7 @@
             // Create a more realistic path with texture and details
             const pathGeometry = new THREE.PlaneGeometry(5, 50, 10, 30);
             const pathMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0xc2b280, // Sandy color for the path
+                color: 0x808080, // Changed to gray color for the driveway
                 roughness: 0.9,
                 metalness: 0.1,
             });
@@ -505,7 +520,7 @@
             
             // Add path borders for more definition (small stones/pebbles along the edges)
             const borderMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0xa8a198, // Slightly darker than the path
+                color: 0x606060, // Darker gray for the borders
                 roughness: 1.0,
                 metalness: 0.05,
             });
@@ -529,8 +544,7 @@
             // Add a few small stone details along the path
             addPathStones();
             
-            // Add steps leading to the house
-            createPorchSteps();
+            // Removed the createPorchSteps() call since the house model has its own steps
         }
         
         // Add small decorative stones along the path
@@ -569,47 +583,8 @@
         
         // Create porch steps leading to the house
         function createPorchSteps() {
-            const stepWidth = 4;
-            const stepDepth = 0.8;
-            const stepMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0xdcdcdc, // Lighter grey for concrete steps
-                roughness: 0.7,
-                metalness: 0.1 
-            });
-            
-            // Add three steps of increasing height
-            for (let i = 0; i < 3; i++) {
-                const stepHeight = 0.2 + (i * 0.2); // Increasing height for each step
-                const stepGeometry = new THREE.BoxGeometry(stepWidth, stepHeight, stepDepth);
-                const step = new THREE.Mesh(stepGeometry, stepMaterial);
-                
-                // Position each step - offset in z direction to line up with the house porch
-                const zPosition = 28 - (i * stepDepth);
-                step.position.set(0, stepHeight / 2, zPosition);
-                
-                step.castShadow = true;
-                step.receiveShadow = true;
-                
-                // Mark as a collidable object
-                step.userData.isCollider = true;
-                
-                scene.add(step);
-                
-                // Add subtle edge details to steps
-                addStepEdge(stepWidth, stepHeight, stepDepth, 0, stepHeight / 2, zPosition);
-            }
-            
-            // Add a porch platform
-            const porchGeometry = new THREE.BoxGeometry(stepWidth, 0.8, 2);
-            const porch = new THREE.Mesh(porchGeometry, stepMaterial);
-            porch.position.set(0, 0.4, 25.5);
-            porch.castShadow = true;
-            porch.receiveShadow = true;
-            porch.userData.isCollider = true;
-            scene.add(porch);
-            
-            // Add decorative planters on either side of the porch
-            addPorchPlanters();
+            // This function is no longer called as the house model has its own steps
+            // Kept for reference only
         }
         
         // Function to add subtle edge detail to steps
@@ -763,8 +738,8 @@
             // Car positioned at the beginning of the path
             { name: 'Car', file: './car.glb', position: [-5, 0, -20], scale: 0.5, rotationY: Math.PI/2 },
             
-            // House positioned at the end of the path (far in front)
-            { name: 'House', file: './house.glb', position: [0, 0, 30], scale: 0.5, rotationY: Math.PI },
+            // House positioned at the end of the path, rotated 45 degrees clockwise
+            { name: 'House', file: './house.glb', position: [0, 0, 30], scale: 0.5, rotationY: Math.PI - Math.PI/4 },
             
             // Bags ON TOP of the car - moved further back (more negative Z)
             { name: 'Car Bag 1', file: './newbag.glb', position: [-5, 3.5, -20.5], scale: 0.4, rotationY: 0 },
@@ -1478,6 +1453,9 @@
             // Current angle
             const currentAngle = characterTilt.rotation.z;
             
+            // Limit the maximum tilt angle to prevent extreme tilts
+            targetAngle = Math.max(-0.15, Math.min(0.15, targetAngle));
+            
             // If angles are very close, don't bother animating
             if (Math.abs(targetAngle - currentAngle) < 0.01) {
                 return;
@@ -1498,6 +1476,10 @@
                 if (frame >= duration) return;
                 
                 characterTilt.rotation.z += angleStep;
+                
+                // Enforce ground collision after each tilt change
+                enforceGroundCollision();
+                
                 frame++;
                 
                 requestAnimationFrame(animateTilt);
@@ -1910,33 +1892,47 @@
         
         // Apply animation effects based on balance status
         function updateAnimationsForBalance(direction, intensity) {
+            // First enforce ground collision to prevent clipping
+            enforceGroundCollision();
+            
+            // Check for fall condition - if intensity is very high, trigger a fall
+            if (intensity > 0.8 && !isGameOver) {
+                // High intensity imbalance triggers a fall
+                triggerGameOver();
+                return;
+            }
+            
             // Use stumble for lower body when imbalanced
             if (direction !== "center") {
                 // If moving, use stumble_lowerbody, otherwise use default animation
-                if (isMoving && !currentLowerBodyAnimation.startsWith('stumble')) {
+                if (isMoving && !currentLowerBodyAnimation.startsWith('stumble') && !isGameOver) {
                     setLowerBodyAnimation('stumble_lowerbody');
                 }
                 
                 // Apply a tilt to the entire character
-                if (characterTilt) {
+                if (characterTilt && !isGameOver) {
                     // Calculate tilt angle based on intensity but with reduced maximum tilt
-                    // Max tilt reduced from 0.5 to 0.3 radians (about 17 degrees instead of 29 degrees)
-                    const tiltAmount = Math.min(0.2, Math.max(0, (intensity - 0.2) * 1.0 + 0.05));
-                    const tiltAngle = (direction === 'left' ? -1 : 1) * tiltAmount;
+                    // Max tilt reduced to prevent extreme angles
+                    const tiltAmount = Math.min(0.15, Math.max(0, (intensity - 0.2) * 0.8 + 0.05));
+                    
+                    // Fix: Swap left/right direction for correct tilt
+                    const tiltAngle = (direction === 'right' ? -1 : 1) * tiltAmount;
                     
                     // Apply tilt with smooth transition
                     gsapTilt(tiltAngle);
                 }
             } else {
                 // Return to normal walking and no tilt
-                if (isMoving && currentLowerBodyAnimation.startsWith('stumble')) {
-                    setLowerBodyAnimation('walk');
-                } else if (!isMoving && currentLowerBodyAnimation.startsWith('stumble')) {
-                    setLowerBodyAnimation('idle');
-                }
-                
-                if (characterTilt) {
-                    gsapTilt(0);
+                if (!isGameOver) {
+                    if (isMoving && currentLowerBodyAnimation.startsWith('stumble')) {
+                        setLowerBodyAnimation('walk');
+                    } else if (!isMoving && currentLowerBodyAnimation.startsWith('stumble')) {
+                        setLowerBodyAnimation('idle');
+                    }
+                    
+                    if (characterTilt) {
+                        gsapTilt(0);
+                    }
                 }
             }
         }
@@ -2489,8 +2485,8 @@
             if (!isUsingTouch) {
                 // Mouse move for camera rotation (no need to click and hold)
                 renderer.domElement.addEventListener('mousemove', function(e) {
-                    if (cameraMode === "thirdPerson" && !controls.enabled) {
-                        // Only rotate camera if in game view mode
+                    if (cameraMode === "thirdPerson" && !controls.enabled && !isGameOver) {
+                        // Only rotate camera if in game view mode and not in game over state
                         const dx = e.movementX || e.mozMovementX || e.webkitMovementX || 0;
                         if (dx !== 0 && mouseLookActive) {
                             // Traditional third-person control: rotate character and camera together
@@ -2517,12 +2513,12 @@
                                 // Faster mouse movements cause more balance disruption
                                 const balanceDisruption = Math.min(0.03, Math.abs(dx) * 0.001);
                                 
-                                // Direction affects which way balance shifts
-                                if (dx < 0) { // Right movement
-                                    balanceValue = Math.max(0, balanceValue - balanceDisruption);
-                                } 
-                                else if (dx > 0) { // Left movement
+                                // Fix: Swap directions - moving mouse right (dx > 0) shifts balance right
+                                if (dx > 0) { // Right movement
                                     balanceValue = Math.min(1, balanceValue + balanceDisruption);
+                                } 
+                                else if (dx < 0) { // Left movement
+                                    balanceValue = Math.max(0, balanceValue - balanceDisruption);
                                 }
                             }
                         }
@@ -2795,18 +2791,27 @@
             // Calculate delta time
             const delta = clock.getDelta();
             
-            // Process input and update character position first
-            // We DO NOT update camera here
-            updateCharacterMovement(delta);
+            // Skip movement updates during game over
+            if (!isGameOver) {
+                // Process input and update character position first
+                // We DO NOT update camera here
+                updateCharacterMovement(delta);
+                
+                // Reset camera update flag for this frame
+                cameraUpdateScheduled = false;
+                
+                // Update animations
+                if (mixer) mixer.update(delta);
+                
+                // Handle balance updates based on control input
+                updateBalanceBasedOnControls();
+            } else {
+                // Still update animations during game over
+                if (mixer) mixer.update(delta);
+            }
             
-            // Reset camera update flag for this frame
-            cameraUpdateScheduled = false;
-            
-            // Update animations
-            if (mixer) mixer.update(delta);
-            
-            // Handle balance updates based on control input
-            updateBalanceBasedOnControls();
+            // Always enforce ground collision
+            enforceGroundCollision();
             
             // ONLY update the camera once per frame, and only after all movement is complete
             if (cameraMode === "thirdPerson" && thirdPersonCamera && characterTilt) {
@@ -3581,7 +3586,7 @@
 
         // Handle rotation joystick (for mobile)
         function handleRotationJoystick() {
-            if (!rotationJoystickActive || !characterTilt) return;
+            if (!rotationJoystickActive || !characterTilt || isGameOver) return;
             
             // Calculate rotation amount based on joystick position
             const rotationAmount = rotationJoystickDirection.x * touchRotationSensitivity;
@@ -3602,11 +3607,12 @@
                     // Joystick rotation directly affects balance - main control for balance
                     const balanceDisruption = Math.min(0.03, Math.abs(rotationAmount) * 3);
                     
+                    // Fix: Swap directions - rotating right shifts balance right
                     if (rotationAmount > 0) { // Rotate right
-                        balanceValue = Math.max(0, balanceValue - balanceDisruption);
+                        balanceValue = Math.min(1, balanceValue + balanceDisruption);
                     } 
                     else if (rotationAmount < 0) { // Rotate left
-                        balanceValue = Math.min(1, balanceValue + balanceDisruption);
+                        balanceValue = Math.max(0, balanceValue - balanceDisruption);
                     }
                 }
             }
@@ -3688,6 +3694,66 @@
             }
         }
         
+        // Global variable to track game state
+        let isGameOver = false;
+        let fallRecoveryTimer = null;
+
+        // Function to reset position to ground level and prevent clipping
+        function enforceGroundCollision() {
+            if (characterTilt) {
+                // Ensure character never goes below ground level (y=0)
+                if (characterTilt.position.y < 0) {
+                    characterTilt.position.y = 0;
+                }
+            }
+        }
+        
+        // Function to handle game over state
+        function triggerGameOver() {
+            if (isGameOver) return; // Prevent multiple triggers
+            
+            isGameOver = true;
+            
+            // Show game over message
+            showPickupFeedback("GAME OVER - You fell! Recovering in 3 seconds...");
+            
+            // Drop all bags
+            dropAllBags();
+            
+            // Play fall animation
+            if (upperBodyActions['stumble_fall']) {
+                forcedAnimationUpdate('stumble_fall');
+            }
+            
+            // Disable controls temporarily
+            balanceEnabled = false;
+            
+            // Set a timer to recover
+            fallRecoveryTimer = setTimeout(() => {
+                // Reset game state
+                isGameOver = false;
+                balanceEnabled = true;
+                balanceValue = 0.5; // Reset balance to center
+                
+                // Reset character tilt
+                gsapTilt(0);
+                
+                // Show recovery message
+                showPickupFeedback("Recovered! Be more careful next time!");
+                
+                // Reset animations
+                forcedAnimationUpdate('idle');
+            }, 3000); // 3 second recovery time
+        }
+        
+        // Function to drop all bags at once
+        function dropAllBags() {
+            // Drop bags one by one until none are left
+            while (attachedBags.length > 0) {
+                detachBag();
+            }
+        }
+
         // Start the main animation loop
         animate(0);
     </script>
