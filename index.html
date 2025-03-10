@@ -1623,11 +1623,30 @@
                     
                     // Update target rotation for balance system
                     targetRotation = characterTilt.rotation.y;
+                    
+                    // When carrying bags, use joystick rotation to affect balance
+                    if (attachedBags.length > 0 && balanceEnabled) {
+                        // Rotation joystick movements add subtle balance shifts
+                        // Speed of rotation causes more balance disruption
+                        const balanceDisruption = Math.min(0.01, Math.abs(rotationAmount) * 0.3);
+                        
+                        // If rotation is to the right, shift balance left
+                        if (rotationAmount > 0) {
+                            balanceValue = Math.max(0, balanceValue - balanceDisruption);
+                        } 
+                        // If rotation is to the left, shift balance right
+                        else if (rotationAmount < 0) {
+                            balanceValue = Math.min(1, balanceValue + balanceDisruption);
+                        }
+                        
+                        // Update the UI and apply effects
+                        document.getElementById('balanceSlider').value = balanceValue * 100;
+                        updateBalanceSystem(balanceValue);
+                    }
                 }
             } else {
                 // For desktop, rotation is handled by mouse movement and pointer lock
-                // This is already implemented in the mousemove event listener
-                // Character should face movement direction, not control camera rotation
+                // Character should face movement direction, but camera orientation is separate
             }
             
             // Process movement input (independent of rotation)
@@ -1700,6 +1719,25 @@
                     // Apply the rotation to the character model, not the tilt container
                     // This way the camera orientation and character orientation can be different
                     characterModel.rotation.y = angle;
+                    
+                    // If we're not using touch controls, also adjust the character and camera
+                    // orientation to match the movement direction more naturally
+                    if (!isUsingTouch && Math.abs(inputZ) > 0.5 && Math.abs(inputX) < 0.2) {
+                        // If moving mostly forward/backward, gradually rotate the character to face movement
+                        const targetAngle = inputZ > 0 ? 
+                            characterTilt.rotation.y + Math.PI : // Face backward if moving backward
+                            characterTilt.rotation.y;            // Face forward if moving forward
+                            
+                        // Calculate angle difference
+                        const angleDiff = (targetAngle - characterTilt.rotation.y) % (Math.PI * 2);
+                        
+                        // Apply a small rotation to gradually align with movement direction
+                        if (Math.abs(angleDiff) > 0.05) {
+                            characterTilt.rotation.y += angleDiff * 0.05;
+                            targetRotation = characterTilt.rotation.y;
+                            updateThirdPersonCamera();
+                        }
+                    }
                 }
                 
                 // Update animations based on movement state change - ONLY if state actually changed
@@ -1956,24 +1994,59 @@
                     if (cameraMode === "thirdPerson" && !controls.enabled) {
                         // Only rotate camera if in game view mode
                         const dx = e.movementX || e.mozMovementX || e.webkitMovementX || 0;
-                        if (dx !== 0) {
-                            // Rotate the camera around the character (don't rotate character)
+                        if (dx !== 0 && mouseLookActive) {
+                            // Rotate the character AND camera together
                             characterTilt.rotation.y -= dx * mouseRotationSensitivity;
                             targetRotation = characterTilt.rotation.y;
                             updateThirdPersonCamera();
+                            
+                            // When carrying bags, use mouse movement to affect balance
+                            if (attachedBags.length > 0 && balanceEnabled) {
+                                // Mouse movements add subtle balance shifts
+                                // Faster mouse movements cause more balance disruption
+                                const balanceDisruption = Math.min(0.01, Math.abs(dx) * 0.0001);
+                                
+                                // If movement is to the left, shift balance left
+                                if (dx > 0) {
+                                    balanceValue = Math.max(0, balanceValue - balanceDisruption);
+                                } 
+                                // If movement is to the right, shift balance right
+                                else if (dx < 0) {
+                                    balanceValue = Math.min(1, balanceValue + balanceDisruption);
+                                }
+                                
+                                // Update the UI and apply effects
+                                document.getElementById('balanceSlider').value = balanceValue * 100;
+                                updateBalanceSystem(balanceValue);
+                            }
                         }
                     }
                 });
                 
                 // Capture pointer for smoother mouse movement
                 renderer.domElement.addEventListener('click', function() {
-                    if (cameraMode === "thirdPerson" && !mouseLookActive) {
+                    if (cameraMode === "thirdPerson" && !mouseLookActive && !controls.enabled) {
+                        // Request pointer lock for smoother mouse controls
                         renderer.domElement.requestPointerLock = 
                             renderer.domElement.requestPointerLock || 
                             renderer.domElement.mozRequestPointerLock || 
                             renderer.domElement.webkitRequestPointerLock;
                         
                         renderer.domElement.requestPointerLock();
+                        
+                        // Show a small notification to indicate pointer is locked
+                        showPickupFeedback("Mouse locked - press ESC to unlock");
+                    }
+                });
+                
+                // Add ESC key handler to exit pointer lock
+                document.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape' && mouseLookActive) {
+                        document.exitPointerLock = document.exitPointerLock || 
+                            document.mozExitPointerLock || 
+                            document.webkitExitPointerLock;
+                            
+                        document.exitPointerLock();
                     }
                 });
             } else {
@@ -2250,6 +2323,10 @@
         window.addEventListener('load', function() {
             setupJoystickControls();
             
+            // Hide debug elements and optimize UI for the current device
+            hideDebugElements();
+            optimizeUIForDevice();
+            
             // Start with balance system disabled
             document.getElementById('toggleBalance').textContent = 'Enable Balance Effect';
             document.getElementById('helpOverlay').style.display = 'block'; // Show help on start
@@ -2482,6 +2559,7 @@
         // Setup a simple debug display
         const debugEl = document.getElementById('debug');
         function updateDebug(message) {
+            const debugEl = document.getElementById('debug');
             if (!debugEl) return;
             
             // Add message to debug log
@@ -2621,6 +2699,84 @@
             }
             
             return false;
+        }
+
+        // Update debug display
+        function updateDebug(message) {
+            const debugEl = document.getElementById('debug');
+            if (!debugEl) return;
+            
+            // Add message to debug log
+            const now = new Date().toLocaleTimeString();
+            debugEl.innerHTML = `[${now}] ${message}<br>` + debugEl.innerHTML.split('<br>').slice(0, 10).join('<br>');
+        }
+
+        // Hide debug elements by default (but leave them available for development)
+        function hideDebugElements() {
+            // Debug elements to hide by default
+            const debugElements = [
+                'controls',
+                'debug',
+                'pickupControls'
+            ];
+            
+            // Hide debug elements
+            debugElements.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.style.display = 'none';
+                }
+            });
+        }
+        
+        // Optimize UI for PC or mobile
+        function optimizeUIForDevice() {
+            // Get necessary elements
+            const carryInfo = document.getElementById('carryInfo');
+            const balanceUI = document.getElementById('balanceUI');
+            const touchControls = document.getElementById('touchControls');
+            
+            if (isUsingTouch) {
+                // Mobile-specific UI adjustments
+                if (touchControls) touchControls.style.display = 'block';
+                
+                // Move balance UI to a better position for mobile
+                if (balanceUI) {
+                    balanceUI.style.bottom = '150px';
+                    balanceUI.style.right = '10px';
+                    balanceUI.style.maxWidth = '150px';
+                }
+                
+                // Make carry info more compact
+                if (carryInfo) {
+                    carryInfo.style.top = '10px';
+                    carryInfo.style.left = '10px';
+                    carryInfo.style.padding = '5px';
+                    carryInfo.style.fontSize = '14px';
+                }
+            } else {
+                // PC-specific UI adjustments
+                if (touchControls) touchControls.style.display = 'none';
+                
+                // Show minimal UI by default on PC
+                if (balanceUI) {
+                    balanceUI.style.bottom = '10px';
+                    balanceUI.style.right = '10px';
+                    balanceUI.style.width = '200px';
+                }
+                
+                // Make carry info visible at top-left
+                if (carryInfo) {
+                    carryInfo.style.display = 'block';
+                    carryInfo.style.top = '10px';
+                    carryInfo.style.left = '10px';
+                    carryInfo.style.padding = '10px';
+                    carryInfo.style.fontSize = '16px';
+                }
+            }
+            
+            // Hide balance UI initially (will show when carrying bags)
+            if (balanceUI) balanceUI.style.display = 'none';
         }
     </script>
 </body>
