@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>One Trip - Balance System Preview</title>
+    <title>One Trip - Preview</title>
     <style>
         body { margin: 0; overflow: hidden; background: #111; }
         #info {
@@ -36,6 +36,17 @@
             padding: 10px;
             font-family: Arial, sans-serif;
             border-radius: 5px;
+        }
+        #pickupControls {
+            position: absolute;
+            left: 10px;
+            top: 60px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            font-family: Arial, sans-serif;
+            border-radius: 5px;
+            z-index: 1000;
         }
         select, button, input {
             margin: 5px;
@@ -81,6 +92,15 @@
         <button id="topView">Top View</button>
         <button id="houseFrontView">House Front View</button>
     </div>
+    
+    <div id="pickupControls">
+        <h3>Pickup Actions</h3>
+        <button id="pickupLowBtn">Pickup Low (Ground)</button>
+        <button id="pickupHighBtn">Pickup High (Car)</button>
+        <button id="attachBagBtn">Attach Bag to Hand</button>
+        <button id="detachBagBtn">Detach Bag</button>
+    </div>
+    
     <div id="balanceUI">
         <h3>Balance System Preview</h3>
         <div>
@@ -202,9 +222,13 @@
             // House positioned at the end of the path (far in front)
             { name: 'House', file: './house.glb', position: [0, 0, 30], scale: 0.5, rotationY: Math.PI },
             
-            // Place bags ON TOP of the car
-            { name: 'Bag 1', file: './newbag.glb', position: [-5, 1.5, -20], scale: 0.4, rotationY: 0 },
-            { name: 'Bag 2', file: './bag2.glb', position: [-5, 1.5, -19], scale: 0.4, rotationY: Math.PI/4 },
+            // Bags ON TOP of the car - HIGHER Y value
+            { name: 'Car Bag 1', file: './newbag.glb', position: [-5, 3.5, -20], scale: 0.4, rotationY: 0 },
+            { name: 'Car Bag 2', file: './bag2.glb', position: [-5, 3.5, -19], scale: 0.4, rotationY: Math.PI/4 },
+            
+            // Bags on the GROUND near character
+            { name: 'Ground Bag 1', file: './newbag.glb', position: [-13, 0, -19], scale: 0.4, rotationY: 0 },
+            { name: 'Ground Bag 2', file: './bag2.glb', position: [-14, 0, -21], scale: 0.4, rotationY: Math.PI/4 },
             
             // Environment objects properly spaced along the path
             { name: 'Tree', file: './tree.glb', position: [-10, 0, 0], scale: 0.5, rotationY: 0 },
@@ -219,6 +243,19 @@
         let currentAnimation = 'walk';
         let balanceEnabled = false;
         let balanceValue = 0.5;
+        
+        // Reference to hand bones for attaching bags
+        let leftHand = null;
+        let rightHand = null;
+        
+        // References to bags for attaching
+        let groundBag1 = null;
+        let groundBag2 = null;
+        let carBag1 = null;
+        let carBag2 = null;
+        
+        // Currently attached bag
+        let attachedBag = null;
 
         // Load models
         const loader = new THREE.GLTFLoader();
@@ -257,6 +294,12 @@
                     
                     scene.add(modelObj);
                     
+                    // Store reference to model
+                    if (model.name === 'Ground Bag 1') groundBag1 = modelObj;
+                    if (model.name === 'Ground Bag 2') groundBag2 = modelObj;
+                    if (model.name === 'Car Bag 1') carBag1 = modelObj;
+                    if (model.name === 'Car Bag 2') carBag2 = modelObj;
+                    
                     // Store model reference for later use
                     window[model.name.toLowerCase().replace(' ', '_')] = modelObj;
                     
@@ -289,8 +332,24 @@
                         // Play walk animation by default
                         playAnimation('walk');
                         
-                        // Log animations for debugging
+                        // Find hand bones for attaching bags
+                        modelObj.traverse(node => {
+                            if (node.isBone) {
+                                if (node.name === 'mixamorigLeftHand') {
+                                    leftHand = node;
+                                    console.log('Found left hand bone');
+                                }
+                                if (node.name === 'mixamorigRightHand') {
+                                    rightHand = node;
+                                    console.log('Found right hand bone');
+                                }
+                            }
+                        });
+                        
+                        // Log animations and bones for debugging
                         console.log("Available animations:", Object.keys(animations));
+                        console.log("Left hand found:", leftHand !== null);
+                        console.log("Right hand found:", rightHand !== null);
                     }
                     
                     // Update loaded count
@@ -330,6 +389,64 @@
             console.log(`Playing animation: ${name}`);
         }
         
+        // Function to attach a bag to the character's hand
+        function attachBagToHand(bag, hand) {
+            if (!bag || !hand || !characterModel) {
+                console.warn("Cannot attach bag - missing references");
+                return;
+            }
+            
+            // Store original position and parent
+            const originalPosition = bag.position.clone();
+            const originalRotation = bag.rotation.clone();
+            const originalParent = bag.parent;
+            
+            // Remove from scene
+            scene.remove(bag);
+            
+            // Add to character hand
+            hand.add(bag);
+            
+            // Position relatively
+            bag.position.set(0, 0, 0);
+            bag.rotation.set(0, 0, 0);
+            
+            // Store for later
+            attachedBag = {
+                mesh: bag,
+                originalParent: originalParent,
+                originalPosition: originalPosition,
+                originalRotation: originalRotation
+            };
+            
+            console.log("Bag attached to hand");
+        }
+        
+        // Function to detach the bag
+        function detachBag() {
+            if (!attachedBag) {
+                console.warn("No bag attached");
+                return;
+            }
+            
+            const bag = attachedBag.mesh;
+            
+            // Remove from hand
+            bag.parent.remove(bag);
+            
+            // Add back to scene
+            scene.add(bag);
+            
+            // Restore position
+            bag.position.copy(attachedBag.originalPosition);
+            bag.rotation.copy(attachedBag.originalRotation);
+            
+            // Clear reference
+            attachedBag = null;
+            
+            console.log("Bag detached");
+        }
+        
         // Function to update the balance visualization
         function updateBalanceUI(value) {
             document.getElementById('balanceValue').textContent = value.toFixed(2);
@@ -358,6 +475,42 @@
         // Set up animation selection
         document.getElementById('animSelect').addEventListener('change', function() {
             playAnimation(this.value);
+        });
+        
+        // Set up pickup buttons
+        document.getElementById('pickupLowBtn').addEventListener('click', function() {
+            if (animations['pickup_low']) {
+                playAnimation('pickup_low');
+                console.log("Playing pickup_low animation");
+            } else {
+                console.warn("pickup_low animation not found");
+            }
+        });
+        
+        document.getElementById('pickupHighBtn').addEventListener('click', function() {
+            if (animations['pickup_high']) {
+                playAnimation('pickup_high');
+                console.log("Playing pickup_high animation");
+            } else {
+                console.warn("pickup_high animation not found");
+            }
+        });
+        
+        // Set up bag attachment buttons
+        document.getElementById('attachBagBtn').addEventListener('click', function() {
+            if (rightHand && groundBag1) {
+                attachBagToHand(groundBag1, rightHand);
+            } else {
+                alert("Cannot attach bag: missing hand or bag reference");
+                console.warn("Missing hand or bag references:", {
+                    rightHand: rightHand !== null,
+                    groundBag1: groundBag1 !== null
+                });
+            }
+        });
+        
+        document.getElementById('detachBagBtn').addEventListener('click', function() {
+            detachBag();
         });
         
         // Set up balance slider
