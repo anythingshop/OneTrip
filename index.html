@@ -146,10 +146,34 @@
             border-radius: 25px;
             touch-action: none;
         }
+        /* Add second joystick for camera rotation */
+        #rotationJoystick {
+            position: absolute;
+            bottom: 80px;
+            right: 80px;
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 60px;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            z-index: 1001;
+            touch-action: none;
+        }
+        #rotationJoystickKnob {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 25px;
+            touch-action: none;
+        }
         #interactButton {
             position: absolute;
             bottom: 100px;
-            right: 100px;
+            right: 220px; /* Moved to make room for rotation joystick */
             width: 80px;
             height: 80px;
             background: rgba(255, 255, 255, 0.5);
@@ -305,6 +329,9 @@
         <div id="virtualJoystick">
             <div id="joystickKnob"></div>
         </div>
+        <div id="rotationJoystick">
+            <div id="rotationJoystickKnob"></div>
+        </div>
         <div id="interactButton">Pick</div>
     </div>
 
@@ -317,8 +344,8 @@
     
     <div id="helpOverlay">
         <h2>Controls</h2>
-        <p><strong>Touch Controls:</strong> Left joystick to move, right button to pick up bags</p>
-        <p><strong>Keyboard:</strong> WASD or arrows to move, E or SPACE to pick up, Q or R to drop</p>
+        <p><strong>Touch Controls:</strong> Left joystick to move, right joystick to rotate, button to pick up bags</p>
+        <p><strong>Keyboard/Mouse:</strong> WASD or arrows to move, mouse to rotate, E or SPACE to pick up, Q or R to drop</p>
         <p><strong>Balance:</strong> Moving quickly affects balance when carrying bags</p>
         <p><strong>Tips:</strong> Get close to bags to pick them up. Ground bags use right hand, car bags use left hand.</p>
         <button id="closeHelpBtn">Got it!</button>
@@ -483,6 +510,19 @@
         let joystickMax = 40; // Maximum distance joystick can move
         let joystickDirection = { x: 0, y: 0 }; // Normalized direction (-1 to 1)
         
+        // Add rotation joystick variables
+        let rotationJoystickActive = false;
+        let rotationJoystickPos = { x: 0, y: 0 };
+        let rotationJoystickOrigin = { x: 0, y: 0 };
+        let rotationJoystickMax = 40;
+        let rotationJoystickDirection = { x: 0, y: 0 };
+        
+        // Mouse look variables
+        let mouseLookActive = false;
+        let lastMouseX = 0;
+        let mouseRotationSensitivity = 0.003;
+        let touchRotationSensitivity = 0.05;
+        
         // DOM elements
         const balanceDirectionEl = document.getElementById('balanceDirection');
         const pickupFeedbackEl = document.getElementById('pickupFeedback');
@@ -491,6 +531,8 @@
         const weightClassEl = document.getElementById('weightClass');
         const joystickEl = document.getElementById('virtualJoystick');
         const joystickKnobEl = document.getElementById('joystickKnob');
+        const rotationJoystickEl = document.getElementById('rotationJoystick');
+        const rotationKnobEl = document.getElementById('rotationJoystickKnob');
         const interactButtonEl = document.getElementById('interactButton');
         
         // Interactive objects for touch/mouse
@@ -1390,7 +1432,7 @@
             const wasMoving = isMoving;
             isMoving = false;
             
-            // Get joystick or keyboard input
+            // Get joystick or keyboard input for movement
             let inputX = 0;
             let inputZ = 0;
             
@@ -1406,55 +1448,78 @@
             } 
             // Otherwise process keyboard input
             else {
-                // W or Up Arrow
+                // W or Up Arrow - Forward movement relative to camera
                 if (keysPressed['w'] || keysPressed['ArrowUp']) {
                     inputZ = -1;
                 }
-                // S or Down Arrow
+                // S or Down Arrow - Backward movement relative to camera
                 if (keysPressed['s'] || keysPressed['ArrowDown']) {
                     inputZ = 1;
                 }
-                // A or Left Arrow
+                // A or Left Arrow - Strafe left relative to camera
                 if (keysPressed['a'] || keysPressed['ArrowLeft']) {
                     inputX = -1;
                 }
-                // D or Right Arrow
+                // D or Right Arrow - Strafe right relative to camera
                 if (keysPressed['d'] || keysPressed['ArrowRight']) {
                     inputX = 1;
                 }
             }
             
-            // Process movement input
+            // Handle rotation separate from movement
+            // For rotation joystick (touch)
+            if (rotationJoystickActive) {
+                const rotationAmount = rotationJoystickDirection.x * touchRotationSensitivity;
+                characterTilt.rotation.y += rotationAmount;
+            }
+            // For mouse look (desktop)
+            else if (mouseLookActive && cameraMode === "thirdPerson") {
+                // Rotation handled in mouse move event
+            }
+            
+            // Process movement input (independent of rotation)
             if (Math.abs(inputX) > 0.1 || Math.abs(inputZ) > 0.1) {
                 isMoving = true;
-                
-                // Calculate target rotation based on input direction
-                if (Math.abs(inputX) > 0.1 || Math.abs(inputZ) > 0.1) {
-                    targetRotation = Math.atan2(inputX, -inputZ);
-                }
-                
-                // Smoothly rotate character towards target direction
-                const currentRotation = characterTilt.rotation.y;
-                let rotationDiff = targetRotation - currentRotation;
-                
-                // Normalize to the shortest rotation path
-                if (rotationDiff > Math.PI) rotationDiff -= Math.PI * 2;
-                if (rotationDiff < -Math.PI) rotationDiff += Math.PI * 2;
-                
-                // Apply rotation with smooth interpolation
-                characterTilt.rotation.y += rotationDiff * turnSpeed;
                 
                 // Calculate movement speed with acceleration/deceleration
                 const targetSpeed = maxMovementSpeed * Math.sqrt(inputX*inputX + inputZ*inputZ);
                 const speedDiff = targetSpeed - movementAcceleration;
-                movementAcceleration += speedDiff * 0.08; // Reduced from 0.1 for smoother acceleration
+                movementAcceleration += speedDiff * 0.08;
                 
-                // Calculate movement vector based on character's forward direction
-                moveDirection.set(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
-                moveDirection.multiplyScalar(movementAcceleration);
+                // Create movement vector based on current camera perspective
+                const cameraForward = new THREE.Vector3(0, 0, -1);
+                const cameraRight = new THREE.Vector3(1, 0, 0);
+                
+                if (cameraMode === "thirdPerson" && thirdPersonCamera) {
+                    // Get camera's forward and right vectors
+                    thirdPersonCamera.getWorldDirection(cameraForward);
+                    cameraForward.y = 0; // Keep movement on horizontal plane
+                    cameraForward.normalize();
+                    
+                    // Right is perpendicular to forward in horizontal plane
+                    cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraForward);
+                } else {
+                    // Use character's orientation for non-third-person
+                    cameraForward.set(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
+                    cameraRight.set(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
+                }
+                
+                // Calculate movement direction relative to camera
+                moveDirection.set(0, 0, 0)
+                    .add(cameraRight.multiplyScalar(inputX))
+                    .add(cameraForward.multiplyScalar(-inputZ));
+                
+                moveDirection.normalize().multiplyScalar(movementAcceleration);
                 
                 // Update character position
                 characterTilt.position.add(moveDirection);
+                
+                // If moving, rotate character mesh to face movement direction (keep characterTilt.rotation separate)
+                if (characterModel && moveDirection.length() > 0.01) {
+                    // Get current rotation of character mesh (not tilt container)
+                    const angle = Math.atan2(moveDirection.x, moveDirection.z);
+                    characterModel.rotation.y = angle;
+                }
                 
                 // Update animations based on movement state change - ONLY if state actually changed
                 if (!wasMoving && !lastMovementState) {
@@ -1462,7 +1527,6 @@
                     updateDebug("State change: idle → moving");
                     
                     if (attachedBags.length > 0) {
-                        // Use carry_walk_weight instead of a generic carry animation
                         setUpperBodyAnimation(`carry_walk_${carryWeightClass}`);
                     } else {
                         setUpperBodyAnimation('walk');
@@ -1489,7 +1553,6 @@
                     
                     if (!currentUpperBodyAnimation.startsWith('pickup')) {
                         if (attachedBags.length > 0) {
-                            // Use carry_stand_weight for standing still with bags
                             setUpperBodyAnimation(`carry_stand_${carryWeightClass}`);
                         } else {
                             setUpperBodyAnimation('idle');
@@ -1516,51 +1579,166 @@
         function setupJoystickControls() {
             const joystick = document.getElementById('virtualJoystick');
             const knob = document.getElementById('joystickKnob');
+            const rotationJoystick = document.getElementById('rotationJoystick');
+            const rotationKnob = document.getElementById('rotationJoystickKnob');
             const interact = document.getElementById('interactButton');
             
-            // Get joystick position
+            // Get joystick positions
             const joystickRect = joystick.getBoundingClientRect();
             joystickOrigin = {
                 x: joystickRect.left + joystickRect.width / 2,
                 y: joystickRect.top + joystickRect.height / 2
             };
             
-            // Touch events for joystick
+            const rotationJoystickRect = rotationJoystick.getBoundingClientRect();
+            rotationJoystickOrigin = {
+                x: rotationJoystickRect.left + rotationJoystickRect.width / 2,
+                y: rotationJoystickRect.top + rotationJoystickRect.height / 2
+            };
+            
+            // Touch events for movement joystick
             joystick.addEventListener('touchstart', function(e) {
                 e.preventDefault();
                 joystickActive = true;
                 updateJoystickPosition(e.touches[0].clientX, e.touches[0].clientY);
             });
             
-            document.addEventListener('touchmove', function(e) {
-                if (!joystickActive) return;
+            // Touch events for rotation joystick
+            rotationJoystick.addEventListener('touchstart', function(e) {
                 e.preventDefault();
-                updateJoystickPosition(e.touches[0].clientX, e.touches[0].clientY);
+                rotationJoystickActive = true;
+                updateRotationJoystickPosition(e.touches[0].clientX, e.touches[0].clientY);
+            });
+            
+            // Touch move for all joysticks
+            document.addEventListener('touchmove', function(e) {
+                e.preventDefault();
+                
+                // Handle multiple touches
+                for (let i = 0; i < e.touches.length; i++) {
+                    const touch = e.touches[i];
+                    
+                    // Check which joystick this touch belongs to
+                    const touchX = touch.clientX;
+                    const touchY = touch.clientY;
+                    
+                    // Distance to movement joystick origin
+                    const moveJoystickDist = Math.sqrt(
+                        Math.pow(touchX - joystickOrigin.x, 2) + 
+                        Math.pow(touchY - joystickOrigin.y, 2)
+                    );
+                    
+                    // Distance to rotation joystick origin
+                    const rotateJoystickDist = Math.sqrt(
+                        Math.pow(touchX - rotationJoystickOrigin.x, 2) + 
+                        Math.pow(touchY - rotationJoystickOrigin.y, 2)
+                    );
+                    
+                    // Update the appropriate joystick
+                    if (moveJoystickDist < rotateJoystickDist && joystickActive) {
+                        updateJoystickPosition(touchX, touchY);
+                    } else if (rotationJoystickActive) {
+                        updateRotationJoystickPosition(touchX, touchY);
+                    }
+                }
             });
             
             document.addEventListener('touchend', function(e) {
-                if (!joystickActive) return;
-                joystickActive = false;
-                resetJoystick();
+                // Need to check which joystick was released
+                if (e.touches.length === 0) {
+                    // All touches ended
+                    joystickActive = false;
+                    rotationJoystickActive = false;
+                    resetJoystick();
+                    resetRotationJoystick();
+                } else {
+                    // Some touches remain - figure out which joystick lost its touch
+                    let moveJoystickTouched = false;
+                    let rotateJoystickTouched = false;
+                    
+                    for (let i = 0; i < e.touches.length; i++) {
+                        const touch = e.touches[i];
+                        const touchX = touch.clientX;
+                        const touchY = touch.clientY;
+                        
+                        // Check distances to each joystick
+                        const moveJoystickDist = Math.sqrt(
+                            Math.pow(touchX - joystickOrigin.x, 2) + 
+                            Math.pow(touchY - joystickOrigin.y, 2)
+                        );
+                        
+                        const rotateJoystickDist = Math.sqrt(
+                            Math.pow(touchX - rotationJoystickOrigin.x, 2) + 
+                            Math.pow(touchY - rotationJoystickOrigin.y, 2)
+                        );
+                        
+                        if (moveJoystickDist < 150) moveJoystickTouched = true;
+                        if (rotateJoystickDist < 150) rotateJoystickTouched = true;
+                    }
+                    
+                    if (!moveJoystickTouched) {
+                        joystickActive = false;
+                        resetJoystick();
+                    }
+                    
+                    if (!rotateJoystickTouched) {
+                        rotationJoystickActive = false;
+                        resetRotationJoystick();
+                    }
+                }
             });
             
-            // Mouse events for joystick (for testing on desktop)
+            // Mouse events for testing
             joystick.addEventListener('mousedown', function(e) {
                 e.preventDefault();
                 joystickActive = true;
                 updateJoystickPosition(e.clientX, e.clientY);
             });
             
-            document.addEventListener('mousemove', function(e) {
-                if (!joystickActive) return;
+            rotationJoystick.addEventListener('mousedown', function(e) {
                 e.preventDefault();
-                updateJoystickPosition(e.clientX, e.clientY);
+                rotationJoystickActive = true;
+                updateRotationJoystickPosition(e.clientX, e.clientY);
+            });
+            
+            document.addEventListener('mousemove', function(e) {
+                if (joystickActive) {
+                    e.preventDefault();
+                    updateJoystickPosition(e.clientX, e.clientY);
+                }
+                if (rotationJoystickActive) {
+                    e.preventDefault();
+                    updateRotationJoystickPosition(e.clientX, e.clientY);
+                }
+                
+                // Handle mouse look if in 3rd person mode & mouse button pressed
+                if (mouseLookActive && cameraMode === "thirdPerson" && characterTilt) {
+                    const dx = e.clientX - lastMouseX;
+                    characterTilt.rotation.y -= dx * mouseRotationSensitivity;
+                    lastMouseX = e.clientX;
+                }
             });
             
             document.addEventListener('mouseup', function() {
-                if (!joystickActive) return;
                 joystickActive = false;
+                rotationJoystickActive = false;
+                mouseLookActive = false;
                 resetJoystick();
+                resetRotationJoystick();
+            });
+            
+            // Mouse right-click for rotation
+            renderer.domElement.addEventListener('contextmenu', function(e) {
+                e.preventDefault(); // Prevent right-click menu
+            });
+            
+            // Mouse down for rotation (right button)
+            renderer.domElement.addEventListener('mousedown', function(e) {
+                if (e.button === 2 && cameraMode === "thirdPerson") { // Right mouse button
+                    e.preventDefault();
+                    mouseLookActive = true;
+                    lastMouseX = e.clientX;
+                }
             });
             
             // Interact button for pickups
@@ -1577,6 +1755,21 @@
             // Camera toggle button
             document.getElementById('gameViewBtn').addEventListener('click', function() {
                 toggleCameraMode();
+            });
+            
+            // Update joystick origins on window resize
+            window.addEventListener('resize', function() {
+                const joystickRect = joystick.getBoundingClientRect();
+                joystickOrigin = {
+                    x: joystickRect.left + joystickRect.width / 2,
+                    y: joystickRect.top + joystickRect.height / 2
+                };
+                
+                const rotationJoystickRect = rotationJoystick.getBoundingClientRect();
+                rotationJoystickOrigin = {
+                    x: rotationJoystickRect.left + rotationJoystickRect.width / 2,
+                    y: rotationJoystickRect.top + rotationJoystickRect.height / 2
+                };
             });
         }
         
@@ -1598,6 +1791,7 @@
             };
             
             // Update joystick knob element position
+            const joystickKnobEl = document.getElementById('joystickKnob');
             joystickKnobEl.style.transform = `translate(calc(-50% + ${joystickPos.x}px), calc(-50% + ${joystickPos.y}px))`;
             
             // Calculate normalized direction for movement (-1 to 1)
@@ -1607,11 +1801,48 @@
             };
         }
         
+        // Update rotation joystick position
+        function updateRotationJoystickPosition(x, y) {
+            // Calculate distance from joystick center
+            const dx = x - rotationJoystickOrigin.x;
+            const dy = y - rotationJoystickOrigin.y;
+            const distance = Math.sqrt(dx*dx + dy*dy);
+            
+            // Limit joystick movement to maximum radius
+            const angle = Math.atan2(dy, dx);
+            const limitedDistance = Math.min(distance, rotationJoystickMax);
+            
+            // Calculate new joystick knob position
+            rotationJoystickPos = {
+                x: Math.cos(angle) * limitedDistance,
+                y: Math.sin(angle) * limitedDistance
+            };
+            
+            // Update joystick knob element position
+            const rotationKnobEl = document.getElementById('rotationJoystickKnob');
+            rotationKnobEl.style.transform = `translate(calc(-50% + ${rotationJoystickPos.x}px), calc(-50% + ${rotationJoystickPos.y}px))`;
+            
+            // Calculate normalized direction for rotation (-1 to 1)
+            rotationJoystickDirection = {
+                x: rotationJoystickPos.x / rotationJoystickMax,
+                y: rotationJoystickPos.y / rotationJoystickMax
+            };
+        }
+        
         // Reset joystick to center position
         function resetJoystick() {
             joystickPos = { x: 0, y: 0 };
             joystickDirection = { x: 0, y: 0 };
+            const joystickKnobEl = document.getElementById('joystickKnob');
             joystickKnobEl.style.transform = 'translate(-50%, -50%)';
+        }
+        
+        // Reset rotation joystick to center
+        function resetRotationJoystick() {
+            rotationJoystickPos = { x: 0, y: 0 };
+            rotationJoystickDirection = { x: 0, y: 0 };
+            const rotationKnobEl = document.getElementById('rotationJoystickKnob');
+            rotationKnobEl.style.transform = 'translate(-50%, -50%)';
         }
         
         // Toggle between third-person and orbit camera modes
