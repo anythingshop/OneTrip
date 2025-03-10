@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>One Trip - Revised Model Layout</title>
+    <title>One Trip - Animation Test</title>
     <style>
         body { margin: 0; overflow: hidden; background: #111; }
         #info {
@@ -27,26 +27,9 @@
             font-family: Arial, sans-serif;
             border-radius: 5px;
         }
-        select, button {
+        select, button, input {
             margin: 5px;
             padding: 5px;
-        }
-        #boneControls {
-            position: absolute;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.7);
-            color: white;
-            padding: 10px;
-            font-family: Arial, sans-serif;
-            border-radius: 5px;
-        }
-        #boneControls label {
-            display: block;
-            margin: 5px 0;
-        }
-        input[type="range"] {
-            width: 150px;
         }
     </style>
 </head>
@@ -54,27 +37,22 @@
     <div id="info">Loading models...</div>
     <div id="controls">
         <div>
-            <label for="animSelect">Animation: </label>
-            <select id="animSelect"></select>
+            <label for="upperBodyAnim">Upper Body Animation: </label>
+            <select id="upperBodyAnim"></select>
         </div>
-        <button id="gameView">Game View</button>
-        <button id="resetView">Reset View</button>
-    </div>
-
-    <div id="boneControls">
-        <h3>Shoulder Adjustment</h3>
-        <label>
-            Left Shoulder Rotation:
-            <input type="range" id="leftShoulderRotation" min="-1" max="1" step="0.05" value="0">
-            <span id="leftShoulderValue">0</span>
-        </label>
-        <label>
-            Right Shoulder Rotation:
-            <input type="range" id="rightShoulderRotation" min="-1" max="1" step="0.05" value="0">
-            <span id="rightShoulderValue">0</span>
-        </label>
-        <button id="applyRotation">Apply Rotation</button>
-        <div id="foundBones"></div>
+        <div>
+            <label for="lowerBodyAnim">Lower Body Animation: </label>
+            <select id="lowerBodyAnim"></select>
+        </div>
+        <div>
+            <label for="balanceSlider">Balance (0-1): </label>
+            <input type="range" id="balanceSlider" min="0" max="100" value="50">
+            <span id="balanceValue">0.5</span>
+        </div>
+        <div>
+            <button id="gameView">Game View</button>
+            <button id="resetView">Reset View</button>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
@@ -86,9 +64,9 @@
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87CEEB);
         
-        // Camera setup - intentionally farther back
+        // Camera setup
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 10, 30);
+        camera.position.set(0, 2, 5);
         
         // Renderer
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -98,7 +76,7 @@
         
         // Controls for testing
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.target.set(0, 2, 0);
+        controls.target.set(0, 1, 0);
         controls.update();
         
         // Lights
@@ -113,347 +91,173 @@
         scene.add(directionalLight);
         
         // Ground
-        const groundGeometry = new THREE.PlaneGeometry(100, 100);
+        const groundGeometry = new THREE.PlaneGeometry(10, 10);
         const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x7CFC00 });
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         scene.add(ground);
         
-        // Grid helper
-        const gridHelper = new THREE.GridHelper(100, 100);
-        scene.add(gridHelper);
-        
-        // Create text labels for each model
-        function createLabel(text, position) {
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.width = 256;
-            canvas.height = 64;
-            
-            context.fillStyle = 'rgba(0,0,0,0.7)';
-            context.fillRect(0, 0, canvas.width, canvas.height);
-            
-            context.font = '24px Arial';
-            context.fillStyle = 'white';
-            context.textAlign = 'center';
-            context.textBaseline = 'middle';
-            context.fillText(text, canvas.width/2, canvas.height/2);
-            
-            const texture = new THREE.CanvasTexture(canvas);
-            const material = new THREE.MeshBasicMaterial({
-                map: texture,
-                transparent: true,
-                side: THREE.DoubleSide
-            });
-            
-            const geometry = new THREE.PlaneGeometry(5, 1.25);
-            const mesh = new THREE.Mesh(geometry, material);
-            mesh.position.set(position.x, position.y + 5, position.z);
-            mesh.lookAt(camera.position);
-            
-            scene.add(mesh);
-            return mesh;
-        }
-
-        // Models to load - with revised positions and scales
-        const models = [
-            // Setup a logical game layout - character near car, car on path to house
-            { name: 'Character', file: './onetrip_maincharacter.glb', position: [-20, 0, 0], scale: 0.5, rotationY: 0 },
-            { name: 'Car', file: './car.glb', position: [-15, 0, 0], scale: 0.5, rotationY: Math.PI/2 },
-            { name: 'House', file: './house.glb', position: [20, 0, 0], scale: 0.5, rotationY: 0 },
-            
-            // Place bags near car
-            { name: 'Bag 1', file: './newbag.glb', position: [-16, 0, 2], scale: 0.4, rotationY: 0 },
-            { name: 'Bag 2', file: './bag2.glb', position: [-14, 0, 2], scale: 0.4, rotationY: 0 },
-            
-            // Environment objects properly spaced
-            { name: 'Tree', file: './tree.glb', position: [-10, 0, 10], scale: 0.5, rotationY: 0 },
-            { name: 'Rocks', file: './rocks.glb', position: [5, 0, 10], scale: 0.5, rotationY: 0 },
-            { name: 'Leaves', file: './leaves.glb', position: [0, 0, -10], scale: 0.5, rotationY: 0 }
-        ];
-
-        // Shoulder bone references
-        let leftShoulder = null;
-        let rightShoulder = null;
-        let shoulderBones = [];
-        let originalRotations = {};
-
-        // Load models
-        const loader = new THREE.GLTFLoader();
-        let loadedCount = 0;
-        let characterModel;
+        // Animation variables
         let mixer;
         let animations = [];
+        let upperBodyActions = {};
+        let lowerBodyActions = {};
+        let currentUpperBodyAction = null;
+        let currentLowerBodyAction = null;
         
-        models.forEach(model => {
-            // Create label for this model
-            const labelMesh = createLabel(model.name, {
-                x: model.position[0],
-                y: model.position[1],
-                z: model.position[2]
-            });
+        // Load character model
+        const loader = new THREE.GLTFLoader();
+        loader.load(
+            './onetrip_maincharacter.glb',
+            (gltf) => {
+                const model = gltf.scene;
+                model.scale.set(0.5, 0.5, 0.5);
+                model.position.set(0, 0, 0);
+                
+                model.traverse(node => {
+                    if (node.isMesh) {
+                        node.castShadow = true;
+                        node.receiveShadow = true;
+                    }
+                });
+                
+                scene.add(model);
+                
+                // Set up animation mixer
+                mixer = new THREE.AnimationMixer(model);
+                animations = gltf.animations;
+                
+                // Log all animations
+                console.log("Available animations:", animations.map(a => a.name));
+                
+                // Populate animation dropdowns
+                const upperSelect = document.getElementById('upperBodyAnim');
+                const lowerSelect = document.getElementById('lowerBodyAnim');
+                
+                animations.forEach((anim, index) => {
+                    // Add to upper body dropdown
+                    const upperOption = document.createElement('option');
+                    upperOption.value = anim.name;
+                    upperOption.textContent = anim.name;
+                    upperSelect.appendChild(upperOption);
+                    
+                    // Add to lower body dropdown
+                    const lowerOption = document.createElement('option');
+                    lowerOption.value = anim.name;
+                    lowerOption.textContent = anim.name;
+                    lowerSelect.appendChild(lowerOption);
+                    
+                    // Create actions
+                    const action = mixer.clipAction(anim);
+                    
+                    // Store actions by name
+                    const animName = anim.name;
+                    upperBodyActions[animName] = action.clone();
+                    upperBodyActions[animName].name = animName;
+                    lowerBodyActions[animName] = action.clone();
+                    lowerBodyActions[animName].name = animName;
+                    
+                    // Set up mask for upper body
+                    const upperBodyBones = ["mixamorigSpine", "mixamorigSpine1", "mixamorigSpine2", 
+                                           "mixamorigNeck", "mixamorigHead", "mixamorigLeftShoulder", 
+                                           "mixamorigLeftArm", "mixamorigRightShoulder", "mixamorigRightArm"];
+                    
+                    // Set up mask for lower body
+                    const lowerBodyBones = ["mixamorigHips", "mixamorigLeftUpLeg", "mixamorigLeftLeg", 
+                                           "mixamorigRightUpLeg", "mixamorigRightLeg"];
+                    
+                    // Apply masks to actions
+                    upperBodyActions[animName].setEffectiveWeight(1);
+                    lowerBodyActions[animName].setEffectiveWeight(1);
+                    
+                    // Default value selection
+                    if (animName === 'walk') {
+                        upperSelect.value = animName;
+                        lowerSelect.value = animName;
+                    }
+                    if (animName === 'stumble_lowerbody') {
+                        lowerSelect.value = animName;
+                    }
+                });
+                
+                // Set default animations
+                setUpperBodyAnimation('walk');
+                setLowerBodyAnimation('walk');
+                
+                // Update info
+                document.getElementById('info').textContent = "Character loaded - Test animation mixing";
+            },
+            undefined,
+            (error) => {
+                console.error("Error loading character:", error);
+                document.getElementById('info').textContent = "Error loading character model";
+            }
+        );
+        
+        // Functions to change animations
+        function setUpperBodyAnimation(name) {
+            if (!upperBodyActions[name]) return;
             
-            loader.load(
-                model.file,
-                (gltf) => {
-                    const modelObj = gltf.scene;
-                    
-                    // Apply scale and position
-                    modelObj.scale.set(model.scale, model.scale, model.scale);
-                    modelObj.position.set(...model.position);
-                    
-                    // Apply rotation if specified
-                    if (model.rotationY !== undefined) {
-                        modelObj.rotation.y = model.rotationY;
-                    }
-                    
-                    // Enable shadows
-                    modelObj.traverse(node => {
-                        if (node.isMesh) {
-                            node.castShadow = true;
-                            node.receiveShadow = true;
-                        }
-                    });
-                    
-                    scene.add(modelObj);
-                    
-                    // Store model reference for later use
-                    window[model.name.toLowerCase().replace(' ', '_')] = modelObj;
-                    
-                    // Set up character animations
-                    if (model.name === 'Character') {
-                        characterModel = modelObj;
-                        
-                        // Create animation mixer
-                        mixer = new THREE.AnimationMixer(modelObj);
-                        
-                        // Store all animations and add to dropdown
-                        animations = gltf.animations;
-                        const select = document.getElementById('animSelect');
-                        
-                        // Add animations to dropdown
-                        animations.forEach((anim, index) => {
-                            const option = document.createElement('option');
-                            option.value = index;
-                            option.textContent = anim.name;
-                            select.appendChild(option);
-                            
-                            // Select walk animation by default
-                            if (anim.name === 'walk') {
-                                select.value = index;
-                            }
-                        });
-                        
-                        // Play walk animation by default
-                        const walkAnim = animations.find(anim => anim.name === 'walk');
-                        if (walkAnim) {
-                            const action = mixer.clipAction(walkAnim);
-                            action.play();
-                        }
-                        
-                        // Find shoulder bones
-                        findShoulderBones(modelObj);
-                    }
-                    
-                    // Update loaded count
-                    loadedCount++;
-                    document.getElementById('info').textContent = 
-                        `Loaded ${loadedCount}/${models.length} models`;
-                    
-                    if (loadedCount === models.length) {
-                        document.getElementById('info').textContent = 
-                            `All models loaded - Use controls to test animations and views`;
-                    }
-                },
-                (xhr) => {
-                    console.log(`${model.name} ${Math.round(xhr.loaded / xhr.total * 100)}% loaded`);
-                },
-                (error) => {
-                    console.error(`Error loading ${model.name}:`, error);
-                    loadedCount++;
-                    document.getElementById('info').textContent += 
-                        `\nError loading ${model.name}`;
-                }
-            );
+            if (currentUpperBodyAction) {
+                currentUpperBodyAction.fadeOut(0.5);
+            }
+            
+            currentUpperBodyAction = upperBodyActions[name];
+            currentUpperBodyAction.reset();
+            currentUpperBodyAction.fadeIn(0.5);
+            currentUpperBodyAction.play();
+            
+            console.log(`Playing upper body animation: ${name}`);
+        }
+        
+        function setLowerBodyAnimation(name) {
+            if (!lowerBodyActions[name]) return;
+            
+            if (currentLowerBodyAction) {
+                currentLowerBodyAction.fadeOut(0.5);
+            }
+            
+            currentLowerBodyAction = lowerBodyActions[name];
+            currentLowerBodyAction.reset();
+            currentLowerBodyAction.fadeIn(0.5);
+            currentLowerBodyAction.play();
+            
+            console.log(`Playing lower body animation: ${name}`);
+        }
+        
+        // UI Controls
+        document.getElementById('upperBodyAnim').addEventListener('change', function() {
+            setUpperBodyAnimation(this.value);
         });
         
-        // Find shoulder bones in the character model
-        function findShoulderBones(model) {
-            const foundBonesDiv = document.getElementById('foundBones');
-            foundBonesDiv.innerHTML = '<h4>Searching for bones...</h4>';
-            
-            let bonesFound = [];
-            
-            model.traverse(node => {
-                // Look for common shoulder bone naming patterns
-                if (node.isBone) {
-                    const name = node.name.toLowerCase();
-                    
-                    // Collect all bone names for debugging
-                    bonesFound.push(node.name);
-                    
-                    // Try to identify shoulder bones
-                    if (name.includes('shoulder') || 
-                        name.includes('clavicle') || 
-                        name.includes('collar') ||
-                        (name.includes('arm') && name.includes('upper')) ||
-                        (name.includes('arm') && name.includes('left')) ||
-                        (name.includes('arm') && name.includes('right'))) {
-                        
-                        // Store original rotation
-                        originalRotations[node.name] = {
-                            x: node.rotation.x,
-                            y: node.rotation.y,
-                            z: node.rotation.z
-                        };
-                        
-                        // Sort into left and right shoulders
-                        if (name.includes('left')) {
-                            leftShoulder = node;
-                            console.log('Found left shoulder:', node.name);
-                        } 
-                        else if (name.includes('right')) {
-                            rightShoulder = node;
-                            console.log('Found right shoulder:', node.name);
-                        }
-                        // If not clearly labeled, make a best guess
-                        else {
-                            shoulderBones.push(node);
-                            console.log('Found potential shoulder bone:', node.name);
-                        }
-                    }
-                }
-            });
-            
-            // Display found bones
-            if (bonesFound.length > 0) {
-                foundBonesDiv.innerHTML = '<h4>Bones found in model:</h4>';
-                foundBonesDiv.innerHTML += `<div style="max-height: 150px; overflow-y: auto;"><pre>${bonesFound.join('\n')}</pre></div>`;
-                
-                if (leftShoulder || rightShoulder || shoulderBones.length > 0) {
-                    foundBonesDiv.innerHTML += '<h4>Potential shoulder bones:</h4>';
-                    if (leftShoulder) foundBonesDiv.innerHTML += `<div>Left shoulder: ${leftShoulder.name}</div>`;
-                    if (rightShoulder) foundBonesDiv.innerHTML += `<div>Right shoulder: ${rightShoulder.name}</div>`;
-                    shoulderBones.forEach(bone => {
-                        foundBonesDiv.innerHTML += `<div>Other: ${bone.name}</div>`;
-                    });
-                    
-                    // If we've found shoulders but not both, make a best guess
-                    if ((leftShoulder && !rightShoulder) || (!leftShoulder && rightShoulder)) {
-                        if (shoulderBones.length > 0) {
-                            if (!leftShoulder) {
-                                leftShoulder = shoulderBones[0];
-                                foundBonesDiv.innerHTML += `<div>Guessing left shoulder: ${leftShoulder.name}</div>`;
-                            }
-                            if (!rightShoulder && shoulderBones.length > 1) {
-                                rightShoulder = shoulderBones[1];
-                                foundBonesDiv.innerHTML += `<div>Guessing right shoulder: ${rightShoulder.name}</div>`;
-                            }
-                        }
-                    }
-                    
-                    // Set initial outward rotation as example
-                    applyShoulderRotation(0.2, 0.2);
-                } 
-                else {
-                    foundBonesDiv.innerHTML += '<div>No shoulder bones found. Try adjusting by model name.</div>';
-                }
-            } 
-            else {
-                foundBonesDiv.innerHTML = '<h4>No bones found in model.</h4>';
-            }
-        }
+        document.getElementById('lowerBodyAnim').addEventListener('change', function() {
+            setLowerBodyAnimation(this.value);
+        });
         
-        // Apply rotation to shoulder bones
-        function applyShoulderRotation(leftRotation, rightRotation) {
-            // Update UI values
-            document.getElementById('leftShoulderValue').textContent = leftRotation.toFixed(2);
-            document.getElementById('rightShoulderValue').textContent = rightRotation.toFixed(2);
+        document.getElementById('balanceSlider').addEventListener('input', function() {
+            const value = this.value / 100;
+            document.getElementById('balanceValue').textContent = value.toFixed(2);
             
-            // Apply to left shoulder
-            if (leftShoulder) {
-                // Get original rotation
-                const orig = originalRotations[leftShoulder.name] || { x: 0, y: 0, z: 0 };
-                
-                // Apply rotation - typically we'd want to rotate around the vertical axis
-                // since we want to rotate the arms "outward" from the body
-                leftShoulder.rotation.set(
-                    orig.x,
-                    orig.y - leftRotation, // Negative for left shoulder to rotate outward
-                    orig.z
-                );
-            }
-            
-            // Apply to right shoulder
-            if (rightShoulder) {
-                // Get original rotation
-                const orig = originalRotations[rightShoulder.name] || { x: 0, y: 0, z: 0 };
-                
-                // Apply rotation
-                rightShoulder.rotation.set(
-                    orig.x,
-                    orig.y + rightRotation, // Positive for right shoulder to rotate outward
-                    orig.z
-                );
-            }
-        }
-        
-        // Set up animation selection
-        document.getElementById('animSelect').addEventListener('change', function() {
-            if (!mixer || !animations) return;
-            
-            // Stop all running animations
-            mixer.stopAllAction();
-            
-            // Play selected animation
-            const index = parseInt(this.value);
-            if (animations[index]) {
-                const action = mixer.clipAction(animations[index]);
-                action.reset().play();
-                console.log(`Playing animation: ${animations[index].name}`);
+            // Apply stumble animation to lower body when balance is low or high
+            if (value < 0.2 || value > 0.8) {
+                setLowerBodyAnimation('stumble_lowerbody');
+            } else {
+                setLowerBodyAnimation('walk');
             }
         });
         
-        // Camera view buttons
+        // Camera controls
         document.getElementById('gameView').addEventListener('click', () => {
-            // Set camera to game-like third person view
-            camera.position.set(-22, 3, 5);
-            controls.target.set(-20, 1, 0); // Look at character
+            camera.position.set(0, 1.5, 3);
+            controls.target.set(0, 1, 0);
             controls.update();
         });
         
         document.getElementById('resetView').addEventListener('click', () => {
-            // Reset to overview
-            camera.position.set(0, 20, 30);
-            controls.target.set(0, 0, 0);
+            camera.position.set(0, 2, 5);
+            controls.target.set(0, 1, 0);
             controls.update();
-        });
-        
-        // Shoulder rotation controls
-        document.getElementById('leftShoulderRotation').addEventListener('input', function() {
-            const leftRotation = parseFloat(this.value);
-            const rightRotation = parseFloat(document.getElementById('rightShoulderRotation').value);
-            applyShoulderRotation(leftRotation, rightRotation);
-        });
-        
-        document.getElementById('rightShoulderRotation').addEventListener('input', function() {
-            const leftRotation = parseFloat(document.getElementById('leftShoulderRotation').value);
-            const rightRotation = parseFloat(this.value);
-            applyShoulderRotation(leftRotation, rightRotation);
-        });
-        
-        document.getElementById('applyRotation').addEventListener('click', function() {
-            const leftRotation = parseFloat(document.getElementById('leftShoulderRotation').value);
-            const rightRotation = parseFloat(document.getElementById('rightShoulderRotation').value);
-            
-            // Apply with emphasis
-            applyShoulderRotation(leftRotation, rightRotation);
-            
-            alert(`Rotation applied: Left ${leftRotation.toFixed(2)}, Right ${rightRotation.toFixed(2)}`);
-            
-            // This is informative but may not always work with animation systems
-            console.log('Note: Bone rotations may be overridden by animation data.');
         });
         
         // Animation loop
@@ -463,16 +267,8 @@
             
             const delta = clock.getDelta();
             
-            // Update character animations
+            // Update animations
             if (mixer) mixer.update(delta);
-            
-            // Update label orientations
-            scene.children.forEach(child => {
-                if (child.material && child.material.map && 
-                    child.material.map.isCanvasTexture) {
-                    child.lookAt(camera.position);
-                }
-            });
             
             renderer.render(scene, camera);
         }
