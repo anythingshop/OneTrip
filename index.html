@@ -1304,6 +1304,55 @@
             setLowerBodyAnimation('walk');
             
             console.log(`Set up ${clipsList.length} animations for mixing`);
+            
+            // Preload all animations to avoid freezing
+            preloadAnimations();
+        }
+        
+        // Preload animations to avoid freezing when first used
+        function preloadAnimations() {
+            console.log("Preloading animations...");
+            
+            // Preload all carry animations by creating them at startup
+            const weightClasses = ["light", "medium", "heavy"];
+            const animTypes = ["walk", "idle", "run"];
+            
+            for (const weight of weightClasses) {
+                for (const type of animTypes) {
+                    const animName = `carry_${type}_${weight}`;
+                    
+                    // Just access the animation to ensure it's created
+                    if (!upperBodyActions[animName] && upperBodyClips[animName]) {
+                        console.log(`Preloading animation: ${animName}`);
+                        
+                        // Create action but don't play it
+                        const action = mixer.clipAction(upperBodyClips[animName]);
+                        action.weight = 0; // Zero weight = no visible effect
+                        action.play(); // Playing with zero weight = preload only
+                        
+                        // Store for future use
+                        upperBodyActions[animName] = action;
+                    }
+                }
+            }
+            
+            // Also preload stumble animations
+            const stumbleAnims = ["stumble_lowerbody", "stumble_fall"];
+            for (const anim of stumbleAnims) {
+                if (!lowerBodyActions[anim] && lowerBodyClips[anim]) {
+                    console.log(`Preloading animation: ${anim}`);
+                    
+                    // Create action but don't play it
+                    const action = mixer.clipAction(lowerBodyClips[anim]);
+                    action.weight = 0;
+                    action.play();
+                    
+                    // Store for future use
+                    lowerBodyActions[anim] = action;
+                }
+            }
+            
+            console.log("Animation preloading complete");
         }
         
         // Update the animation selection and carrying code to use correct animation naming pattern
@@ -1682,9 +1731,35 @@
                     updateDebug("Balance system enabled - avoid tipping over!");
                 }
                 
-                // Set appropriate animation
-                if (currentAnimation && !currentAnimation.name.startsWith('carry')) {
-                    setAnimation("carry_idle");
+                // Determine weight class based on total weight
+                let newWeightClass = "none";
+                
+                if (attachedBags.length > 0) {
+                    if (totalBagWeight <= 3) {
+                        newWeightClass = "light";
+                    } else if (totalBagWeight <= 7) {
+                        newWeightClass = "medium";
+                    } else {
+                        newWeightClass = "heavy";
+                    }
+                }
+                
+                // Update weight class display
+                if (weightClassEl) {
+                    weightClassEl.textContent = newWeightClass.charAt(0).toUpperCase() + newWeightClass.slice(1);
+                }
+                
+                // If weight class changed, update the animation
+                if (newWeightClass !== carryWeightClass) {
+                    updateDebug(`Carry weight class changed: ${carryWeightClass} → ${newWeightClass}`);
+                    carryWeightClass = newWeightClass;
+                    
+                    // Update animation based on movement state
+                    if (isMoving) {
+                        forcedAnimationUpdate(`carry_walk_${carryWeightClass}`);
+                    } else {
+                        forcedAnimationUpdate(`carry_idle_${carryWeightClass}`);
+                    }
                 }
                 
                 // Show balance UI
@@ -1707,6 +1782,9 @@
                     document.getElementById('balanceToggle').classList.remove('active');
                 }
                 
+                // Reset weight class
+                carryWeightClass = "none";
+                
                 // Hide balance UI
                 const balanceUI = document.getElementById('balanceUI');
                 if (balanceUI) balanceUI.style.display = 'none';
@@ -1715,8 +1793,9 @@
                 balanceValue = 0.5;
                 
                 // Switch back to regular animations
-                if (currentAnimation && currentAnimation.name.startsWith('carry')) {
-                    setAnimation("idle");
+                if (currentUpperBodyAnimation.startsWith('carry')) {
+                    setUpperBodyAnimation('idle');
+                    setLowerBodyAnimation('idle');
                 }
             }
         }
@@ -2209,14 +2288,14 @@
             
             // Update character animations based on movement state
             if (isMoving) {
-                // Set appropriate animations for moving
-                        if (attachedBags.length > 0) {
-                    // Check current animation to avoid unnecessary changes
-                    if (!currentUpperBodyAnimation.startsWith('carry')) {
-                        setUpperBodyAnimation('walk'); // Will be converted to appropriate carry animation
-                        setLowerBodyAnimation('walk');
+                // Set appropriate animations for moving based on weight class
+                if (attachedBags.length > 0) {
+                    // Use weight-based carry animations
+                    const animName = `carry_walk_${carryWeightClass}`;
+                    if (currentUpperBodyAnimation !== animName) {
+                        forcedAnimationUpdate(animName);
                     }
-                        } else {
+                } else {
                     // Regular walking animation when not carrying
                     if (currentUpperBodyAnimation !== 'walk') {
                         setUpperBodyAnimation('walk');
@@ -2226,10 +2305,10 @@
             } else {
                 // Set appropriate animations for idle
                 if (attachedBags.length > 0) {
-                    // Check current animation to avoid unnecessary changes
-                    if (!currentUpperBodyAnimation.startsWith('carry')) {
-                        setUpperBodyAnimation('idle'); // Will be converted to appropriate carry animation
-                        setLowerBodyAnimation('idle');
+                    // Use weight-based carry animations for idle
+                    const animName = `carry_idle_${carryWeightClass}`;
+                    if (currentUpperBodyAnimation !== animName) {
+                        forcedAnimationUpdate(animName);
                     }
                 } else {
                     // Regular idle animation when not carrying
@@ -2962,12 +3041,12 @@
             
             // Update character animations based on movement state
             if (isMoving) {
-                // Set appropriate animations for moving
+                // Set appropriate animations for moving based on weight class
                 if (attachedBags.length > 0) {
-                    // Check current animation to avoid unnecessary changes
-                    if (!currentUpperBodyAnimation.startsWith('carry')) {
-                        setUpperBodyAnimation('walk'); // Will be converted to appropriate carry animation
-                        setLowerBodyAnimation('walk');
+                    // Use weight-based carry animations
+                    const animName = `carry_walk_${carryWeightClass}`;
+                    if (currentUpperBodyAnimation !== animName) {
+                        forcedAnimationUpdate(animName);
                     }
                 } else {
                     // Regular walking animation when not carrying
@@ -2979,10 +3058,10 @@
             } else {
                 // Set appropriate animations for idle
                 if (attachedBags.length > 0) {
-                    // Check current animation to avoid unnecessary changes
-                    if (!currentUpperBodyAnimation.startsWith('carry')) {
-                        setUpperBodyAnimation('idle'); // Will be converted to appropriate carry animation
-                        setLowerBodyAnimation('idle');
+                    // Use weight-based carry animations for idle
+                    const animName = `carry_idle_${carryWeightClass}`;
+                    if (currentUpperBodyAnimation !== animName) {
+                        forcedAnimationUpdate(animName);
                     }
                 } else {
                     // Regular idle animation when not carrying
