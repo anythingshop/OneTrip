@@ -256,6 +256,9 @@
         let balanceValue = 0.5;
         let currentBalanceDirection = "center"; // left, center, right
         
+        // Character root object for rotation
+        let characterRoot = null;
+        
         // Reference to hand bones for attaching bags
         let leftHand = null;
         let rightHand = null;
@@ -319,6 +322,7 @@
                     // Set up character animations and bone references
                     if (model.name === 'Character') {
                         characterModel = modelObj;
+                        characterRoot = modelObj;
                         
                         // Create animation mixer
                         mixer = new THREE.AnimationMixer(modelObj);
@@ -365,43 +369,6 @@
                 }
             );
         });
-        
-        // Create a mirrored animation by flipping position and rotation values
-        function createMirroredAnimation(originalClip, newName) {
-            // Clone the original animation
-            const mirroredTracks = [];
-            
-            // Process each track in the original clip
-            originalClip.tracks.forEach(track => {
-                const trackName = track.name;
-                const values = track.values.slice(); // Clone the values
-                
-                // For position tracks (X axis movement), invert X values
-                if (trackName.endsWith('.position')) {
-                    // Position tracks have [x,y,z, x,y,z, ...] format
-                    for (let i = 0; i < values.length; i += 3) {
-                        values[i] = -values[i]; // Invert X position
-                    }
-                }
-                
-                // For quaternion tracks (rotations), we need to flip appropriate components
-                if (trackName.endsWith('.quaternion')) {
-                    // Quaternion tracks have [x,y,z,w, x,y,z,w, ...] format
-                    // To mirror, we invert Y and Z components
-                    for (let i = 0; i < values.length; i += 4) {
-                        values[i + 1] = -values[i + 1]; // Invert Y
-                        values[i + 2] = -values[i + 2]; // Invert Z
-                    }
-                }
-                
-                // Create a new track with mirrored values
-                const mirroredTrack = new THREE.KeyframeTrack(trackName, track.times, values);
-                mirroredTracks.push(mirroredTrack);
-            });
-            
-            // Create the mirrored animation clip
-            return new THREE.AnimationClip(newName, originalClip.duration, mirroredTracks);
-        }
         
         // Set up animation mixing system
         function setupAnimationMixing(clipsList) {
@@ -485,16 +452,14 @@
                     lowerSelect.value = clip.name;
                 }
                 
-                // Create mirrored animation for stumble_lowerbody
+                // Create stumble actions for both directions
                 if (clip.name === 'stumble_lowerbody') {
-                    // Create mirrored version for left stumble
-                    const mirroredClip = createMirroredAnimation(lowerBodyClip, 'stumble_lowerbody_left_lower');
-                    
-                    // Store the original as right stumble and the mirrored as left stumble
                     stumbleRightAction = lowerBodyActions[clip.name];
-                    stumbleLeftAction = mixer.clipAction(mirroredClip);
                     
-                    console.log('Created mirrored stumble animation for left direction');
+                    // For left direction, we'll use the same animation but rotate the character
+                    stumbleLeftAction = lowerBodyActions[clip.name];
+                    
+                    console.log('Set up stumble animations for both directions');
                 }
             });
             
@@ -549,27 +514,40 @@
             console.log(`Playing lower body animation: ${name}`);
         }
         
-        // Function to play stumble animation based on balance direction
+        // Function to play stumble animation based on direction
         function playStumbleAnimation(direction) {
             // Fade out current lower body animation
             if (currentLowerBodyAction) {
                 currentLowerBodyAction.fadeOut(0.3);
             }
             
-            let action;
-            if (direction === 'left') {
-                action = stumbleLeftAction;
-                console.log('Playing left stumble animation');
-            } else {
-                action = stumbleRightAction;
-                console.log('Playing right stumble animation');
+            // Reset character rotation for fresh start
+            if (characterRoot) {
+                characterRoot.rotation.y = 0; // Reset to original orientation
             }
             
-            if (action) {
-                action.reset();
-                action.fadeIn(0.3);
-                action.play();
-                currentLowerBodyAction = action;
+            if (direction === 'left') {
+                // Play the animation
+                stumbleRightAction.reset();
+                stumbleRightAction.fadeIn(0.3);
+                stumbleRightAction.play();
+                currentLowerBodyAction = stumbleRightAction;
+                
+                // For left direction, we'll rotate the character to flip the effect
+                if (characterRoot) {
+                    // Rotate 180 degrees to flip the direction
+                    characterRoot.rotation.y = Math.PI;
+                }
+                
+                console.log('Playing left stumble (flipped character)');
+            } else {
+                // For right direction, use the normal animation
+                stumbleRightAction.reset();
+                stumbleRightAction.fadeIn(0.3);
+                stumbleRightAction.play();
+                currentLowerBodyAction = stumbleRightAction;
+                
+                console.log('Playing right stumble animation');
             }
         }
         
@@ -607,7 +585,7 @@
             originalParent.remove(bag);
             hand.add(bag);
             
-            // Reset local transform
+            // Position relative to hand
             bag.position.set(0, 0, 0);
             bag.rotation.set(0, 0, 0);
             
@@ -711,6 +689,10 @@
                     } else if (newDirection === "right") {
                         playStumbleAnimation("right");
                     } else {
+                        // Return to normal position
+                        if (characterRoot) {
+                            characterRoot.rotation.y = 0;
+                        }
                         setLowerBodyAnimation('walk');
                     }
                     
