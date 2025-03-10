@@ -83,6 +83,15 @@
             font-weight: bold;
             text-align: center;
         }
+        .bagCategory {
+            margin-top: 10px;
+            border-top: 1px solid #444;
+            padding-top: 5px;
+        }
+        #carriedBags {
+            margin-top: 10px;
+            color: #4CAF50;
+        }
     </style>
 </head>
 <body>
@@ -102,10 +111,37 @@
     
     <div id="pickupControls">
         <h3>Pickup Actions</h3>
-        <button id="pickupLowBtn">Pickup Low (Ground)</button>
-        <button id="pickupHighBtn">Pickup High (Car)</button>
-        <button id="attachBagBtn">Attach Bag to Hand</button>
-        <button id="detachBagBtn">Detach Bag</button>
+        
+        <div class="bagCategory">
+            <h4>Light Bags:</h4>
+            <button id="pickupLowLightBtn">Pickup Low Light</button>
+            <button id="pickupHighLightBtn">Pickup High Light</button>
+        </div>
+        
+        <div class="bagCategory">
+            <h4>Medium Bags:</h4>
+            <button id="pickupLowMediumBtn">Pickup Low Medium</button>
+            <button id="pickupHighMediumBtn">Pickup High Medium</button>
+        </div>
+        
+        <div class="bagCategory">
+            <h4>Heavy Bags:</h4>
+            <button id="pickupLowHeavyBtn">Pickup Low Heavy</button>
+            <button id="pickupHighHeavyBtn">Pickup High Heavy</button>
+        </div>
+        
+        <div class="bagCategory">
+            <h4>Hand Controls:</h4>
+            <button id="attachLeftHandBtn">Use Left Hand</button>
+            <button id="attachRightHandBtn">Use Right Hand</button>
+            <button id="detachAllBagsBtn">Drop All Bags</button>
+        </div>
+        
+        <div id="carriedBags">
+            <h4>Currently Carrying:</h4>
+            <div id="leftHandStatus">Left Hand: Empty</div>
+            <div id="rightHandStatus">Right Hand: Empty</div>
+        </div>
     </div>
     
     <div id="balanceUI">
@@ -231,12 +267,12 @@
             { name: 'House', file: './house.glb', position: [0, 0, 30], scale: 0.5, rotationY: Math.PI },
             
             // Bags ON TOP of the car - moved further back (more negative Z)
-            { name: 'Car Bag 1', file: './newbag.glb', position: [-5, 3.5, -21], scale: 0.4, rotationY: 0 },
-            { name: 'Car Bag 2', file: './bag2.glb', position: [-5, 3.5, -22], scale: 0.4, rotationY: Math.PI/4 },
+            { name: 'Car Bag 1 (Light)', file: './newbag.glb', position: [-5, 3.5, -21], scale: 0.3, rotationY: 0, weight: 'light' },
+            { name: 'Car Bag 2 (Medium)', file: './bag2.glb', position: [-5, 3.5, -22], scale: 0.4, rotationY: Math.PI/4, weight: 'medium' },
             
             // Bags on the GROUND near character
-            { name: 'Ground Bag 1', file: './newbag.glb', position: [-13, 0, -19], scale: 0.4, rotationY: 0 },
-            { name: 'Ground Bag 2', file: './bag2.glb', position: [-14, 0, -21], scale: 0.4, rotationY: Math.PI/4 },
+            { name: 'Ground Bag 1 (Medium)', file: './newbag.glb', position: [-13, 0, -19], scale: 0.4, rotationY: 0, weight: 'medium' },
+            { name: 'Ground Bag 2 (Heavy)', file: './bag2.glb', position: [-14, 0, -21], scale: 0.5, rotationY: Math.PI/4, weight: 'heavy' },
             
             // Environment objects properly spaced along the path
             { name: 'Tree', file: './tree.glb', position: [-10, 0, 0], scale: 0.5, rotationY: 0 },
@@ -250,32 +286,52 @@
         let animations = [];
         let upperBodyActions = {};
         let lowerBodyActions = {};
+        let mirroredUpperBodyActions = {};
+        let mirroredLowerBodyActions = {};
         let currentUpperBodyAction = null;
         let currentLowerBodyAction = null;
+        let currentUpperBodyAnimation = 'walk';
+        let currentLowerBodyAnimation = 'walk';
         let balanceEnabled = false;
         let balanceValue = 0.5;
         let currentBalanceDirection = "center"; // left, center, right
-        
-        // Character root object for rotation
-        let characterRoot = null;
         
         // Reference to hand bones for attaching bags
         let leftHand = null;
         let rightHand = null;
         
         // References to bags for attaching
-        let groundBag1 = null;
-        let groundBag2 = null;
-        let carBag1 = null;
-        let carBag2 = null;
+        let allBags = {};
+        let lightBags = [];
+        let mediumBags = [];
+        let heavyBags = [];
+
+        // Selected bag and hand for pickup
+        let selectedBag = null;
+        let useLeftHand = false;
+
+        // Currently attached bags
+        let attachedBags = {
+            leftHand: null,
+            rightHand: null
+        };
+
+        // Bag offset positions based on weight
+        const bagOffsets = {
+            light: {
+                position: new THREE.Vector3(0, -0.05, 0),
+                rotation: new THREE.Euler(-Math.PI/2, 0, 0)
+            },
+            medium: {
+                position: new THREE.Vector3(0, -0.1, 0),
+                rotation: new THREE.Euler(-Math.PI/2, 0, 0)
+            },
+            heavy: {
+                position: new THREE.Vector3(0, -0.15, 0),
+                rotation: new THREE.Euler(-Math.PI/2, 0, 0)
+            }
+        };
         
-        // Currently attached bag
-        let attachedBag = null;
-
-        // References for mirrored animations
-        let stumbleLeftAction = null;
-        let stumbleRightAction = null;
-
         // Load models
         const loader = new THREE.GLTFLoader();
         let loadedCount = 0;
@@ -322,7 +378,6 @@
                     // Set up character animations and bone references
                     if (model.name === 'Character') {
                         characterModel = modelObj;
-                        characterRoot = modelObj;
                         
                         // Create animation mixer
                         mixer = new THREE.AnimationMixer(modelObj);
@@ -348,6 +403,30 @@
                         setupAnimationMixing(gltf.animations);
                     }
                     
+                    // Store bag references
+                    if (model.name.includes('Bag')) {
+                        // Store by specific name
+                        allBags[model.name] = {
+                            mesh: modelObj,
+                            weight: model.weight || 'medium',
+                            originalParent: scene,
+                            originalPosition: new THREE.Vector3(...model.position),
+                            originalRotation: new THREE.Euler(0, model.rotationY || 0, 0),
+                            originalScale: new THREE.Vector3(model.scale, model.scale, model.scale)
+                        };
+                        
+                        // Also store by weight category
+                        if (model.weight === 'light') {
+                            lightBags.push(model.name);
+                        } else if (model.weight === 'heavy') {
+                            heavyBags.push(model.name);
+                        } else {
+                            mediumBags.push(model.name);
+                        }
+                        
+                        console.log(`Added bag: ${model.name} with weight ${model.weight}`);
+                    }
+                    
                     // Update loaded count
                     loadedCount++;
                     document.getElementById('info').textContent = 
@@ -369,6 +448,46 @@
                 }
             );
         });
+        
+        // Create a mirrored animation by flipping X values
+        function createMirroredAnimation(originalClip, newName) {
+            // Clone the original tracks
+            const mirroredTracks = [];
+            
+            // Process each track in the original clip
+            originalClip.tracks.forEach(track => {
+                const trackName = track.name;
+                const values = track.values.slice(); // Clone the values array
+                
+                // For position tracks, invert X values
+                if (trackName.endsWith('.position')) {
+                    // Position tracks have [x,y,z, x,y,z, ...] format
+                    for (let i = 0; i < values.length; i += 3) {
+                        values[i] = -values[i]; // Invert X position
+                    }
+                }
+                
+                // For quaternion tracks (rotations), invert appropriate components
+                if (trackName.endsWith('.quaternion')) {
+                    for (let i = 0; i < values.length; i += 4) {
+                        values[i] = -values[i];      // Invert X component
+                        values[i + 2] = -values[i + 2]; // Invert Z component
+                    }
+                }
+                
+                // Create a new track with mirrored values
+                const mirroredTrack = new THREE.KeyframeTrack(
+                    trackName,
+                    track.times.slice(),
+                    values
+                );
+                
+                mirroredTracks.push(mirroredTrack);
+            });
+            
+            // Create the mirrored animation clip
+            return new THREE.AnimationClip(newName, originalClip.duration, mirroredTracks);
+        }
         
         // Set up animation mixing system
         function setupAnimationMixing(clipsList) {
@@ -431,9 +550,24 @@
                     lowerBodyTracks
                 );
                 
-                // Store actions
+                // Create mirrored versions
+                const mirroredUpperBodyClip = createMirroredAnimation(
+                    upperBodyClip,
+                    clip.name + '_upper_mirrored'
+                );
+                
+                const mirroredLowerBodyClip = createMirroredAnimation(
+                    lowerBodyClip,
+                    clip.name + '_lower_mirrored'
+                );
+                
+                // Store regular actions
                 upperBodyActions[clip.name] = mixer.clipAction(upperBodyClip);
                 lowerBodyActions[clip.name] = mixer.clipAction(lowerBodyClip);
+                
+                // Store mirrored actions
+                mirroredUpperBodyActions[clip.name] = mixer.clipAction(mirroredUpperBodyClip);
+                mirroredLowerBodyActions[clip.name] = mixer.clipAction(mirroredLowerBodyClip);
                 
                 // Add to dropdowns
                 const upperOption = document.createElement('option');
@@ -451,16 +585,6 @@
                     upperSelect.value = clip.name;
                     lowerSelect.value = clip.name;
                 }
-                
-                // Create stumble actions for both directions
-                if (clip.name === 'stumble_lowerbody') {
-                    stumbleRightAction = lowerBodyActions[clip.name];
-                    
-                    // For left direction, we'll use the same animation but rotate the character
-                    stumbleLeftAction = lowerBodyActions[clip.name];
-                    
-                    console.log('Set up stumble animations for both directions');
-                }
             });
             
             // Initialize with default animations
@@ -471,10 +595,21 @@
         }
         
         // Function to set upper body animation
-        function setUpperBodyAnimation(name) {
-            if (!upperBodyActions[name]) {
-                console.warn(`Upper body animation '${name}' not found`);
-                return;
+        function setUpperBodyAnimation(name, mirrored = false) {
+            let action;
+            
+            if (mirrored) {
+                action = mirroredUpperBodyActions[name];
+                if (!action) {
+                    console.warn(`Mirrored upper body animation '${name}' not found`);
+                    return;
+                }
+            } else {
+                action = upperBodyActions[name];
+                if (!action) {
+                    console.warn(`Upper body animation '${name}' not found`);
+                    return;
+                }
             }
             
             // Fade out current animation
@@ -483,20 +618,32 @@
             }
             
             // Play new animation
-            const action = upperBodyActions[name];
             action.reset();
             action.fadeIn(0.5);
             action.play();
             
             currentUpperBodyAction = action;
-            console.log(`Playing upper body animation: ${name}`);
+            currentUpperBodyAnimation = name;
+            
+            console.log(`Playing upper body animation: ${name}${mirrored ? ' (mirrored)' : ''}`);
         }
         
         // Function to set lower body animation
-        function setLowerBodyAnimation(name) {
-            if (!lowerBodyActions[name]) {
-                console.warn(`Lower body animation '${name}' not found`);
-                return;
+        function setLowerBodyAnimation(name, mirrored = false) {
+            let action;
+            
+            if (mirrored) {
+                action = mirroredLowerBodyActions[name];
+                if (!action) {
+                    console.warn(`Mirrored lower body animation '${name}' not found`);
+                    return;
+                }
+            } else {
+                action = lowerBodyActions[name];
+                if (!action) {
+                    console.warn(`Lower body animation '${name}' not found`);
+                    return;
+                }
             }
             
             // Fade out current animation
@@ -505,217 +652,282 @@
             }
             
             // Play new animation
-            const action = lowerBodyActions[name];
             action.reset();
             action.fadeIn(0.5);
             action.play();
             
             currentLowerBodyAction = action;
-            console.log(`Playing lower body animation: ${name}`);
+            currentLowerBodyAnimation = name;
+            
+            console.log(`Playing lower body animation: ${name}${mirrored ? ' (mirrored)' : ''}`);
         }
         
-        // Function to play stumble animation based on direction
-        function playStumbleAnimation(direction) {
-            // Fade out current lower body animation
-            if (currentLowerBodyAction) {
-                currentLowerBodyAction.fadeOut(0.3);
-            }
-            
-            // Reset character rotation for fresh start
-            if (characterRoot) {
-                characterRoot.rotation.y = 0; // Reset to original orientation
-            }
-            
+        // Function to update animations based on balance direction
+        function updateAnimationsForBalance(direction) {
             if (direction === 'left') {
-                // Play the animation
-                stumbleRightAction.reset();
-                stumbleRightAction.fadeIn(0.3);
-                stumbleRightAction.play();
-                currentLowerBodyAction = stumbleRightAction;
-                
-                // For left direction, we'll rotate the character to flip the effect
-                if (characterRoot) {
-                    // Rotate 180 degrees to flip the direction
-                    characterRoot.rotation.y = Math.PI;
-                }
-                
-                console.log('Playing left stumble (flipped character)');
+                // Use mirrored animations for left imbalance
+                setLowerBodyAnimation('stumble_lowerbody', true);
+                setUpperBodyAnimation(currentUpperBodyAnimation, true);
+                console.log('Left imbalance - using mirrored animations');
+            } else if (direction === 'right') {
+                // Use regular animations for right imbalance
+                setLowerBodyAnimation('stumble_lowerbody', false);
+                setUpperBodyAnimation(currentUpperBodyAnimation, false);
+                console.log('Right imbalance - using regular animations');
             } else {
-                // For right direction, use the normal animation
-                stumbleRightAction.reset();
-                stumbleRightAction.fadeIn(0.3);
-                stumbleRightAction.play();
-                currentLowerBodyAction = stumbleRightAction;
-                
-                console.log('Playing right stumble animation');
+                // Return to walking for balance
+                setLowerBodyAnimation('walk', false);
+                setUpperBodyAnimation(currentUpperBodyAnimation, false);
+                console.log('Balanced - using regular walk animation for lower body');
             }
         }
         
-        // Function to attach a bag to the character's hand
-        function attachBagToHand(bag, hand) {
-            if (!bag || !hand || !characterModel) {
+        // Function to attach a bag to a specific hand
+        function attachBagToHand(bagName, hand, isLeftHand = false) {
+            if (!allBags[bagName] || !hand || !characterModel) {
                 console.error("Cannot attach bag - missing references:", { 
-                    bag: bag ? true : false, 
+                    bag: bagName ? true : false, 
                     hand: hand ? hand.name : false, 
                     character: characterModel ? true : false 
                 });
                 return;
             }
             
-            console.log("Attaching bag to hand...");
+            const handName = isLeftHand ? 'leftHand' : 'rightHand';
             
-            // Get current world position of the bag
-            const bagWorldPos = new THREE.Vector3();
-            bag.getWorldPosition(bagWorldPos);
-            
-            // Get current world position of the hand
-            const handWorldPos = new THREE.Vector3();
-            hand.getWorldPosition(handWorldPos);
-            
-            console.log("Bag world position:", bagWorldPos);
-            console.log("Hand world position:", handWorldPos);
-            
-            // Store original parent and transform
-            const originalParent = bag.parent;
-            const originalPosition = bag.position.clone();
-            const originalRotation = bag.rotation.clone();
-            const originalScale = bag.scale.clone();
-            
-            // Remove from current parent and attach to hand
-            originalParent.remove(bag);
-            hand.add(bag);
-            
-            // Position relative to hand
-            bag.position.set(0, 0, 0);
-            bag.rotation.set(0, 0, 0);
-            
-            // Set attached bag data
-            attachedBag = {
-                mesh: bag,
-                originalParent: originalParent,
-                originalPosition: originalPosition,
-                originalRotation: originalRotation,
-                originalScale: originalScale
-            };
-            
-            console.log("Bag attached successfully to", hand.name);
-        }
-        
-        // Function to detach bag
-        function detachBag() {
-            if (!attachedBag) {
-                console.warn("No bag is currently attached");
+            // Check if hand already has a bag
+            if (attachedBags[handName]) {
+                console.warn(`${isLeftHand ? 'Left' : 'Right'} hand already has a bag attached. Detach it first.`);
                 return;
             }
             
-            console.log("Detaching bag...");
+            console.log(`Attaching ${bagName} to ${isLeftHand ? 'left' : 'right'} hand...`);
             
-            const bag = attachedBag.mesh;
-            const originalParent = attachedBag.originalParent;
+            const bagData = allBags[bagName];
+            const bag = bagData.mesh;
             
-            // Get current world position and rotation
-            const worldPos = new THREE.Vector3();
-            const worldQuat = new THREE.Quaternion();
-            bag.getWorldPosition(worldPos);
-            bag.getWorldQuaternion(worldQuat);
+            // Store original parent and transform if not already stored
+            if (!bagData.originalParent) {
+                bagData.originalParent = bag.parent;
+                bagData.originalPosition = bag.position.clone();
+                bagData.originalRotation = bag.rotation.clone();
+                bagData.originalScale = bag.scale.clone();
+            }
+            
+            // Remove from current parent
+            bag.parent.remove(bag);
+            
+            // Add to hand
+            hand.add(bag);
+            
+            // Apply position and rotation offsets based on weight
+            const offsets = bagOffsets[bagData.weight];
+            bag.position.copy(offsets.position);
+            bag.rotation.copy(offsets.rotation);
+            
+            // If this is left hand, mirror the position
+            if (isLeftHand) {
+                bag.position.x = -bag.position.x;
+                bag.rotation.z = -bag.rotation.z;
+            }
+            
+            // Set attached bag data
+            attachedBags[handName] = {
+                name: bagName,
+                mesh: bag,
+                weight: bagData.weight
+            };
+            
+            // Update UI
+            updateBagStatusUI();
+            
+            console.log(`Bag ${bagName} attached successfully to ${isLeftHand ? 'left' : 'right'} hand`);
+            
+            // Switch to appropriate animation based on weight
+            const animationPrefix = bagData.weight;
+            setUpperBodyAnimation('carry_' + animationPrefix, currentBalanceDirection === 'left');
+        }
+
+        // Function to detach a bag from a specific hand
+        function detachBag(isLeftHand = false) {
+            const handName = isLeftHand ? 'leftHand' : 'rightHand';
+            
+            if (!attachedBags[handName]) {
+                console.warn(`No bag attached to ${isLeftHand ? 'left' : 'right'} hand`);
+                return;
+            }
+            
+            console.log(`Detaching bag from ${isLeftHand ? 'left' : 'right'} hand...`);
+            
+            const bagName = attachedBags[handName].name;
+            const bag = attachedBags[handName].mesh;
+            const bagData = allBags[bagName];
             
             // Remove from hand
             bag.parent.remove(bag);
             
             // Add back to original parent
-            originalParent.add(bag);
+            bagData.originalParent.add(bag);
             
             // Restore original transform
-            bag.position.copy(attachedBag.originalPosition);
-            bag.rotation.copy(attachedBag.originalRotation);
-            bag.scale.copy(attachedBag.originalScale);
+            bag.position.copy(bagData.originalPosition);
+            bag.rotation.copy(bagData.originalRotation);
+            bag.scale.copy(bagData.originalScale);
             
             // Clear reference
-            attachedBag = null;
+            attachedBags[handName] = null;
             
-            console.log("Bag detached successfully");
+            // Update UI
+            updateBagStatusUI();
+            
+            console.log(`Bag detached successfully from ${isLeftHand ? 'left' : 'right'} hand`);
+            
+            // Check if both hands are empty, switch back to walk
+            if (!attachedBags.leftHand && !attachedBags.rightHand) {
+                setUpperBodyAnimation('walk', currentBalanceDirection === 'left');
+            }
         }
-        
-        // Function to update the balance system
-        function updateBalanceSystem(value) {
-            document.getElementById('balanceValue').textContent = value.toFixed(2);
-            document.getElementById('balanceIndicator').style.left = `${value * 100}%`;
-            
-            // Get direction element
-            const directionEl = document.getElementById('balanceDirection');
-            
-            // Change indicator color based on balance
-            const indicator = document.getElementById('balanceIndicator');
-            
-            let newDirection = "center";
-            
-            if (value < 0.2) {
-                // Left imbalance (severe)
-                indicator.style.background = '#ff4444'; // Red for danger
-                directionEl.textContent = "Severe Left Imbalance";
-                directionEl.style.color = '#ff4444';
-                newDirection = "left";
-            } else if (value < 0.3) {
-                // Left imbalance (moderate)
-                indicator.style.background = '#ffaa44'; // Orange for warning
-                directionEl.textContent = "Left Imbalance";
-                directionEl.style.color = '#ffaa44';
-                newDirection = "left";
-            } else if (value > 0.8) {
-                // Right imbalance (severe)
-                indicator.style.background = '#ff4444'; // Red for danger
-                directionEl.textContent = "Severe Right Imbalance";
-                directionEl.style.color = '#ff4444';
-                newDirection = "right";
-            } else if (value > 0.7) {
-                // Right imbalance (moderate)
-                indicator.style.background = '#ffaa44'; // Orange for warning
-                directionEl.textContent = "Right Imbalance";
-                directionEl.style.color = '#ffaa44';
-                newDirection = "right";
-            } else {
-                // Balanced
-                indicator.style.background = '#ffffff'; // White for safe
-                directionEl.textContent = "Balanced";
-                directionEl.style.color = '#ffffff';
-                newDirection = "center";
+
+        // Function to detach all bags
+        function detachAllBags() {
+            if (attachedBags.leftHand) {
+                detachBag(true);
             }
             
-            // Apply animation based on balance if enabled
-            if (balanceEnabled) {
-                if (newDirection !== currentBalanceDirection) {
-                    if (newDirection === "left") {
-                        playStumbleAnimation("left");
-                    } else if (newDirection === "right") {
-                        playStumbleAnimation("right");
-                    } else {
-                        // Return to normal position
-                        if (characterRoot) {
-                            characterRoot.rotation.y = 0;
-                        }
-                        setLowerBodyAnimation('walk');
-                    }
-                    
-                    currentBalanceDirection = newDirection;
+            if (attachedBags.rightHand) {
+                detachBag(false);
+            }
+            
+            console.log("All bags detached");
+        }
+
+        // Function to update the UI showing which bags are carried
+        function updateBagStatusUI() {
+            const leftHandStatus = document.getElementById('leftHandStatus');
+            const rightHandStatus = document.getElementById('rightHandStatus');
+            
+            if (attachedBags.leftHand) {
+                const bagInfo = attachedBags.leftHand;
+                leftHandStatus.textContent = `Left Hand: ${bagInfo.name} (${bagInfo.weight})`;
+                leftHandStatus.style.color = getWeightColor(bagInfo.weight);
+            } else {
+                leftHandStatus.textContent = 'Left Hand: Empty';
+                leftHandStatus.style.color = '#4CAF50';
+            }
+            
+            if (attachedBags.rightHand) {
+                const bagInfo = attachedBags.rightHand;
+                rightHandStatus.textContent = `Right Hand: ${bagInfo.name} (${bagInfo.weight})`;
+                rightHandStatus.style.color = getWeightColor(bagInfo.weight);
+            } else {
+                rightHandStatus.textContent = 'Right Hand: Empty';
+                rightHandStatus.style.color = '#4CAF50';
+            }
+        }
+
+        // Helper function to get color based on weight
+        function getWeightColor(weight) {
+            switch (weight) {
+                case 'light': return '#4CAF50'; // green
+                case 'medium': return '#FFC107'; // amber
+                case 'heavy': return '#F44336'; // red
+                default: return '#FFFFFF'; // white
+            }
+        }
+
+        // Function to select a bag based on weight and location
+        function selectBag(weight, isHigh) {
+            let bagsList;
+            
+            // Get list based on weight
+            if (weight === 'light') {
+                bagsList = lightBags;
+            } else if (weight === 'heavy') {
+                bagsList = heavyBags;
+            } else { // medium
+                bagsList = mediumBags;
+            }
+            
+            if (bagsList.length === 0) {
+                console.warn(`No ${weight} bags available`);
+                return null;
+            }
+            
+            // Filter by location (high bags are on car, low bags are on ground)
+            const filteredBags = bagsList.filter(bagName => {
+                return isHigh ? bagName.includes('Car') : bagName.includes('Ground');
+            });
+            
+            if (filteredBags.length === 0) {
+                console.warn(`No ${isHigh ? 'high' : 'low'} ${weight} bags available`);
+                return null;
+            }
+            
+            // Find an unattached bag
+            for (const bagName of filteredBags) {
+                const isAttached = Object.values(attachedBags).some(bag => 
+                    bag && bag.name === bagName);
+                
+                if (!isAttached) {
+                    return bagName;
                 }
             }
+            
+            console.warn(`All ${weight} bags are already attached`);
+            return null;
+        }
+
+        // Function to perform pickup animation and attach bag
+        function performPickup(weight, isHigh) {
+            const bagName = selectBag(weight, isHigh);
+            
+            if (!bagName) {
+                alert(`No available ${weight} bags to pick up from ${isHigh ? 'car' : 'ground'}`);
+                return;
+            }
+            
+            // Determine which hand to use
+            const hand = useLeftHand ? leftHand : rightHand;
+            const handName = useLeftHand ? 'left' : 'right';
+            
+            // Check if hand already has a bag
+            if (attachedBags[`${handName}Hand`]) {
+                alert(`${handName} hand already has a bag. Use the other hand or drop this bag first.`);
+                return;
+            }
+            
+            // Play pickup animation
+            const animName = isHigh ? 'pickup_high' : 'pickup_low';
+            setUpperBodyAnimation(animName, currentBalanceDirection === 'left');
+            
+            // Attach the bag after a short delay to simulate pickup
+            setTimeout(() => {
+                attachBagToHand(bagName, hand, useLeftHand);
+            }, 1000); // 1 second delay
         }
         
         // Set up UI event listeners
         document.getElementById('upperBodyAnim').addEventListener('change', function() {
-            setUpperBodyAnimation(this.value);
+            // Update the animation and maintain the current mirroring if needed
+            setUpperBodyAnimation(this.value, currentBalanceDirection === 'left');
         });
         
         document.getElementById('lowerBodyAnim').addEventListener('change', function() {
-            setLowerBodyAnimation(this.value);
+            // Only change if not in imbalance mode
+            if (!balanceEnabled || currentBalanceDirection === 'center') {
+                setLowerBodyAnimation(this.value);
+            } else {
+                alert("Can't change lower body animation while balance effect is active. Disable balance effect first.");
+                this.value = currentLowerBodyAnimation;
+            }
         });
         
         document.getElementById('pickupLowBtn').addEventListener('click', function() {
-            setUpperBodyAnimation('pickup_low');
+            setUpperBodyAnimation('pickup_low', currentBalanceDirection === 'left');
         });
         
         document.getElementById('pickupHighBtn').addEventListener('click', function() {
-            setUpperBodyAnimation('pickup_high');
+            setUpperBodyAnimation('pickup_high', currentBalanceDirection === 'left');
         });
         
         document.getElementById('attachBagBtn').addEventListener('click', function() {
@@ -744,6 +956,7 @@
             this.textContent = balanceEnabled ? 
                 'Disable Balance Effect' : 'Enable Balance Effect';
             
+            // Apply current balance state immediately when toggled
             updateBalanceSystem(balanceValue);
         });
         
@@ -787,6 +1000,54 @@
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
+
+        // Set up hand selection buttons
+        document.getElementById('attachLeftHandBtn').addEventListener('click', function() {
+            useLeftHand = true;
+            this.style.backgroundColor = '#4CAF50';
+            document.getElementById('attachRightHandBtn').style.backgroundColor = '';
+            console.log('Using left hand');
+        });
+
+        document.getElementById('attachRightHandBtn').addEventListener('click', function() {
+            useLeftHand = false;
+            this.style.backgroundColor = '#4CAF50';
+            document.getElementById('attachLeftHandBtn').style.backgroundColor = '';
+            console.log('Using right hand');
+        });
+
+        document.getElementById('detachAllBagsBtn').addEventListener('click', function() {
+            detachAllBags();
+        });
+
+        // Set up low pickup buttons
+        document.getElementById('pickupLowLightBtn').addEventListener('click', function() {
+            performPickup('light', false);
+        });
+
+        document.getElementById('pickupLowMediumBtn').addEventListener('click', function() {
+            performPickup('medium', false);
+        });
+
+        document.getElementById('pickupLowHeavyBtn').addEventListener('click', function() {
+            performPickup('heavy', false);
+        });
+
+        // Set up high pickup buttons
+        document.getElementById('pickupHighLightBtn').addEventListener('click', function() {
+            performPickup('light', true);
+        });
+
+        document.getElementById('pickupHighMediumBtn').addEventListener('click', function() {
+            performPickup('medium', true);
+        });
+
+        document.getElementById('pickupHighHeavyBtn').addEventListener('click', function() {
+            performPickup('heavy', true);
+        });
+
+        // Select right hand by default
+        document.getElementById('attachRightHandBtn').click();
     </script>
 </body>
 </html> 
