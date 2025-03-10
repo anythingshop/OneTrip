@@ -110,6 +110,56 @@
             border-radius: 5px;
             z-index: 1000;
         }
+        #touchControls {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            height: 100%;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: all;
+            touch-action: none;
+        }
+        #helpOverlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            border-radius: 5px;
+            z-index: 3000;
+            max-width: 80%;
+            text-align: center;
+        }
+        #helpOverlay h2 {
+            margin-top: 0;
+        }
+        #helpOverlay button {
+            margin-top: 10px;
+            padding: 8px 16px;
+        }
+        #helpBtn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            font-size: 20px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            z-index: 1001;
+        }
     </style>
 </head>
 <body>
@@ -156,9 +206,22 @@
         <h3>Carrying Status</h3>
         <div>Bags: <span id="bagCount">0</span></div>
         <div>Total Weight: <span id="totalWeight">0</span></div>
+        <div>Weight Class: <span id="weightClass">None</span></div>
     </div>
     
     <div id="pickupFeedback"></div>
+    
+    <div id="touchControls"></div>
+    
+    <button id="helpBtn">?</button>
+    
+    <div id="helpOverlay" style="display: none;">
+        <h2>Controls</h2>
+        <p><strong>Touch Controls:</strong> Swipe left/right to adjust balance. Tap objects to interact.</p>
+        <p><strong>Mouse Controls:</strong> Click and drag left/right to adjust balance. Click objects to interact.</p>
+        <p><strong>Keyboard:</strong> A/D or Left/Right arrows to adjust balance. Space to interact.</p>
+        <button id="closeHelpBtn">Got it!</button>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
@@ -292,12 +355,21 @@
         let balanceEnabled = false;
         let balanceValue = 0.5;
         let currentBalanceDirection = "center"; // left, center, right
+        let carryWeightClass = "none"; // none, light, medium, heavy
         
         // DOM elements
         const balanceDirectionEl = document.getElementById('balanceDirection');
         const pickupFeedbackEl = document.getElementById('pickupFeedback');
         const bagCountEl = document.getElementById('bagCount');
         const totalWeightEl = document.getElementById('totalWeight');
+        const weightClassEl = document.getElementById('weightClass');
+        
+        // Interactive objects for touch/mouse
+        let interactiveObjects = [];
+        let isUsingTouch = false;
+        let isDragging = false;
+        let lastTouchX = 0;
+        let lastMouseX = 0;
         
         // Character tilt object for leaning
         let characterTilt = null;
@@ -513,9 +585,19 @@
         
         // Function to set upper body animation
         function setUpperBodyAnimation(name) {
+            // Check if we should use a carry animation based on weight class
+            if (attachedBags.length > 0 && name.startsWith('carry')) {
+                // Use weight-appropriate carry animation
+                const baseAnimName = name.includes('_') ? 
+                    name.substring(0, name.indexOf('_')) : name;
+                
+                name = `${baseAnimName}_${carryWeightClass}`;
+                console.log(`Using weight-specific animation: ${name}`);
+            }
+            
             if (!upperBodyActions[name]) {
-                console.warn(`Upper body animation '${name}' not found`);
-                return;
+                console.warn(`Upper body animation '${name}' not found, falling back to walk`);
+                name = 'walk';
             }
             
             // Fade out current animation
@@ -725,6 +807,46 @@
             // Calculate total weight
             totalBagWeight = attachedBags.reduce((total, bag) => total + bag.weight, 0);
             totalWeightEl.textContent = totalBagWeight + " kg";
+            
+            // Determine weight class based on total weight or bag count
+            let newWeightClass = "none";
+            
+            if (attachedBags.length > 0) {
+                if (totalBagWeight <= 3) {
+                    newWeightClass = "light";
+                } else if (totalBagWeight <= 7) {
+                    newWeightClass = "medium";
+                } else {
+                    newWeightClass = "heavy";
+                }
+            }
+            
+            // Update weight class display
+            weightClassEl.textContent = newWeightClass.charAt(0).toUpperCase() + newWeightClass.slice(1);
+            
+            // If weight class changed, update the animation
+            if (newWeightClass !== carryWeightClass) {
+                carryWeightClass = newWeightClass;
+                
+                // If current animation is a carry animation, update it
+                if (currentUpperBodyAnimation.startsWith('carry')) {
+                    // Extract base animation name
+                    const baseAnimName = currentUpperBodyAnimation.includes('_') ? 
+                        currentUpperBodyAnimation.substring(0, currentUpperBodyAnimation.indexOf('_')) : 
+                        currentUpperBodyAnimation;
+                    
+                    // Apply the new weight class
+                    if (carryWeightClass !== "none") {
+                        setUpperBodyAnimation(`${baseAnimName}_${carryWeightClass}`);
+                    } else {
+                        // If no bags, go back to walk
+                        setUpperBodyAnimation('walk');
+                    }
+                } else if (attachedBags.length > 0) {
+                    // If we picked up our first bag, switch to carry animation
+                    setUpperBodyAnimation(`carry_${carryWeightClass}`);
+                }
+            }
         }
         
         // Function to detach bag
@@ -966,12 +1088,203 @@
         }
         animate();
         
+        // Initialize controls when everything is loaded
+        window.addEventListener('load', function() {
+            setupTouchControls();
+        });
+        
         // Handle window resize
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
+
+        // Function to detect what kind of bag is in view
+        function findInteractableBagInViewDirection() {
+            // Create a raycaster from camera
+            const raycaster = new THREE.Raycaster();
+            const mousePos = new THREE.Vector2(0, 0); // Center of screen
+            
+            raycaster.setFromCamera(mousePos, camera);
+            
+            // Create an array of all bags
+            const bags = [];
+            if (groundBag1 && !attachedBags.some(b => b.mesh === groundBag1)) bags.push(groundBag1);
+            if (groundBag2 && !attachedBags.some(b => b.mesh === groundBag2)) bags.push(groundBag2);
+            if (carBag1 && !attachedBags.some(b => b.mesh === carBag1)) bags.push(carBag1);
+            if (carBag2 && !attachedBags.some(b => b.mesh === carBag2)) bags.push(carBag2);
+            
+            // Find all meshes in the bags
+            const bagMeshes = [];
+            bags.forEach(bag => {
+                bag.traverse(child => {
+                    if (child.isMesh) {
+                        bagMeshes.push({
+                            mesh: child,
+                            bag: bag
+                        });
+                    }
+                });
+            });
+            
+            // Check for intersections
+            const intersects = raycaster.intersectObjects(
+                bagMeshes.map(item => item.mesh),
+                true
+            );
+            
+            if (intersects.length > 0) {
+                // Find which bag this mesh belongs to
+                const hitMesh = intersects[0].object;
+                const bagInfo = bagMeshes.find(item => item.mesh === hitMesh || item.mesh.isAncestorOf(hitMesh));
+                
+                if (bagInfo) {
+                    const bag = bagInfo.bag;
+                    
+                    // Determine if it's a ground bag or car bag
+                    if (bag === groundBag1 || bag === groundBag2) {
+                        return { bag, isGroundBag: true };
+                    } else {
+                        return { bag, isGroundBag: false };
+                    }
+                }
+            }
+            
+            return null;
+        }
+        
+        // Interactive pickup function for touch/click
+        function attemptPickupInteraction() {
+            const bagInView = findInteractableBagInViewDirection();
+            
+            if (bagInView) {
+                if (bagInView.isGroundBag) {
+                    // Ground pickup
+                    setUpperBodyAnimation('pickup_low');
+                    
+                    setTimeout(() => {
+                        if (rightHand && bagInView.bag && !attachedBags.some(b => b.mesh === bagInView.bag)) {
+                            attachBagToHand(bagInView.bag, rightHand);
+                        } else {
+                            showPickupFeedback("Cannot pick up this bag");
+                        }
+                    }, 500);
+                } else {
+                    // Car pickup
+                    setUpperBodyAnimation('pickup_high');
+                    
+                    setTimeout(() => {
+                        if (leftHand && bagInView.bag && !attachedBags.some(b => b.mesh === bagInView.bag)) {
+                            attachBagToHand(bagInView.bag, leftHand);
+                        } else {
+                            showPickupFeedback("Cannot pick up this bag");
+                        }
+                    }, 500);
+                }
+                return true;
+            }
+            
+            return false;
+        }
+        
+        // Set up touch/mouse controls
+        function setupTouchControls() {
+            const touchElement = document.getElementById('touchControls');
+            
+            // Touch events
+            touchElement.addEventListener('touchstart', function(e) {
+                isUsingTouch = true;
+                lastTouchX = e.touches[0].clientX;
+                e.preventDefault();
+            });
+            
+            touchElement.addEventListener('touchmove', function(e) {
+                const touchX = e.touches[0].clientX;
+                const deltaX = touchX - lastTouchX;
+                
+                // Update balance based on touch movement
+                if (Math.abs(deltaX) > 5) {
+                    const sensitivity = 0.003;
+                    balanceValue = Math.max(0, Math.min(1, balanceValue + deltaX * sensitivity));
+                    document.getElementById('balanceSlider').value = balanceValue * 100;
+                    updateBalanceSystem(balanceValue);
+                    lastTouchX = touchX;
+                }
+                
+                e.preventDefault();
+            });
+            
+            touchElement.addEventListener('touchend', function(e) {
+                // Check if this was a tap (not a drag)
+                if (!isDragging) {
+                    attemptPickupInteraction();
+                }
+                isDragging = false;
+                e.preventDefault();
+            });
+            
+            // Mouse events
+            touchElement.addEventListener('mousedown', function(e) {
+                if (isUsingTouch) return;
+                
+                isDragging = false;
+                lastMouseX = e.clientX;
+            });
+            
+            touchElement.addEventListener('mousemove', function(e) {
+                if (isUsingTouch || !e.buttons) return;
+                
+                isDragging = true;
+                const deltaX = e.clientX - lastMouseX;
+                
+                // Update balance based on mouse movement
+                if (Math.abs(deltaX) > 5) {
+                    const sensitivity = 0.003;
+                    balanceValue = Math.max(0, Math.min(1, balanceValue + deltaX * sensitivity));
+                    document.getElementById('balanceSlider').value = balanceValue * 100;
+                    updateBalanceSystem(balanceValue);
+                    lastMouseX = e.clientX;
+                }
+            });
+            
+            touchElement.addEventListener('click', function(e) {
+                if (isUsingTouch || isDragging) return;
+                
+                attemptPickupInteraction();
+            });
+            
+            // Keyboard controls
+            window.addEventListener('keydown', function(e) {
+                // A/Left Arrow = move balance left
+                if (e.key === 'a' || e.key === 'ArrowLeft') {
+                    balanceValue = Math.max(0, balanceValue - 0.05);
+                    document.getElementById('balanceSlider').value = balanceValue * 100;
+                    updateBalanceSystem(balanceValue);
+                }
+                
+                // D/Right Arrow = move balance right
+                if (e.key === 'd' || e.key === 'ArrowRight') {
+                    balanceValue = Math.min(1, balanceValue + 0.05);
+                    document.getElementById('balanceSlider').value = balanceValue * 100;
+                    updateBalanceSystem(balanceValue);
+                }
+                
+                // Space = interact/pickup
+                if (e.key === ' ') {
+                    attemptPickupInteraction();
+                }
+            });
+            
+            // Help button
+            document.getElementById('helpBtn').addEventListener('click', function() {
+                document.getElementById('helpOverlay').style.display = 'block';
+            });
+            
+            document.getElementById('closeHelpBtn').addEventListener('click', function() {
+                document.getElementById('helpOverlay').style.display = 'none';
+            });
+        }
     </script>
 </body>
 </html> 
