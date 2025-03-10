@@ -112,17 +112,52 @@
         }
         #touchControls {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
             z-index: 50;
+            pointer-events: all;
+            touch-action: none;
+        }
+        #virtualJoystick {
+            position: absolute;
+            bottom: 80px;
+            left: 80px;
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 60px;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            z-index: 1001;
+            touch-action: none;
+        }
+        #joystickKnob {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 25px;
+            touch-action: none;
+        }
+        #interactButton {
+            position: absolute;
+            bottom: 100px;
+            right: 100px;
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 40px;
             display: flex;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
-            pointer-events: all;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            z-index: 1001;
             touch-action: none;
         }
         #helpOverlay {
@@ -158,6 +193,17 @@
             border-radius: 50%;
             border: none;
             cursor: pointer;
+            z-index: 1001;
+        }
+        #gameViewBtn {
+            position: absolute;
+            top: 60px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 10px;
+            font-family: Arial, sans-serif;
+            border-radius: 5px;
             z-index: 1001;
         }
     </style>
@@ -211,15 +257,21 @@
     
     <div id="pickupFeedback"></div>
     
-    <div id="touchControls"></div>
+    <div id="touchControls">
+        <div id="virtualJoystick">
+            <div id="joystickKnob"></div>
+        </div>
+        <div id="interactButton">Pick</div>
+    </div>
     
     <button id="helpBtn">?</button>
+    <button id="gameViewBtn">Toggle Camera</button>
     
     <div id="helpOverlay" style="display: none;">
         <h2>Controls</h2>
-        <p><strong>Touch Controls:</strong> Swipe left/right to adjust balance. Tap objects to interact.</p>
-        <p><strong>Mouse Controls:</strong> Click and drag left/right to adjust balance. Click objects to interact.</p>
-        <p><strong>Keyboard:</strong> A/D or Left/Right arrows to adjust balance. Space to interact.</p>
+        <p><strong>Touch Controls:</strong> Left joystick to move, right button to interact/pickup</p>
+        <p><strong>Mouse Controls:</strong> WASD or arrows to move, click objects to interact</p>
+        <p><strong>Balance:</strong> Moving quickly or turning sharply affects your balance</p>
         <button id="closeHelpBtn">Got it!</button>
     </div>
 
@@ -352,10 +404,27 @@
         let currentLowerBodyAction = null;
         let currentUpperBodyAnimation = 'walk';
         let currentLowerBodyAnimation = 'walk';
-        let balanceEnabled = false;
+        let balanceEnabled = true; // Set to true by default now
         let balanceValue = 0.5;
         let currentBalanceDirection = "center"; // left, center, right
         let carryWeightClass = "none"; // none, light, medium, heavy
+        
+        // Movement and control variables
+        let moveDirection = new THREE.Vector3();
+        let movementSpeed = 0.05;
+        let turnSpeed = 0.05;
+        let isMoving = false;
+        let targetRotation = 0;
+        let movementAcceleration = 0;
+        let maxMovementSpeed = 0.1;
+        let cameraMode = "thirdPerson"; // thirdPerson or orbit
+        
+        // Joystick variables
+        let joystickActive = false;
+        let joystickPos = { x: 0, y: 0 };
+        let joystickOrigin = { x: 0, y: 0 };
+        let joystickMax = 40; // Maximum distance joystick can move
+        let joystickDirection = { x: 0, y: 0 }; // Normalized direction (-1 to 1)
         
         // DOM elements
         const balanceDirectionEl = document.getElementById('balanceDirection');
@@ -363,16 +432,23 @@
         const bagCountEl = document.getElementById('bagCount');
         const totalWeightEl = document.getElementById('totalWeight');
         const weightClassEl = document.getElementById('weightClass');
+        const joystickEl = document.getElementById('virtualJoystick');
+        const joystickKnobEl = document.getElementById('joystickKnob');
+        const interactButtonEl = document.getElementById('interactButton');
         
         // Interactive objects for touch/mouse
         let interactiveObjects = [];
         let isUsingTouch = false;
         let isDragging = false;
-        let lastTouchX = 0;
-        let lastMouseX = 0;
+        let isCameraFollowing = true;
         
         // Character tilt object for leaning
         let characterTilt = null;
+        
+        // Third-person camera setup
+        let thirdPersonCamera = null;
+        let thirdPersonCameraTarget = new THREE.Vector3();
+        let thirdPersonCameraOffset = new THREE.Vector3(0, 2, 8);
         
         // Reference to hand bones for attaching bags
         let leftHand = null;
@@ -446,6 +522,9 @@
                         modelObj.position.set(0, 0, 0);
                         
                         characterModel = modelObj;
+                        
+                        // Set up third-person camera
+                        setupThirdPersonCamera();
                         
                         // Create animation mixer
                         mixer = new THREE.AnimationMixer(modelObj);
@@ -645,7 +724,10 @@
         function updateAnimationsForBalance(direction, intensity) {
             // Use stumble for lower body when imbalanced
             if (direction !== "center") {
-                setLowerBodyAnimation('stumble_lowerbody');
+                // If moving, use stumble_lowerbody, otherwise use default animation
+                if (isMoving) {
+                    setLowerBodyAnimation('stumble_lowerbody');
+                }
                 
                 // Apply a tilt to the entire character
                 if (characterTilt) {
@@ -659,7 +741,11 @@
                 }
             } else {
                 // Return to normal walking and no tilt
-                setLowerBodyAnimation('walk');
+                if (isMoving) {
+                    setLowerBodyAnimation('walk');
+                } else {
+                    setLowerBodyAnimation('idle');
+                }
                 
                 if (characterTilt) {
                     gsapTilt(0);
@@ -1066,12 +1152,312 @@
             controls.update();
         });
         
+        // Function to update the balance system based on movement and turning
+        function updateMovementBasedBalance() {
+            if (!balanceEnabled) return;
+            
+            // Calculate balance shifts based on movement and turning
+            let balanceShift = 0;
+            
+            // Movement speed affects balance
+            balanceShift += movementAcceleration * 0.5; 
+            
+            // Turning affects balance
+            if (Math.abs(targetRotation - characterTilt.rotation.y) > 0.05) {
+                const turnDirection = ((targetRotation - characterTilt.rotation.y) + Math.PI) % (Math.PI * 2) - Math.PI;
+                balanceShift += turnDirection * 0.02;
+            }
+            
+            // Carrying weight makes balance harder
+            const carryFactor = 1 + (totalBagWeight * 0.05);
+            balanceShift *= carryFactor;
+            
+            // Apply changes to balance value
+            balanceValue = Math.max(0, Math.min(1, balanceValue + balanceShift));
+            
+            // Update the UI
+            document.getElementById('balanceSlider').value = balanceValue * 100;
+            updateBalanceSystem(balanceValue);
+        }
+        
+        // Set up third-person camera
+        function setupThirdPersonCamera() {
+            thirdPersonCamera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+            updateThirdPersonCamera();
+        }
+        
+        // Update third-person camera position and target
+        function updateThirdPersonCamera() {
+            if (!characterTilt || !thirdPersonCamera) return;
+            
+            // Get character position and rotation
+            const characterPos = new THREE.Vector3();
+            characterTilt.getWorldPosition(characterPos);
+            
+            // Calculate camera position based on character position and rotation
+            const cameraOffset = thirdPersonCameraOffset.clone();
+            cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
+            
+            // Set camera position and target
+            thirdPersonCamera.position.copy(characterPos).add(cameraOffset);
+            thirdPersonCameraTarget.copy(characterPos);
+            thirdPersonCameraTarget.y += 1.5; // Look slightly above character's feet
+            thirdPersonCamera.lookAt(thirdPersonCameraTarget);
+        }
+        
+        // Update character movement and rotation based on controls
+        function updateCharacterMovement(delta) {
+            if (!characterTilt) return;
+            
+            // Reset movement flag
+            isMoving = false;
+            
+            // Get joystick or keyboard input
+            let inputX = 0;
+            let inputZ = 0;
+            
+            // Process joystick input if active
+            if (joystickActive) {
+                inputX = joystickDirection.x;
+                inputZ = joystickDirection.y;
+            } 
+            // Otherwise process keyboard input
+            else {
+                // W or Up Arrow
+                if (keysPressed['w'] || keysPressed['ArrowUp']) {
+                    inputZ = -1;
+                }
+                // S or Down Arrow
+                if (keysPressed['s'] || keysPressed['ArrowDown']) {
+                    inputZ = 1;
+                }
+                // A or Left Arrow
+                if (keysPressed['a'] || keysPressed['ArrowLeft']) {
+                    inputX = -1;
+                }
+                // D or Right Arrow
+                if (keysPressed['d'] || keysPressed['ArrowRight']) {
+                    inputX = 1;
+                }
+            }
+            
+            // Process movement input
+            if (Math.abs(inputX) > 0.1 || Math.abs(inputZ) > 0.1) {
+                isMoving = true;
+                
+                // Calculate target rotation based on input direction
+                if (Math.abs(inputX) > 0.1 || Math.abs(inputZ) > 0.1) {
+                    targetRotation = Math.atan2(inputX, -inputZ);
+                }
+                
+                // Smoothly rotate character towards target direction
+                const currentRotation = characterTilt.rotation.y;
+                let rotationDiff = targetRotation - currentRotation;
+                
+                // Normalize to the shortest rotation path
+                if (rotationDiff > Math.PI) rotationDiff -= Math.PI * 2;
+                if (rotationDiff < -Math.PI) rotationDiff += Math.PI * 2;
+                
+                // Apply rotation with smooth interpolation
+                characterTilt.rotation.y += rotationDiff * turnSpeed;
+                
+                // Calculate movement speed with acceleration/deceleration
+                const targetSpeed = maxMovementSpeed * Math.sqrt(inputX*inputX + inputZ*inputZ);
+                const speedDiff = targetSpeed - movementAcceleration;
+                movementAcceleration += speedDiff * 0.1;
+                
+                // Calculate movement vector based on character's forward direction
+                moveDirection.set(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
+                moveDirection.multiplyScalar(movementAcceleration);
+                
+                // Update character position
+                characterTilt.position.add(moveDirection);
+                
+                // Update animations based on movement
+                if (attachedBags.length > 0) {
+                    setUpperBodyAnimation(`carry_${carryWeightClass}`);
+                } else {
+                    setUpperBodyAnimation('walk');
+                }
+                setLowerBodyAnimation('walk');
+            } else {
+                // Character is not moving, slow down gradually
+                movementAcceleration *= 0.8;
+                if (movementAcceleration < 0.001) {
+                    movementAcceleration = 0;
+                }
+                
+                // Update animations for idle state
+                if (!currentUpperBodyAnimation.startsWith('pickup')) {
+                    if (attachedBags.length > 0) {
+                        setUpperBodyAnimation(`carry_${carryWeightClass}`);
+                    } else {
+                        setUpperBodyAnimation('idle');
+                    }
+                }
+                if (!currentLowerBodyAnimation.startsWith('stumble')) {
+                    setLowerBodyAnimation('idle');
+                }
+            }
+            
+            // Update balance based on movement and carrying
+            updateMovementBasedBalance();
+            
+            // Update camera if in third-person mode and following
+            if (cameraMode === "thirdPerson" && isCameraFollowing) {
+                updateThirdPersonCamera();
+            }
+        }
+        
+        // Set up joystick controls
+        function setupJoystickControls() {
+            const joystick = document.getElementById('virtualJoystick');
+            const knob = document.getElementById('joystickKnob');
+            const interact = document.getElementById('interactButton');
+            
+            // Get joystick position
+            const joystickRect = joystick.getBoundingClientRect();
+            joystickOrigin = {
+                x: joystickRect.left + joystickRect.width / 2,
+                y: joystickRect.top + joystickRect.height / 2
+            };
+            
+            // Touch events for joystick
+            joystick.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                joystickActive = true;
+                updateJoystickPosition(e.touches[0].clientX, e.touches[0].clientY);
+            });
+            
+            document.addEventListener('touchmove', function(e) {
+                if (!joystickActive) return;
+                e.preventDefault();
+                updateJoystickPosition(e.touches[0].clientX, e.touches[0].clientY);
+            });
+            
+            document.addEventListener('touchend', function(e) {
+                if (!joystickActive) return;
+                joystickActive = false;
+                resetJoystick();
+            });
+            
+            // Mouse events for joystick (for testing on desktop)
+            joystick.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                joystickActive = true;
+                updateJoystickPosition(e.clientX, e.clientY);
+            });
+            
+            document.addEventListener('mousemove', function(e) {
+                if (!joystickActive) return;
+                e.preventDefault();
+                updateJoystickPosition(e.clientX, e.clientY);
+            });
+            
+            document.addEventListener('mouseup', function() {
+                if (!joystickActive) return;
+                joystickActive = false;
+                resetJoystick();
+            });
+            
+            // Interact button for pickups
+            interact.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                attemptPickupInteraction();
+            });
+            
+            interact.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                attemptPickupInteraction();
+            });
+            
+            // Camera toggle button
+            document.getElementById('gameViewBtn').addEventListener('click', function() {
+                toggleCameraMode();
+            });
+        }
+        
+        // Update joystick position and calculate direction
+        function updateJoystickPosition(x, y) {
+            // Calculate distance from joystick center
+            const dx = x - joystickOrigin.x;
+            const dy = y - joystickOrigin.y;
+            const distance = Math.sqrt(dx*dx + dy*dy);
+            
+            // Limit joystick movement to maximum radius
+            const angle = Math.atan2(dy, dx);
+            const limitedDistance = Math.min(distance, joystickMax);
+            
+            // Calculate new joystick knob position
+            joystickPos = {
+                x: Math.cos(angle) * limitedDistance,
+                y: Math.sin(angle) * limitedDistance
+            };
+            
+            // Update joystick knob element position
+            joystickKnobEl.style.transform = `translate(calc(-50% + ${joystickPos.x}px), calc(-50% + ${joystickPos.y}px))`;
+            
+            // Calculate normalized direction for movement (-1 to 1)
+            joystickDirection = {
+                x: joystickPos.x / joystickMax,
+                y: joystickPos.y / joystickMax
+            };
+        }
+        
+        // Reset joystick to center position
+        function resetJoystick() {
+            joystickPos = { x: 0, y: 0 };
+            joystickDirection = { x: 0, y: 0 };
+            joystickKnobEl.style.transform = 'translate(-50%, -50%)';
+        }
+        
+        // Toggle between third-person and orbit camera modes
+        function toggleCameraMode() {
+            if (cameraMode === "thirdPerson") {
+                // Switch to orbit mode
+                cameraMode = "orbit";
+                isCameraFollowing = false;
+                
+                // Set orbit camera
+                camera.position.set(0, 20, 30);
+                controls.target.set(0, 0, 0);
+                controls.update();
+            } else {
+                // Switch to third-person mode
+                cameraMode = "thirdPerson";
+                isCameraFollowing = true;
+                
+                // Re-enable third-person camera
+                updateThirdPersonCamera();
+            }
+        }
+        
+        // Store keyboard state
+        const keysPressed = {};
+        
+        // Keyboard event listeners
+        window.addEventListener('keydown', function(e) {
+            keysPressed[e.key.toLowerCase()] = true;
+            
+            // Space = interact/pickup
+            if (e.key === ' ') {
+                attemptPickupInteraction();
+            }
+        });
+        
+        window.addEventListener('keyup', function(e) {
+            keysPressed[e.key.toLowerCase()] = false;
+        });
+        
         // Animation loop
         const clock = new THREE.Clock();
         function animate() {
             requestAnimationFrame(animate);
             
             const delta = clock.getDelta();
+            
+            // Update character movement
+            updateCharacterMovement(delta);
             
             // Update character animations
             if (mixer) mixer.update(delta);
@@ -1080,17 +1466,27 @@
             scene.children.forEach(child => {
                 if (child.material && child.material.map && 
                     child.material.map.isCanvasTexture) {
-                    child.lookAt(camera.position);
+                    if (cameraMode === "thirdPerson" && thirdPersonCamera) {
+                        child.lookAt(thirdPersonCamera.position);
+                    } else {
+                        child.lookAt(camera.position);
+                    }
                 }
             });
             
-            renderer.render(scene, camera);
+            // Render scene with appropriate camera
+            if (cameraMode === "thirdPerson" && thirdPersonCamera) {
+                renderer.render(scene, thirdPersonCamera);
+            } else {
+                renderer.render(scene, camera);
+            }
         }
         animate();
         
         // Initialize controls when everything is loaded
         window.addEventListener('load', function() {
-            setupTouchControls();
+            setupJoystickControls();
+            document.getElementById('toggleBalance').textContent = 'Disable Balance Effect';
         });
         
         // Handle window resize
@@ -1186,104 +1582,6 @@
             }
             
             return false;
-        }
-        
-        // Set up touch/mouse controls
-        function setupTouchControls() {
-            const touchElement = document.getElementById('touchControls');
-            
-            // Touch events
-            touchElement.addEventListener('touchstart', function(e) {
-                isUsingTouch = true;
-                lastTouchX = e.touches[0].clientX;
-                e.preventDefault();
-            });
-            
-            touchElement.addEventListener('touchmove', function(e) {
-                const touchX = e.touches[0].clientX;
-                const deltaX = touchX - lastTouchX;
-                
-                // Update balance based on touch movement
-                if (Math.abs(deltaX) > 5) {
-                    const sensitivity = 0.003;
-                    balanceValue = Math.max(0, Math.min(1, balanceValue + deltaX * sensitivity));
-                    document.getElementById('balanceSlider').value = balanceValue * 100;
-                    updateBalanceSystem(balanceValue);
-                    lastTouchX = touchX;
-                }
-                
-                e.preventDefault();
-            });
-            
-            touchElement.addEventListener('touchend', function(e) {
-                // Check if this was a tap (not a drag)
-                if (!isDragging) {
-                    attemptPickupInteraction();
-                }
-                isDragging = false;
-                e.preventDefault();
-            });
-            
-            // Mouse events
-            touchElement.addEventListener('mousedown', function(e) {
-                if (isUsingTouch) return;
-                
-                isDragging = false;
-                lastMouseX = e.clientX;
-            });
-            
-            touchElement.addEventListener('mousemove', function(e) {
-                if (isUsingTouch || !e.buttons) return;
-                
-                isDragging = true;
-                const deltaX = e.clientX - lastMouseX;
-                
-                // Update balance based on mouse movement
-                if (Math.abs(deltaX) > 5) {
-                    const sensitivity = 0.003;
-                    balanceValue = Math.max(0, Math.min(1, balanceValue + deltaX * sensitivity));
-                    document.getElementById('balanceSlider').value = balanceValue * 100;
-                    updateBalanceSystem(balanceValue);
-                    lastMouseX = e.clientX;
-                }
-            });
-            
-            touchElement.addEventListener('click', function(e) {
-                if (isUsingTouch || isDragging) return;
-                
-                attemptPickupInteraction();
-            });
-            
-            // Keyboard controls
-            window.addEventListener('keydown', function(e) {
-                // A/Left Arrow = move balance left
-                if (e.key === 'a' || e.key === 'ArrowLeft') {
-                    balanceValue = Math.max(0, balanceValue - 0.05);
-                    document.getElementById('balanceSlider').value = balanceValue * 100;
-                    updateBalanceSystem(balanceValue);
-                }
-                
-                // D/Right Arrow = move balance right
-                if (e.key === 'd' || e.key === 'ArrowRight') {
-                    balanceValue = Math.min(1, balanceValue + 0.05);
-                    document.getElementById('balanceSlider').value = balanceValue * 100;
-                    updateBalanceSystem(balanceValue);
-                }
-                
-                // Space = interact/pickup
-                if (e.key === ' ') {
-                    attemptPickupInteraction();
-                }
-            });
-            
-            // Help button
-            document.getElementById('helpBtn').addEventListener('click', function() {
-                document.getElementById('helpOverlay').style.display = 'block';
-            });
-            
-            document.getElementById('closeHelpBtn').addEventListener('click', function() {
-                document.getElementById('helpOverlay').style.display = 'none';
-            });
         }
     </script>
 </body>
