@@ -26,6 +26,7 @@
             padding: 10px;
             font-family: Arial, sans-serif;
             border-radius: 5px;
+            display: none; /* Hide testing controls */
         }
         #balanceUI {
             position: absolute;
@@ -36,6 +37,7 @@
             padding: 10px;
             font-family: Arial, sans-serif;
             border-radius: 5px;
+            display: none; /* Hide balance UI */
         }
         #pickupControls {
             position: absolute;
@@ -47,6 +49,7 @@
             font-family: Arial, sans-serif;
             border-radius: 5px;
             z-index: 1000;
+            display: none; /* Hide pickup controls */
         }
         select, button, input {
             margin: 5px;
@@ -101,7 +104,7 @@
         }
         #carryInfo {
             position: absolute;
-            top: 200px;
+            top: 10px;
             left: 10px;
             background: rgba(0,0,0,0.7);
             color: white;
@@ -206,6 +209,18 @@
             border-radius: 5px;
             z-index: 1001;
         }
+        #debug {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            font-family: monospace;
+            border-radius: 5px;
+            z-index: 1001;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
@@ -249,10 +264,8 @@
     </div>
     
     <div id="carryInfo">
-        <h3>Carrying Status</h3>
         <div>Bags: <span id="bagCount">0</span></div>
-        <div>Total Weight: <span id="totalWeight">0</span></div>
-        <div>Weight Class: <span id="weightClass">None</span></div>
+        <div>Weight: <span id="totalWeight">0</span> kg</div>
     </div>
     
     <div id="pickupFeedback"></div>
@@ -266,6 +279,8 @@
     
     <button id="helpBtn">?</button>
     <button id="gameViewBtn">Toggle Camera</button>
+    
+    <div id="debug"></div>
     
     <div id="helpOverlay" style="display: none;">
         <h2>Controls</h2>
@@ -418,6 +433,12 @@
         let movementAcceleration = 0;
         let maxMovementSpeed = 0.1;
         let cameraMode = "thirdPerson"; // thirdPerson or orbit
+        
+        // Animation transition variables
+        let animationTransitionTime = 0.5; // seconds to blend between animations
+        let isAnimationTransitioning = false;
+        let animationTransitionTimeout = null;
+        let lastAnimationChange = 0;
         
         // Joystick variables
         let joystickActive = false;
@@ -664,6 +685,15 @@
         
         // Function to set upper body animation
         function setUpperBodyAnimation(name) {
+            // Prevent rapid animation changes
+            const now = Date.now();
+            if (now - lastAnimationChange < 300) {
+                return; // Ignore if we just changed animations
+            }
+            lastAnimationChange = now;
+            
+            updateDebug(`Setting upper body anim: ${name}`);
+            
             // Check if we should use a carry animation based on weight class
             if (attachedBags.length > 0 && name.startsWith('carry')) {
                 // Use weight-appropriate carry animation
@@ -671,53 +701,67 @@
                     name.substring(0, name.indexOf('_')) : name;
                 
                 name = `${baseAnimName}_${carryWeightClass}`;
-                console.log(`Using weight-specific animation: ${name}`);
+                updateDebug(`Using weight-specific animation: ${name}`);
             }
             
             if (!upperBodyActions[name]) {
-                console.warn(`Upper body animation '${name}' not found, falling back to walk`);
+                updateDebug(`Upper body animation '${name}' not found, falling back to walk`);
                 name = 'walk';
+            }
+            
+            // If already playing this animation, don't restart it
+            if (currentUpperBodyAnimation === name && currentUpperBodyAction) {
+                return;
             }
             
             // Fade out current animation
             if (currentUpperBodyAction) {
-                currentUpperBodyAction.fadeOut(0.5);
+                currentUpperBodyAction.fadeOut(animationTransitionTime);
             }
             
             // Play new animation
             const action = upperBodyActions[name];
             action.reset();
-            action.fadeIn(0.5);
+            action.fadeIn(animationTransitionTime);
             action.play();
             
             currentUpperBodyAction = action;
             currentUpperBodyAnimation = name;
-            
-            console.log(`Playing upper body animation: ${name}`);
         }
         
         // Function to set lower body animation
         function setLowerBodyAnimation(name) {
+            // Prevent rapid animation changes
+            const now = Date.now();
+            if (now - lastAnimationChange < 300) {
+                return; // Ignore if we just changed animations
+            }
+            
+            updateDebug(`Setting lower body anim: ${name}`);
+            
             if (!lowerBodyActions[name]) {
-                console.warn(`Lower body animation '${name}' not found`);
+                updateDebug(`Lower body animation '${name}' not found`);
+                return;
+            }
+            
+            // If already playing this animation, don't restart it
+            if (currentLowerBodyAnimation === name && currentLowerBodyAction) {
                 return;
             }
             
             // Fade out current animation
             if (currentLowerBodyAction) {
-                currentLowerBodyAction.fadeOut(0.5);
+                currentLowerBodyAction.fadeOut(animationTransitionTime);
             }
             
             // Play new animation
             const action = lowerBodyActions[name];
             action.reset();
-            action.fadeIn(0.5);
+            action.fadeIn(animationTransitionTime);
             action.play();
             
             currentLowerBodyAction = action;
             currentLowerBodyAnimation = name;
-            
-            console.log(`Playing lower body animation: ${name}`);
         }
         
         // Function to update animations based on balance direction
@@ -725,7 +769,7 @@
             // Use stumble for lower body when imbalanced
             if (direction !== "center") {
                 // If moving, use stumble_lowerbody, otherwise use default animation
-                if (isMoving) {
+                if (isMoving && !currentLowerBodyAnimation.startsWith('stumble')) {
                     setLowerBodyAnimation('stumble_lowerbody');
                 }
                 
@@ -741,9 +785,9 @@
                 }
             } else {
                 // Return to normal walking and no tilt
-                if (isMoving) {
+                if (isMoving && currentLowerBodyAnimation.startsWith('stumble')) {
                     setLowerBodyAnimation('walk');
-                } else {
+                } else if (!isMoving && currentLowerBodyAnimation.startsWith('stumble')) {
                     setLowerBodyAnimation('idle');
                 }
                 
@@ -1160,19 +1204,19 @@
             let balanceShift = 0;
             
             // Movement speed affects balance
-            balanceShift += movementAcceleration * 0.5; 
+            balanceShift += movementAcceleration * 0.3; // Reduced from 0.5 to make it less sensitive
             
             // Turning affects balance
             if (Math.abs(targetRotation - characterTilt.rotation.y) > 0.05) {
                 const turnDirection = ((targetRotation - characterTilt.rotation.y) + Math.PI) % (Math.PI * 2) - Math.PI;
-                balanceShift += turnDirection * 0.02;
+                balanceShift += turnDirection * 0.01; // Reduced from 0.02 to make it less sensitive
             }
             
             // Carrying weight makes balance harder
-            const carryFactor = 1 + (totalBagWeight * 0.05);
+            const carryFactor = 1 + (totalBagWeight * 0.03); // Reduced from 0.05
             balanceShift *= carryFactor;
             
-            // Apply changes to balance value
+            // Apply changes to balance value with smoothing
             balanceValue = Math.max(0, Math.min(1, balanceValue + balanceShift));
             
             // Update the UI
@@ -1210,6 +1254,7 @@
             if (!characterTilt) return;
             
             // Reset movement flag
+            const wasMoving = isMoving;
             isMoving = false;
             
             // Get joystick or keyboard input
@@ -1273,13 +1318,23 @@
                 // Update character position
                 characterTilt.position.add(moveDirection);
                 
-                // Update animations based on movement
-                if (attachedBags.length > 0) {
-                    setUpperBodyAnimation(`carry_${carryWeightClass}`);
-                } else {
-                    setUpperBodyAnimation('walk');
+                // Update animations based on movement state change
+                if (!wasMoving || currentUpperBodyAnimation === 'idle') {
+                    // Just started moving
+                    if (attachedBags.length > 0) {
+                        setUpperBodyAnimation(`carry_${carryWeightClass}`);
+                    } else {
+                        setUpperBodyAnimation('walk');
+                    }
                 }
-                setLowerBodyAnimation('walk');
+                
+                if (!wasMoving || currentLowerBodyAnimation === 'idle') {
+                    if (currentBalanceDirection === "center") {
+                        setLowerBodyAnimation('walk');
+                    } else {
+                        setLowerBodyAnimation('stumble_lowerbody');
+                    }
+                }
             } else {
                 // Character is not moving, slow down gradually
                 movementAcceleration *= 0.8;
@@ -1287,16 +1342,20 @@
                     movementAcceleration = 0;
                 }
                 
-                // Update animations for idle state
-                if (!currentUpperBodyAnimation.startsWith('pickup')) {
-                    if (attachedBags.length > 0) {
-                        setUpperBodyAnimation(`carry_${carryWeightClass}`);
-                    } else {
-                        setUpperBodyAnimation('idle');
+                // Update animations for idle state only if we were previously moving
+                if (wasMoving) {
+                    // Just stopped moving
+                    if (!currentUpperBodyAnimation.startsWith('pickup')) {
+                        if (attachedBags.length > 0) {
+                            setUpperBodyAnimation(`carry_${carryWeightClass}`);
+                        } else {
+                            setUpperBodyAnimation('idle');
+                        }
                     }
-                }
-                if (!currentLowerBodyAnimation.startsWith('stumble')) {
-                    setLowerBodyAnimation('idle');
+                    
+                    if (!currentLowerBodyAnimation.startsWith('stumble') && currentLowerBodyAnimation !== 'idle') {
+                        setLowerBodyAnimation('idle');
+                    }
                 }
             }
             
@@ -1487,6 +1546,10 @@
         window.addEventListener('load', function() {
             setupJoystickControls();
             document.getElementById('toggleBalance').textContent = 'Disable Balance Effect';
+            document.getElementById('helpOverlay').style.display = 'block'; // Show help on start
+            
+            // Add a simple debug message
+            updateDebug('Game loaded successfully');
         });
         
         // Handle window resize
@@ -1552,6 +1615,11 @@
         
         // Interactive pickup function for touch/click
         function attemptPickupInteraction() {
+            // Don't allow pickups during pickup animations
+            if (currentUpperBodyAnimation.startsWith('pickup')) {
+                return false;
+            }
+            
             const bagInView = findInteractableBagInViewDirection();
             
             if (bagInView) {
@@ -1583,6 +1651,35 @@
             
             return false;
         }
+
+        // Setup a simple debug display
+        const debugEl = document.getElementById('debug');
+        function updateDebug(message) {
+            if (!debugEl) return;
+            
+            // Add message to debug log
+            const now = new Date().toLocaleTimeString();
+            debugEl.innerHTML = `[${now}] ${message}<br>` + debugEl.innerHTML.split('<br>').slice(0, 10).join('<br>');
+        }
+        
+        // Add keyboard shortcut to toggle development UI
+        document.addEventListener('keydown', function(e) {
+            // Press D key to toggle development controls
+            if (e.key.toLowerCase() === 'd' && e.ctrlKey) {
+                const elements = [
+                    document.getElementById('controls'),
+                    document.getElementById('balanceUI'),
+                    document.getElementById('pickupControls'),
+                    document.getElementById('debug')
+                ];
+                
+                elements.forEach(el => {
+                    if (el) {
+                        el.style.display = el.style.display === 'none' ? 'block' : 'none';
+                    }
+                });
+            }
+        });
     </script>
 </body>
 </html> 
