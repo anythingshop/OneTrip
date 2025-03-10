@@ -380,6 +380,9 @@
         renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadow edges
         document.body.appendChild(renderer.domElement);
         
+        // Add a flag to prevent multiple renders in the same frame
+        let renderRequested = false;
+        
         // Controls for testing
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.target.set(0, 2, 0);
@@ -433,7 +436,22 @@
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
+        ground.position.y = 0.1; // Raise slightly to be above the flat base
         scene.add(ground);
+        
+        // Add a completely flat base ground plane with the same green color
+        const baseGroundGeometry = new THREE.PlaneGeometry(200, 200, 1, 1); // Large flat plane
+        const baseGroundMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x2D4C31, // Same green color as specified
+            roughness: 0.9,
+            metalness: 0.05,
+        });
+        
+        const baseGround = new THREE.Mesh(baseGroundGeometry, baseGroundMaterial);
+        baseGround.rotation.x = -Math.PI / 2;
+        baseGround.position.y = 0; // At the very bottom
+        baseGround.receiveShadow = true;
+        scene.add(baseGround);
         
         // Grid helper (hidden by default for better visuals)
         const gridHelper = new THREE.GridHelper(200, 200);
@@ -2036,24 +2054,21 @@
             // Only apply balance effects when carrying bags
             if (!balanceEnabled || attachedBags.length === 0) return;
             
-            // Calculate balance shifts based on movement and turning
+            // Remove the movement acceleration influence - only use turning
             let balanceShift = 0;
             
-            // Movement speed affects balance - reduced sensitivity
-            balanceShift += movementAcceleration * 0.15; // Reduced from 0.3
-            
-            // Turning affects balance - reduced sensitivity
-            if (Math.abs(targetRotation - characterTilt.rotation.y) > 0.1) { // Increased threshold from 0.05 to 0.1
+            // Turning affects balance
+            if (Math.abs(targetRotation - characterTilt.rotation.y) > 0.1) {
                 const turnDirection = ((targetRotation - characterTilt.rotation.y) + Math.PI) % (Math.PI * 2) - Math.PI;
-                balanceShift += turnDirection * 0.005; // Reduced from 0.01
+                balanceShift += turnDirection * 0.01; // Increased from 0.005 for more pronounced effect
             }
             
             // Carrying weight makes balance harder
-            const carryFactor = 1 + (totalBagWeight * 0.02); // Reduced from 0.03
+            const carryFactor = 1 + (totalBagWeight * 0.02);
             balanceShift *= carryFactor;
             
-            // Apply changes to balance value with smoothing and reduced rate of change
-            balanceValue = Math.max(0, Math.min(1, balanceValue + (balanceShift * 0.5))); // Added 0.5 multiplier to slow changes
+            // Apply changes to balance value with smoothing
+            balanceValue = Math.max(0, Math.min(1, balanceValue + (balanceShift * 0.5)));
             
             // Update the UI
             document.getElementById('balanceSlider').value = balanceValue * 100;
@@ -2074,19 +2089,22 @@
         function updateThirdPersonCamera() {
             if (!characterTilt || !thirdPersonCamera) return;
             
-            // Get character position and rotation
+            // Create new vectors for camera calculations to avoid reference issues
             const characterPos = new THREE.Vector3();
             characterTilt.getWorldPosition(characterPos);
             
-            // Calculate camera position based on character position and rotation
-            const cameraOffset = thirdPersonCameraOffset.clone();
-            cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
+            // Clone the offset and apply rotation
+            const tempOffset = thirdPersonCameraOffset.clone();
+            tempOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
             
-            // Set camera position and target
-            thirdPersonCamera.position.copy(characterPos).add(cameraOffset);
-            thirdPersonCameraTarget.copy(characterPos);
-            thirdPersonCameraTarget.y += 1.5; // Look slightly above character's feet
-            thirdPersonCamera.lookAt(thirdPersonCameraTarget);
+            // Set camera position directly
+            thirdPersonCamera.position.copy(characterPos);
+            thirdPersonCamera.position.add(tempOffset);
+            
+            // Set camera target
+            const targetPos = new THREE.Vector3().copy(characterPos);
+            targetPos.y += 1.5; // Look slightly above character's feet
+            thirdPersonCamera.lookAt(targetPos);
         }
         
         // Update character movement and fix orientation
@@ -2783,10 +2801,22 @@
         
         // Animation loop
         const clock = new THREE.Clock();
+        let lastCameraUpdate = 0;
+        
         function animate() {
-            requestAnimationFrame(animate);
+            // Only request a new frame if one isn't already pending
+            if (!renderRequested) {
+                renderRequested = true;
+                requestAnimationFrame(frameUpdate);
+            }
+        }
+        
+        function frameUpdate() {
+            // Reset the flag at the start of the frame
+            renderRequested = false;
             
             const delta = clock.getDelta();
+            const elapsedTime = clock.getElapsedTime();
             
             // Update character movement
             updateCharacterMovement(delta);
@@ -2794,8 +2824,7 @@
             // Update character animations
             if (mixer) mixer.update(delta);
             
-            // Apply camera rotation updates here, in the main animation loop
-            // This ensures we don't get ghosting from multiple camera updates in a single frame
+            // Apply smooth character rotation in the animation loop
             if (characterTilt && Math.abs(targetRotation - characterTilt.rotation.y) > 0.01) {
                 characterTilt.rotation.y = THREE.MathUtils.lerp(
                     characterTilt.rotation.y,
@@ -2804,8 +2833,7 @@
                 );
             }
             
-            // Always update camera position once per frame, regardless of movement
-            // This prevents the double vision effect
+            // Update camera position once per frame
             if (cameraMode === "thirdPerson" && thirdPersonCamera && characterTilt) {
                 updateThirdPersonCamera();
             }
@@ -2830,15 +2858,18 @@
                 }
             });
             
-            // Render scene with appropriate camera
+            // Render scene with appropriate camera - rendering exactly once per frame
             if (cameraMode === "thirdPerson" && thirdPersonCamera) {
                 renderer.render(scene, thirdPersonCamera);
             } else {
                 renderer.render(scene, camera);
             }
+            
+            // Request the next frame
+            requestAnimationFrame(frameUpdate);
         }
         
-        // Start the animation loop
+        // Start the animation loop - this only needs to be called once
         animate();
         
         // Initialize controls when everything is loaded
