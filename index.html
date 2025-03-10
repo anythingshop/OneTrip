@@ -3202,7 +3202,20 @@
                 if (intersects.length > 0) {
                     // Find which bag this mesh belongs to
                     const hitMesh = intersects[0].object;
-                    const bagInfo = bagMeshes.find(item => item.mesh === hitMesh || item.mesh.isAncestorOf(hitMesh));
+                    // Fix for isAncestorOf error - use a simpler approach to find the parent bag
+                    const bagInfo = bagMeshes.find(item => {
+                        // Check if it's the same mesh
+                        if (item.mesh === hitMesh) return true;
+                        
+                        // Or check if the hit mesh is a child of the bag mesh
+                        // by comparing UUIDs or checking parent chain
+                        let parent = hitMesh.parent;
+                        while (parent) {
+                            if (parent === item.bag) return true;
+                            parent = parent.parent;
+                        }
+                        return false;
+                    });
                     
                     if (bagInfo) {
                         const bag = bagInfo.bag;
@@ -3581,6 +3594,21 @@
             
             // Start the update loop
             updateTouchControls();
+        }
+        
+        // Function to switch animations for both upper and lower body
+        function switchAnimation(upperAnim, forceUpper, lowerAnim, forceLower) {
+            if (forceUpper) {
+                forcedAnimationUpdate(upperAnim);
+            } else {
+                setUpperBodyAnimation(upperAnim);
+            }
+            
+            if (lowerAnim && forceLower) {
+                setLowerBodyAnimation(lowerAnim);
+            } else if (lowerAnim) {
+                setLowerBodyAnimation(lowerAnim);
+            }
         }
         
         // Start the main animation loop
