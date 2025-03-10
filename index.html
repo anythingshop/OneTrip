@@ -29,15 +29,29 @@
             display: none; /* Hide testing controls */
         }
         #balanceUI {
-            position: absolute;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.7);
+            position: fixed;
+            top: 70px; /* Keep this height */
+            left: 20px; /* Move to left side instead of right side */
+            background: rgba(0, 0, 0, 0.6);
             color: white;
             padding: 10px;
-            font-family: Arial, sans-serif;
             border-radius: 5px;
-            display: none; /* Hide balance UI */
+            z-index: 1001;
+            max-width: 180px; /* Limit width to prevent overflow */
+            display: flex; /* Use flexbox for better layout */
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        #balanceUI h3 {
+            margin-top: 0;
+            margin-bottom: 5px;
+            font-size: 14px; /* Smaller text */
+        }
+        
+        #balanceSlider {
+            width: 150px; /* Set fixed width */
+            margin: 5px 0;
         }
         #pickupControls {
             position: absolute;
@@ -96,31 +110,40 @@
             pointer-events: none;  /* Disable interaction with slider since it's read-only now */
         }
         #pickupFeedback {
-            position: absolute;
-            top: 50%;
+            position: fixed;
+            top: 20%; /* Move higher on screen to avoid interference (from 50%) */
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.7);
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.7);
             color: white;
-            padding: 15px 30px;
-            font-family: Arial, sans-serif;
             border-radius: 5px;
-            font-size: 24px;
+            font-size: 16px;
+            font-weight: bold;
             opacity: 0;
-            transition: opacity 0.3s;
+            transition: opacity 0.3s ease;
+            z-index: 1000;
             pointer-events: none;
-            z-index: 2000;
         }
         #carryInfo {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(0,0,0,0.7);
+            position: fixed;
+            top: 70px; /* Position at top */
+            right: 20px; /* Position at right */
+            background: rgba(0, 0, 0, 0.6);
             color: white;
             padding: 10px;
-            font-family: Arial, sans-serif;
             border-radius: 5px;
-            z-index: 1000;
+            max-width: 250px; /* Limit width */
+            z-index: 1001;
+            display: flex;
+            flex-direction: column;
+            font-size: 14px; /* Smaller text */
+        }
+        
+        #carryInfo h3 {
+            margin-top: 0;
+            margin-bottom: 5px;
+            font-size: 14px;
         }
         #touchControls {
             position: absolute;
@@ -134,14 +157,16 @@
         }
         #virtualJoystick {
             position: absolute;
-            bottom: 80px;
-            left: 80px;
-            width: 120px;
-            height: 120px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 60px;
-            border: 2px solid rgba(255, 255, 255, 0.5);
-            z-index: 1001;
+            bottom: 100px;
+            left: 30px; /* Move further left from 50px */
+            width: 150px;
+            height: 150px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 75px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
             touch-action: none;
         }
         #joystickKnob {
@@ -158,14 +183,16 @@
         /* Add second joystick for camera rotation */
         #rotationJoystick {
             position: absolute;
-            bottom: 80px;
-            right: 80px;
-            width: 120px;
-            height: 120px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 60px;
-            border: 2px solid rgba(255, 255, 255, 0.5);
-            z-index: 1001;
+            bottom: 100px;
+            right: 30px; /* Move further right from 50px */
+            width: 150px;
+            height: 150px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 75px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
             touch-action: none;
         }
         #rotationJoystickKnob {
@@ -181,8 +208,8 @@
         }
         #interactButton {
             position: absolute;
-            bottom: 230px; /* Moved higher up */
-            left: 80px; /* Positioned above the left joystick */
+            bottom: 250px; /* Moved higher up */
+            left: 50px; /* Aligned with left joystick */
             width: 80px;
             height: 80px;
             background: rgba(255, 255, 255, 0.5);
@@ -285,6 +312,10 @@
             pointer-events: none;
             z-index: 1000;
         }
+        /* New Drop Button Styles */
+        #dropButton {
+            display: none; /* Hide the drop button completely */
+        }
     </style>
 </head>
 <body>
@@ -352,8 +383,9 @@
         <h2>Controls</h2>
         <p><strong>Touch Controls:</strong> Left joystick to move, right joystick to rotate, button to pick up bags</p>
         <p><strong>Keyboard/Mouse:</strong> WASD or arrows to move, mouse to rotate, SPACE to pick up, R to drop</p>
-        <p><strong>Balance:</strong> Use Q and E keys to control balance when carrying bags</p>
+        <p><strong>Balance:</strong> Use Q and E keys to control balance when carrying bags, or tilt right joystick left/right on mobile</p>
         <p><strong>Tips:</strong> Get close to bags to pick them up. Ground bags use right hand, car bags use left hand.</p>
+        <p><strong>Game Over:</strong> If you lose your balance while carrying bags, you'll fall and drop everything. You'll recover after 3 seconds.</p>
         <button id="closeHelpBtn">Got it!</button>
     </div>
 
@@ -779,14 +811,13 @@
         ];
 
         // Animation variables
-        let mixer;
-        let animations = [];
+        let mixer, skeleton;
         let upperBodyActions = {};
         let lowerBodyActions = {};
-        let currentUpperBodyAction = null;
-        let currentLowerBodyAction = null;
-        let currentUpperBodyAnimation = 'walk';
-        let currentLowerBodyAnimation = 'walk';
+        let lowerBodyClips = {};
+        let upperBodyClips = {};
+        let currentUpperBodyAnimation = 'idle';
+        let currentLowerBodyAnimation = 'idle';
         let balanceEnabled = false; // Set to false by default now
         let balanceValue = 0.5;
         let currentBalanceDirection = "center"; // left, center, right
@@ -810,6 +841,7 @@
         let isAnimationTransitioning = false;
         let animationTransitionTimeout = null;
         let lastAnimationChange = 0;
+        let lastAnimationChangeTime = 0; // Track pickup animation start time
         let animationChangeMinDelay = 250; // Reduced from 800ms to make animations more responsive
         
         // Joystick variables
@@ -1561,6 +1593,40 @@
         function preloadAnimations() {
             console.log("Preloading animations...");
             
+            let preloadedCount = 0;
+            
+            // Preload all basic animations first
+            const basicAnims = ["idle", "walk", "run"];
+            for (const anim of basicAnims) {
+                // Preload for upper body
+                if (!upperBodyActions[anim] && upperBodyClips[anim]) {
+                    console.log(`Preloading basic animation (upper): ${anim}`);
+                    
+                    // Create action but don't play it
+                    const action = mixer.clipAction(upperBodyClips[anim]);
+                    action.weight = 0; // Zero weight = no visible effect
+                    action.play(); // Playing with zero weight = preload only
+                    
+                    // Store for future use
+                    upperBodyActions[anim] = action;
+                    preloadedCount++;
+                }
+                
+                // Preload for lower body
+                if (!lowerBodyActions[anim] && lowerBodyClips[anim]) {
+                    console.log(`Preloading basic animation (lower): ${anim}`);
+                    
+                    // Create action but don't play it
+                    const action = mixer.clipAction(lowerBodyClips[anim]);
+                    action.weight = 0;
+                    action.play();
+                    
+                    // Store for future use
+                    lowerBodyActions[anim] = action;
+                    preloadedCount++;
+                }
+            }
+            
             // Preload all carry animations by creating them at startup
             const weightClasses = ["light", "medium", "heavy"];
             const animTypes = ["walk", "idle", "run"];
@@ -1571,7 +1637,7 @@
                     
                     // Just access the animation to ensure it's created
                     if (!upperBodyActions[animName] && upperBodyClips[animName]) {
-                        console.log(`Preloading animation: ${animName}`);
+                        console.log(`Preloading carry animation: ${animName}`);
                         
                         // Create action but don't play it
                         const action = mixer.clipAction(upperBodyClips[animName]);
@@ -1580,6 +1646,7 @@
                         
                         // Store for future use
                         upperBodyActions[animName] = action;
+                        preloadedCount++;
                     }
                 }
             }
@@ -1588,7 +1655,7 @@
             const stumbleAnims = ["stumble_lowerbody", "stumble_fall"];
             for (const anim of stumbleAnims) {
                 if (!lowerBodyActions[anim] && lowerBodyClips[anim]) {
-                    console.log(`Preloading animation: ${anim}`);
+                    console.log(`Preloading stumble animation: ${anim}`);
                     
                     // Create action but don't play it
                     const action = mixer.clipAction(lowerBodyClips[anim]);
@@ -1597,10 +1664,28 @@
                     
                     // Store for future use
                     lowerBodyActions[anim] = action;
+                    preloadedCount++;
                 }
             }
             
-            console.log("Animation preloading complete");
+            // Preload pickup animations
+            const pickupAnims = ["pickup_low", "pickup_high"];
+            for (const anim of pickupAnims) {
+                if (!upperBodyActions[anim] && upperBodyClips[anim]) {
+                    console.log(`Preloading pickup animation: ${anim}`);
+                    
+                    // Create action but don't play it
+                    const action = mixer.clipAction(upperBodyClips[anim]);
+                    action.weight = 0;
+                    action.play();
+                    
+                    // Store for future use
+                    upperBodyActions[anim] = action;
+                    preloadedCount++;
+                }
+            }
+            
+            console.log(`Animation preloading complete. Preloaded ${preloadedCount} animations.`);
         }
         
         // Update the animation selection and carrying code to use correct animation naming pattern
@@ -1629,65 +1714,45 @@
 
         // Function to set upper body animation
         function setUpperBodyAnimation(name) {
-            // Prevent rapid animation changes
-            const now = Date.now();
-            if (now - lastAnimationChange < animationChangeMinDelay) { // Use variable for min delay
-                updateDebug(`Ignoring animation change: too soon (${name})`);
-                return; // Ignore if we just changed animations
-            }
+            // Don't change if same animation is already playing
+            if (name === currentUpperBodyAnimation) return;
             
-            updateDebug(`Setting upper body anim: ${name}`);
+            // Track animation change time
+            lastAnimationChange = Date.now();
             
-            // Check if we should use a carry animation based on weight class
-            if (attachedBags.length > 0 && (name === 'walk' || name === 'idle' || name === 'run' || name.startsWith('carry'))) {
-                // For carrying, we use the special format: carry_[movement]_[weight]
-                name = getAnimationNameForCarrying(name, carryWeightClass);
-                updateDebug(`Using carry animation: ${name}`);
-            }
-            
-            if (!upperBodyActions[name]) {
-                updateDebug(`Upper body animation '${name}' not found, falling back to walk`);
+            // If we have the animation, play it
+            if (upperBodyActions[name]) {
+                // Smoothly transition to new animation
+                updateDebug(`Upper body animation: ${name}`);
                 
-                // Try to find a similar animation if the exact one isn't available
-                const simplifiedName = name.split('_')[0]; // Get base animation name
-                
-                if (simplifiedName === 'carry' && upperBodyActions['carry_walk_medium']) {
-                    name = 'carry_walk_medium'; // Fallback to a default carry animation
-                } else {
-                    name = 'walk'; // Fallback to basic walk
+                // Fade out current animation
+                if (upperBodyActions[currentUpperBodyAnimation]) {
+                    upperBodyActions[currentUpperBodyAnimation].fadeOut(0.2);
                 }
+                
+                // Fade in new animation
+                upperBodyActions[name].reset();
+                upperBodyActions[name].fadeIn(0.2);
+                upperBodyActions[name].play();
+                
+                // Update current animation
+                currentUpperBodyAnimation = name;
+                
+                // For pickup animations, make sure lower body is in appropriate state
+                if (name.startsWith('pickup')) {
+                    // For pickups, upper body leads, but we want lower body to follow
+                    if (name === 'pickup_low') {
+                        setLowerBodyAnimation('idle'); // Stay in place for ground pickups
+                    } else if (name === 'pickup_high') {
+                        setLowerBodyAnimation('idle'); // Stay in place for car pickups
+                    }
+                }
+                
+                return true;
+            } else {
+                updateDebug(`Animation not found: ${name}`);
+                return false;
             }
-            
-            // If already playing this animation, don't restart it
-            if (currentUpperBodyAnimation === name && currentUpperBodyAction) {
-                updateDebug(`Already playing ${name}, not restarting`);
-                return;
-            }
-            
-            // Set animation transitioning flag
-            isAnimationTransitioning = true;
-            
-            // Fade out current animation
-            if (currentUpperBodyAction) {
-                currentUpperBodyAction.fadeOut(animationTransitionTime);
-            }
-            
-            // Play new animation
-            const action = upperBodyActions[name];
-            action.reset();
-            action.fadeIn(animationTransitionTime);
-            action.play();
-            
-            currentUpperBodyAction = action;
-            currentUpperBodyAnimation = name;
-            lastAnimationChange = now;
-            
-            // Clear transition flag after transition completes
-            clearTimeout(animationTransitionTimeout);
-            animationTransitionTimeout = setTimeout(() => {
-                isAnimationTransitioning = false;
-                updateDebug(`Animation transition complete: ${name}`);
-            }, animationTransitionTime * 1000);
         }
         
         // Function to set lower body animation
@@ -2609,6 +2674,10 @@
             
             updateDebug(`Forcing animation: ${name}`);
             
+            // Update animation change tracking for both general and pickup animations
+            lastAnimationChange = Date.now();
+            lastAnimationChangeTime = Date.now();
+            
             // Get the original animation name before modifications
             const originalName = name;
             
@@ -2632,43 +2701,59 @@
                 }
             }
             
-            // If already playing this animation, don't restart it
-            if (currentUpperBodyAnimation === name && currentUpperBodyAction) {
-                updateDebug(`Already playing ${name}, not restarting`);
-                return;
-            }
-            
             // Set animation transitioning flag
             isAnimationTransitioning = true;
             
-            // Fade out current animation
+            // Fade out current upper body animation - use a short transition time for forced updates
+            const shortTransitionTime = 0.15; // Faster transitions for forced updates (was 0.5)
+            
             if (currentUpperBodyAction) {
-                currentUpperBodyAction.fadeOut(animationTransitionTime);
+                currentUpperBodyAction.fadeOut(shortTransitionTime);
             }
             
-            // Play new animation
+            // Play new animation with short fade in
             const action = upperBodyActions[name];
-            action.reset();
-            action.fadeIn(animationTransitionTime);
-            action.play();
+            if (action) {
+                action.reset();
+                action.fadeIn(shortTransitionTime);
+                action.play();
+                
+                currentUpperBodyAction = action;
+                currentUpperBodyAnimation = name;
+            }
             
-            currentUpperBodyAction = action;
-            currentUpperBodyAnimation = name;
-            lastAnimationChange = Date.now();
-            
-            // Also update lower body animation when appropriate
-            // For regular walk/idle animations or for carry animations
-            if (originalName === 'walk' || originalName === 'idle' || originalName === 'run') {
-                // Use the original name for lower body when not carrying
-                setLowerBodyAnimation(originalName);
-                updateDebug(`Also setting lower body animation to: ${originalName}`);
-            } else if (name.startsWith('carry_')) {
-                // For carry animations, extract the base animation (walk/idle/run)
-                const baseParts = name.split('_');
-                if (baseParts.length >= 2) {
-                    const lowerAnim = baseParts[1]; // 'walk', 'idle', etc.
-                    setLowerBodyAnimation(lowerAnim);
-                    updateDebug(`Setting lower body animation for carry to: ${lowerAnim}`);
+            // Also make sure lower body matches if needed for specific animations
+            if (name.startsWith('pickup_') || name === 'idle' || name === 'stumble_fall') {
+                // For certain animations, make sure lower body is synchronized
+                if (lowerBodyActions['idle']) {
+                    const lowerAction = lowerBodyActions['idle'];
+                    
+                    if (currentLowerBodyAction) {
+                        currentLowerBodyAction.fadeOut(shortTransitionTime);
+                    }
+                    
+                    lowerAction.reset();
+                    lowerAction.fadeIn(shortTransitionTime);
+                    lowerAction.play();
+                    
+                    currentLowerBodyAction = lowerAction;
+                    currentLowerBodyAnimation = 'idle';
+                }
+            } else if (name.startsWith('walk') || name.startsWith('carry_walk')) {
+                // For walk animations, make sure lower body also walks
+                if (lowerBodyActions['walk']) {
+                    const lowerAction = lowerBodyActions['walk'];
+                    
+                    if (currentLowerBodyAction) {
+                        currentLowerBodyAction.fadeOut(shortTransitionTime);
+                    }
+                    
+                    lowerAction.reset();
+                    lowerAction.fadeIn(shortTransitionTime);
+                    lowerAction.play();
+                    
+                    currentLowerBodyAction = lowerAction;
+                    currentLowerBodyAnimation = 'walk';
                 }
             }
             
@@ -2677,7 +2762,7 @@
             animationTransitionTimeout = setTimeout(() => {
                 isAnimationTransitioning = false;
                 updateDebug(`Animation transition complete: ${name}`);
-            }, animationTransitionTime * 1000);
+            }, shortTransitionTime * 1000);
         }
         
         // Set up joystick controls
@@ -2900,10 +2985,10 @@
             
             // Interact button for pickups - use keyboard for desktop, touch for mobile
             if (isUsingTouch) {
-            interact.addEventListener('touchstart', function(e) {
-                e.preventDefault();
-                attemptPickupInteraction();
-            });
+                interact.addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    attemptPickupInteraction();
+                });
             } else {
                 // For desktop, keyboard controls will handle pickups
                 // Hide the interact button
@@ -3466,9 +3551,19 @@
             const helpText = document.querySelector('#helpOverlay p:first-of-type');
             if (helpText) {
                 if (isUsingTouch) {
-                    helpText.textContent = "Touch Controls: Left joystick to move, right joystick to rotate, button to pick up bags";
+                    helpText.textContent = "Touch Controls: Left joystick to move, right joystick to rotate and balance, button to pick up bags";
                 } else {
                     helpText.textContent = "Keyboard/Mouse: WASD or arrows to move, mouse to look around, SPACE to pick up, R to drop";
+                }
+            }
+            
+            // Update the second paragraph of help text for balance instructions
+            const balanceHelpText = document.querySelector('#helpOverlay p:nth-of-type(3)');
+            if (balanceHelpText) {
+                if (isUsingTouch) {
+                    balanceHelpText.textContent = "Balance: Tilt the right joystick left/right to control balance when carrying bags";
+                } else {
+                    balanceHelpText.textContent = "Balance: Use Q and E keys to control balance when carrying bags";
                 }
             }
             
@@ -3656,31 +3751,22 @@
         
         // Interactive pickup function for touch/click
         function attemptPickupInteraction() {
-            // Don't allow pickups during pickup animations but with a timeout to prevent stuck state
+            // If game is in game over state, don't allow pickups
+            if (isGameOver) return false;
+            
+            // If we're already in a pickup animation but haven't finished the 
+            // attachment process, allow a new pickup to override it
             if (currentUpperBodyAnimation.startsWith('pickup')) {
-                // Only show message if we haven't shown it recently to avoid spam
+                // Check how long we've been in this pickup animation
                 const now = Date.now();
-                if (!lastPickupFeedbackTime || now - lastPickupFeedbackTime > 1500) {
-                updateDebug("Cannot pickup: already in pickup animation");
-                showPickupFeedback("Wait for pickup to finish");
-                    lastPickupFeedbackTime = now;
-                }
+                const pickupDuration = now - lastAnimationChangeTime;
                 
-                // Add a failsafe to prevent getting stuck in pickup animation
-                if (!pickupTimeoutSet) {
-                    pickupTimeoutSet = true;
-                    setTimeout(() => {
-                        // If we're still in pickup animation after timeout, force reset
-                        if (currentUpperBodyAnimation.startsWith('pickup')) {
-                            updateDebug("Pickup animation timed out, forcing reset");
-                            setUpperBodyAnimation('idle');
-                            setLowerBodyAnimation('idle');
-                        }
-                        pickupTimeoutSet = false;
-                    }, 3000); // 3 second timeout
+                // If we've been in pickup animation for over 150ms, we can force completion
+                if (pickupDuration > 150) {
+                    updateDebug("Force completing previous pickup animation");
+                    // Force the animation to end early
+                    setUpperBodyAnimation('idle');
                 }
-                
-                return false;
             }
             
             const bagInView = findInteractableBagInViewDirection();
@@ -3689,40 +3775,61 @@
                 updateDebug(`Found bag to pick up: ${bagInView.isGroundBag ? 'ground' : 'car'} bag`);
                 showPickupFeedback(bagInView.isGroundBag ? "Picking up bag..." : "Grabbing from car...");
                 
+                // Track when we started the animation
+                lastAnimationChangeTime = Date.now();
+                
                 if (bagInView.isGroundBag) {
-                    // Ground pickup
+                    // Ground pickup - preload with zero timeout
+                    if (upperBodyActions['pickup_low']) {
+                        // Make sure it's preloaded
+                        upperBodyActions['pickup_low'].reset();
+                    }
+                    
+                    // Start the animation
                     setUpperBodyAnimation('pickup_low');
                     
-                    // Reduced timeout for more responsive gameplay
-                    setTimeout(() => {
-                        if (rightHand && bagInView.bag && !attachedBags.some(b => b.mesh === bagInView.bag)) {
-                            attachBagToHand(bagInView.bag, rightHand);
-                        }
-                        // Force animation to end and transition to carry state
-                        if (attachedBags.length > 0) {
-                            const animName = `carry_idle_${carryWeightClass}`;
-                            forcedAnimationUpdate(animName);
-                        } else {
-                            setUpperBodyAnimation('idle');
-                        }
-                    }, 500); // Reduced from longer time for more responsive feel
+                    // Reduced timeout for more responsive gameplay - use requestAnimationFrame for better timing
+                    requestAnimationFrame(() => {
+                        // Process in next frame for smoother performance
+                        setTimeout(() => {
+                            if (rightHand && bagInView.bag && !attachedBags.some(b => b.mesh === bagInView.bag)) {
+                                attachBagToHand(bagInView.bag, rightHand);
+                            }
+                            // Force animation to end and transition to carry state
+                            if (attachedBags.length > 0) {
+                                const animName = `carry_idle_${carryWeightClass}`;
+                                forcedAnimationUpdate(animName);
+                            } else {
+                                setUpperBodyAnimation('idle');
+                            }
+                        }, 250); // Further reduced time but still allows animation to be visible
+                    });
                 } else {
-                    // Car pickup
+                    // Car pickup - preload with zero timeout
+                    if (upperBodyActions['pickup_high']) {
+                        // Make sure it's preloaded
+                        upperBodyActions['pickup_high'].reset();
+                    }
+                    
+                    // Start the animation
                     setUpperBodyAnimation('pickup_high');
                     
-                    // Reduced timeout for more responsive gameplay
-                    setTimeout(() => {
-                        if (leftHand && bagInView.bag && !attachedBags.some(b => b.mesh === bagInView.bag)) {
-                            attachBagToHand(bagInView.bag, leftHand);
-                        }
-                        // Force animation to end and transition to carry state
-                        if (attachedBags.length > 0) {
-                            const animName = `carry_idle_${carryWeightClass}`;
-                            forcedAnimationUpdate(animName);
-                        } else {
-                            setUpperBodyAnimation('idle');
-                        }
-                    }, 500); // Reduced from longer time for more responsive feel
+                    // Reduced timeout for more responsive gameplay - use requestAnimationFrame for better timing
+                    requestAnimationFrame(() => {
+                        // Process in next frame for smoother performance
+                        setTimeout(() => {
+                            if (leftHand && bagInView.bag && !attachedBags.some(b => b.mesh === bagInView.bag)) {
+                                attachBagToHand(bagInView.bag, leftHand);
+                            }
+                            // Force animation to end and transition to carry state
+                            if (attachedBags.length > 0) {
+                                const animName = `carry_idle_${carryWeightClass}`;
+                                forcedAnimationUpdate(animName);
+                            } else {
+                                setUpperBodyAnimation('idle');
+                            }
+                        }, 250); // Further reduced time but still allows animation to be visible
+                    });
                 }
                 return true;
             } else {
@@ -3780,24 +3887,13 @@
         function updatePickupButtonHighlight() {
             const bagInView = findInteractableBagInViewDirection();
             const interactBtn = document.getElementById('interactButton');
-            const rangeIndicator = document.getElementById('bagInRangeIndicator');
             
             if (bagInView && interactBtn) {
                 interactBtn.classList.add('highlight');
                 interactBtn.textContent = bagInView.isGroundBag ? 'Pickup' : 'Grab';
-                
-                // Show range indicator
-                if (rangeIndicator) {
-                    rangeIndicator.style.opacity = '1';
-                }
             } else if (interactBtn) {
                 interactBtn.classList.remove('highlight');
                 interactBtn.textContent = 'Pick';
-                
-                // Hide range indicator
-                if (rangeIndicator) {
-                    rangeIndicator.style.opacity = '0';
-                }
             }
         }
 
@@ -4081,6 +4177,12 @@
             updateDebug("GAME OVER - You fell!");
             showPickupFeedback("GAME OVER - You fell! Recovering in 3 seconds...");
             
+            // Make the feedback message stay visible during recovery
+            pickupFeedbackEl.style.opacity = "1";
+            pickupFeedbackEl.style.background = "rgba(255, 50, 50, 0.9)"; // Brighter red
+            pickupFeedbackEl.style.fontSize = "18px"; // Larger text
+            pickupFeedbackEl.style.padding = "15px 30px"; // Larger padding
+            
             // Drop all bags when you fall
             while (attachedBags.length > 0) {
                 detachBag(true); // Force detach all bags
@@ -4111,6 +4213,10 @@
                 
                 // Show recovery message
                 showPickupFeedback("Recovered! Be more careful next time!");
+                
+                // Make recovery message prominent
+                pickupFeedbackEl.style.background = "rgba(76, 175, 80, 0.9)"; // Brighter green
+                
                 updateDebug("Recovered from fall");
                 
                 // Reset animations
@@ -4184,6 +4290,19 @@
                 }
             }
         });
+
+        // Update the mobile help text
+        function showHelpText() {
+            const helpText = document.getElementById('helpTextContent');
+            if (!helpText) return;
+            
+            // Set appropriate text based on device
+            if (isUsingTouch) {
+                helpText.textContent = "Touch Controls: Left joystick to move, right joystick to rotate and balance, button to pick up bags. Be careful with your balance!";
+            } else {
+                helpText.textContent = "Keyboard/Mouse: WASD or arrows to move, mouse to look around, SPACE to pick up, R to drop, Q/E to balance";
+            }
+        }
     </script>
 </body>
 </html> 
