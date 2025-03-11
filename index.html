@@ -172,8 +172,8 @@
         }
         #interactButton {
             position: absolute;
-            bottom: 100px;
-            right: 220px; /* Moved to make room for rotation joystick */
+            bottom: 220px; /* Move up higher above the joystick */
+            left: 30px; /* Position to the left of the screen */
             width: 80px;
             height: 80px;
             background: rgba(255, 255, 255, 0.5);
@@ -260,6 +260,7 @@
             border-radius: 5px;
             z-index: 1001;
             font-size: 12px;
+            display: none; /* Hide debug by default */
         }
         #bagInRangeIndicator {
             position: absolute;
@@ -302,10 +303,10 @@
     </div>
     
     <div id="balanceUI">
-        <h3>Balance System Preview</h3>
+        <h3>Balance System</h3>
         <div>
-            <label for="balanceSlider">Balance (0-1): </label>
-            <input type="range" id="balanceSlider" min="0" max="100" value="50">
+            <label for="balanceSlider">Balance: </label>
+            <input type="range" id="balanceSlider" min="0" max="100" value="50" disabled>
             <span id="balanceValue">0.5</span>
         </div>
         <div id="balanceMeter">
@@ -313,10 +314,7 @@
             <div id="balanceIndicator"></div>
         </div>
         <div id="balanceDirection">Balanced</div>
-        <div>
-            <button id="toggleBalance">Toggle Balance Effect</button>
-            </div>
-        </div>
+    </div>
         
     <div id="carryInfo">
         <div>Bags: <span id="bagCount">0</span></div>
@@ -1397,13 +1395,16 @@
         function setupThirdPersonCamera() {
             thirdPersonCamera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
             
-            // Adjust the camera offset for a better view behind the character
-            thirdPersonCameraOffset = new THREE.Vector3(0, 3, 6); // Position camera slightly higher and closer
+            // Position camera higher and behind the character
+            thirdPersonCameraOffset = new THREE.Vector3(0, 3, 6);
+            
+            // Initialize camera target and rotation angle
+            cameraOrbitAngle = 0; // Initial camera angle (behind character)
             
             updateThirdPersonCamera();
         }
         
-        // Update third-person camera position for better view
+        // Update third-person camera position with orbital movement
         function updateThirdPersonCamera() {
             if (!characterTilt || !thirdPersonCamera) return;
             
@@ -1411,9 +1412,12 @@
             const characterPos = new THREE.Vector3();
             characterTilt.getWorldPosition(characterPos);
             
-            // Calculate camera position based on character position and character's Y rotation only
-            const cameraOffset = thirdPersonCameraOffset.clone();
-            cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
+            // Calculate camera position based on orbital angle around character
+            const cameraOffset = new THREE.Vector3(
+                Math.sin(cameraOrbitAngle) * thirdPersonCameraOffset.z,
+                thirdPersonCameraOffset.y,
+                Math.cos(cameraOrbitAngle) * thirdPersonCameraOffset.z
+            );
             
             // Set camera position and target
             thirdPersonCamera.position.copy(characterPos).add(cameraOffset);
@@ -1464,25 +1468,19 @@
                 }
             }
             
-            // Handle rotation separate from movement
+            // Handle rotation for camera orbiting - not character rotation
             // For rotation joystick (touch)
             if (rotationJoystickActive) {
                 const rotationAmount = rotationJoystickDirection.x * touchRotationSensitivity;
+                // Update camera orbit angle instead of character rotation
+                cameraOrbitAngle -= rotationAmount;
                 
-                // Use the rotation joystick to rotate both character and camera
-                characterTilt.rotation.y += rotationAmount;
-                
-                // Update target rotation for balance system
-                targetRotation = characterTilt.rotation.y;
-                
-                // Rotate the camera with character
+                // Update camera position after rotation
                 updateThirdPersonCamera();
             }
             // For mouse look (desktop)
             else if (mouseLookActive && cameraMode === "thirdPerson") {
-                // Rotation handled in mouse move event
-                // Update target rotation for balance system
-                targetRotation = characterTilt.rotation.y;
+                // Camera rotation is handled in mouse move event
             }
             
             // Process movement input (independent of rotation)
@@ -1495,19 +1493,16 @@
                 movementAcceleration += speedDiff * 0.08;
                 
                 // Create movement vector based on current camera perspective
+                // Use the camera's forward direction, not the character's
                 const cameraForward = new THREE.Vector3(0, 0, -1);
                 const cameraRight = new THREE.Vector3(1, 0, 0);
                 
                 if (cameraMode === "thirdPerson" && thirdPersonCamera) {
-                    // Get camera's forward and right vectors
-                    thirdPersonCamera.getWorldDirection(cameraForward);
-                    cameraForward.y = 0; // Keep movement on horizontal plane
-                    cameraForward.normalize();
-                    
-                    // Right is perpendicular to forward in horizontal plane
-                    cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraForward);
+                    // Use camera orbit angle for movement direction
+                    cameraForward.set(Math.sin(cameraOrbitAngle), 0, Math.cos(cameraOrbitAngle)).normalize();
+                    cameraRight.set(Math.sin(cameraOrbitAngle + Math.PI/2), 0, Math.cos(cameraOrbitAngle + Math.PI/2)).normalize();
                 } else {
-                    // Use character's orientation for non-third-person
+                    // For any other mode, use character's orientation
                     cameraForward.set(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
                     cameraRight.set(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
                 }
@@ -1522,14 +1517,19 @@
                 // Update character position
                 characterTilt.position.add(moveDirection);
                 
-                // If moving, rotate character mesh to face movement direction (keep characterTilt.rotation separate)
+                // If moving, rotate character model to face movement direction
+                // This doesn't change the overall character tilt container's rotation
                 if (characterModel && moveDirection.length() > 0.01) {
                     // Get current rotation of character mesh (not tilt container)
                     const angle = Math.atan2(moveDirection.x, moveDirection.z);
                     characterModel.rotation.y = angle;
+                    
+                    // Also update the target rotation for balance calculations
+                    // This ensures balance effects remain tied to movement direction
+                    targetRotation = angle;
                 }
                 
-                // Update animations based on movement state change - ONLY if state actually changed
+                // Update animations based on movement state change
                 if (!wasMoving || !lastMovementState) {
                     // Just started moving or continuing to move
                     if (!wasMoving) {
@@ -1785,10 +1785,12 @@
                     updateRotationJoystickPosition(e.clientX, e.clientY);
                 }
                 
-                // Handle mouse look if in 3rd person mode & mouse button pressed
-                if (mouseLookActive && cameraMode === "thirdPerson" && characterTilt) {
+                // Handle mouse look for camera rotation (not character rotation)
+                if (mouseLookActive && cameraMode === "thirdPerson") {
                     const dx = e.clientX - lastMouseX;
-                    characterTilt.rotation.y -= dx * mouseRotationSensitivity;
+                    // Update camera orbit angle instead of character rotation
+                    cameraOrbitAngle -= dx * mouseRotationSensitivity;
+                    updateThirdPersonCamera();
                     lastMouseX = e.clientX;
                 }
             });
@@ -2235,12 +2237,15 @@
         function updateDebug(message) {
             if (!debugEl) return;
             
-            // Add message to debug log
+            // Add message to debug log - but keep it hidden by default
             const now = new Date().toLocaleTimeString();
             debugEl.innerHTML = `[${now}] ${message}<br>` + debugEl.innerHTML.split('<br>').slice(0, 10).join('<br>');
+            
+            // Log to console as well for development
+            console.log(`[${now}] ${message}`);
         }
 
-        // Add keyboard shortcut to toggle development UI
+        // Add keyboard shortcut to toggle development UI - update to include showing debug
         document.addEventListener('keydown', function(e) {
             // Press D key to toggle development controls
             if (e.key.toLowerCase() === 'd' && e.ctrlKey) {
@@ -2296,6 +2301,9 @@
                 }
             }
         }
+
+        // Add camera orbit angle variable
+        let cameraOrbitAngle = 0;
     </script>
 </body>
 </html> 
