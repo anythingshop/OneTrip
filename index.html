@@ -29,29 +29,15 @@
             display: none; /* Hide testing controls */
         }
         #balanceUI {
-            position: fixed;
-            top: 70px; /* Keep this height */
-            left: 20px; /* Move to left side instead of right side */
-            background: rgba(0, 0, 0, 0.6);
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
             color: white;
             padding: 10px;
+            font-family: Arial, sans-serif;
             border-radius: 5px;
-            z-index: 1001;
-            max-width: 180px; /* Limit width to prevent overflow */
-            display: flex; /* Use flexbox for better layout */
-            flex-direction: column;
-            align-items: center;
-        }
-        
-        #balanceUI h3 {
-            margin-top: 0;
-            margin-bottom: 5px;
-            font-size: 14px; /* Smaller text */
-        }
-        
-        #balanceSlider {
-            width: 150px; /* Set fixed width */
-            margin: 5px 0;
+            display: none; /* Hide balance UI */
         }
         #pickupControls {
             position: absolute;
@@ -71,79 +57,61 @@
         }
         #balanceMeter {
             width: 200px;
-            height: 20px;
+            height: 10px;
             background: rgba(255,255,255,0.3);
-            border-radius: 10px;
-            margin-top: 10px;
-            margin-bottom: 10px;
+            border-radius: 5px;
+            margin-top: 5px;
             position: relative;
-            overflow: hidden;
-        }
-        .balanceZone {
-            position: absolute;
-            left: 40%;
-            width: 20%;
-            height: 100%;
-            background: rgba(0,255,0,0.3);
-            z-index: 1;
         }
         #balanceIndicator {
             position: absolute;
-            left: 50%;
             width: 6px;
             height: 100%;
-            background: #00ff00;
-            transform: translateX(-3px);
-            z-index: 2;
+            background: white;
+            border-radius: 3px;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        .balanceZone {
+            position: absolute;
+            width: 20%;
+            height: 100%;
+            background: rgba(76,175,80,0.3);
+            top: 0;
+            left: 40%;
         }
         #balanceDirection {
+            margin-top: 5px;
             font-weight: bold;
             text-align: center;
-            margin-top: 5px;
-        }
-        #balanceValue {
-            margin-left: 10px;
-        }
-        #balanceSlider {
-            width: 180px;
-            margin-top: 10px;
-            pointer-events: none;  /* Disable interaction with slider since it's read-only now */
         }
         #pickupFeedback {
-            position: fixed;
-            top: 20%; /* Move higher on screen to avoid interference (from 50%) */
+            position: absolute;
+            top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            padding: 10px 20px;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0,0,0,0.7);
             color: white;
+            padding: 15px 30px;
+            font-family: Arial, sans-serif;
             border-radius: 5px;
-            font-size: 16px;
-            font-weight: bold;
+            font-size: 24px;
             opacity: 0;
-            transition: opacity 0.3s ease;
-            z-index: 1000;
+            transition: opacity 0.3s;
             pointer-events: none;
+            z-index: 2000;
         }
         #carryInfo {
-            position: fixed;
-            top: 70px; /* Position at top */
-            right: 20px; /* Position at right */
-            background: rgba(0, 0, 0, 0.6);
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
             color: white;
             padding: 10px;
+            font-family: Arial, sans-serif;
             border-radius: 5px;
-            max-width: 250px; /* Limit width */
-            z-index: 1001;
-            display: flex;
-            flex-direction: column;
-            font-size: 14px; /* Smaller text */
-        }
-        
-        #carryInfo h3 {
-            margin-top: 0;
-            margin-bottom: 5px;
-            font-size: 14px;
+            z-index: 1000;
         }
         #touchControls {
             position: absolute;
@@ -157,16 +125,14 @@
         }
         #virtualJoystick {
             position: absolute;
-            bottom: 100px;
-            left: 30px; /* Move further left from 50px */
-            width: 150px;
-            height: 150px;
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 75px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
+            bottom: 80px;
+            left: 80px;
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 60px;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            z-index: 1001;
             touch-action: none;
         }
         #joystickKnob {
@@ -183,16 +149,14 @@
         /* Add second joystick for camera rotation */
         #rotationJoystick {
             position: absolute;
-            bottom: 100px;
-            right: 30px; /* Move further right from 50px */
-            width: 150px;
-            height: 150px;
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 75px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
+            bottom: 80px;
+            right: 80px;
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 60px;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            z-index: 1001;
             touch-action: none;
         }
         #rotationJoystickKnob {
@@ -208,8 +172,8 @@
         }
         #interactButton {
             position: absolute;
-            bottom: 250px; /* Moved higher up */
-            left: 50px; /* Aligned with left joystick */
+            bottom: 100px;
+            right: 220px; /* Moved to make room for rotation joystick */
             width: 80px;
             height: 80px;
             background: rgba(255, 255, 255, 0.5);
@@ -217,18 +181,18 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 16px;
-            color: #333;
+            color: white;
+            font-size: 24px;
             font-weight: bold;
             z-index: 1001;
             touch-action: none;
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            text-shadow: 1px 1px 2px #000;
         }
         #interactButton.highlight {
-            background: rgba(76, 175, 80, 0.7); /* Green highlight */
-            color: white;
-            text-shadow: 1px 1px 2px #000;
-            box-shadow: 0 0 15px rgba(76, 175, 80, 0.9);
-            border: 2px solid rgba(255, 255, 255, 0.8);
+            background: rgba(76, 175, 80, 0.7);
+            transform: scale(1.1);
+            transition: all 0.3s;
         }
         #helpOverlay {
             position: absolute;
@@ -312,10 +276,6 @@
             pointer-events: none;
             z-index: 1000;
         }
-        /* New Drop Button Styles */
-        #dropButton {
-            display: none; /* Hide the drop button completely */
-        }
     </style>
 </head>
 <body>
@@ -342,10 +302,10 @@
     </div>
     
     <div id="balanceUI">
-        <h3>Balance Meter</h3>
+        <h3>Balance System Preview</h3>
         <div>
-            <label for="balanceSlider">Balance: </label>
-            <input type="range" id="balanceSlider" min="0" max="100" value="50" disabled>
+            <label for="balanceSlider">Balance (0-1): </label>
+            <input type="range" id="balanceSlider" min="0" max="100" value="50">
             <span id="balanceValue">0.5</span>
         </div>
         <div id="balanceMeter">
@@ -353,6 +313,9 @@
             <div id="balanceIndicator"></div>
         </div>
         <div id="balanceDirection">Balanced</div>
+        <div>
+            <button id="toggleBalance">Toggle Balance Effect</button>
+            </div>
         </div>
         
     <div id="carryInfo">
@@ -382,10 +345,9 @@
     <div id="helpOverlay">
         <h2>Controls</h2>
         <p><strong>Touch Controls:</strong> Left joystick to move, right joystick to rotate, button to pick up bags</p>
-        <p><strong>Keyboard/Mouse:</strong> WASD or arrows to move, mouse to rotate, SPACE to pick up, R to drop</p>
-        <p><strong>Balance:</strong> Use Q and E keys to control balance when carrying bags, or tilt right joystick left/right on mobile</p>
+        <p><strong>Keyboard/Mouse:</strong> WASD or arrows to move, mouse to rotate, E or SPACE to pick up, Q or R to drop</p>
+        <p><strong>Balance:</strong> Moving quickly affects balance when carrying bags</p>
         <p><strong>Tips:</strong> Get close to bags to pick them up. Ground bags use right hand, car bags use left hand.</p>
-        <p><strong>Game Over:</strong> If you lose your balance while carrying bags, you'll fall and drop everything. You'll recover after 3 seconds.</p>
         <button id="closeHelpBtn">Got it!</button>
     </div>
 
@@ -396,23 +358,7 @@
     <script>
         // Scene setup
         const scene = new THREE.Scene();
-        
-        // Load skyline.jpg as a sky texture instead of a solid color
-        const textureLoader = new THREE.TextureLoader();
-        textureLoader.load('skyline.jpg', function(texture) {
-            // Ensure the texture wraps properly
-            texture.wrapS = THREE.ClampToEdgeWrapping;
-            texture.wrapT = THREE.ClampToEdgeWrapping;
-            scene.background = texture;
-            console.log("Skyline texture loaded successfully");
-        }, undefined, function(err) {
-            console.error("Error loading skyline texture:", err);
-            // Fallback to the default sky blue color if texture fails to load
         scene.background = new THREE.Color(0x87CEEB);
-        });
-        
-        // Add subtle atmospheric fog for depth
-        scene.fog = new THREE.FogExp2(0x9dc1e0, 0.015); // Slightly increased fog density for more contained feel
         
         // Camera setup
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
@@ -422,7 +368,6 @@
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadow edges
         document.body.appendChild(renderer.domElement);
         
         // Controls for testing
@@ -430,74 +375,27 @@
         controls.target.set(0, 2, 0);
         controls.update();
         
-        // Enhanced lighting for better visuals
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6); // Slightly brighter ambient light
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
         scene.add(ambientLight);
         
-        // Main directional light (sun)
-        const directionalLight = new THREE.DirectionalLight(0xfff0dd, 1.2); // Warmer light color and brighter
-        directionalLight.position.set(5, 12, 8);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(5, 10, 5);
         directionalLight.castShadow = true;
         directionalLight.shadow.mapSize.width = 2048;
         directionalLight.shadow.mapSize.height = 2048;
-        directionalLight.shadow.camera.near = 0.5;
-        directionalLight.shadow.camera.far = 50;
-        directionalLight.shadow.camera.left = -20;
-        directionalLight.shadow.camera.right = 20;
-        directionalLight.shadow.camera.top = 20;
-        directionalLight.shadow.camera.bottom = -20;
         scene.add(directionalLight);
         
-        // Add a secondary fill light
-        const fillLight = new THREE.DirectionalLight(0xcceeff, 0.4); // Subtle blue-ish fill light
-        fillLight.position.set(-10, 8, -10);
-        scene.add(fillLight);
-        
-        // Ground with enhanced visual quality - color maintained as requested
-        const groundGeometry = new THREE.PlaneGeometry(80, 80, 50, 50); // Reduced size for more contained playable area
-        const groundMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x2D4C31, // Maintained the rich green color as specified
-            roughness: 0.8,
-            metalness: 0.1,
-        });
-        
-        // Add a backup darker ground plane to ensure we don't see through to the background
-        const backupGroundGeometry = new THREE.PlaneGeometry(200, 200); // Larger to cover everything
-        const backupGroundMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x0A1A0C, // Much darker green for the backup ground to match grass
-            roughness: 0.9,
-            metalness: 0.0,
-        });
-        
-        // Create and add the backup ground slightly below the main ground
-        const backupGround = new THREE.Mesh(backupGroundGeometry, backupGroundMaterial);
-        backupGround.rotation.x = -Math.PI / 2;
-        backupGround.position.y = -0.02; // Slightly below main ground
-        backupGround.receiveShadow = true;
-        scene.add(backupGround);
-        
-        // Add some variation to the ground vertices for a more natural look
-        const vertices = groundGeometry.attributes.position.array;
-        for (let i = 0; i < vertices.length; i += 3) {
-            // Skip the very center area where the path will be
-            const x = vertices[i];
-            const z = vertices[i + 2];
-            
-            // Don't modify terrain near the path
-            if (Math.abs(x) < 3 && z > -30 && z < 30) continue;
-            
-            // Add subtle height variation
-            vertices[i + 1] = Math.sin(x / 10) * Math.cos(z / 10) * 0.2;
-        }
-        
+        // Ground
+        const groundGeometry = new THREE.PlaneGeometry(200, 200);
+        const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x7CFC00 });
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         scene.add(ground);
         
-        // Grid helper (hidden by default for better visuals)
+        // Grid helper
         const gridHelper = new THREE.GridHelper(200, 200);
-        gridHelper.visible = false; // Hide grid by default for better aesthetics
         scene.add(gridHelper);
         
         // Create text labels for each model
@@ -534,245 +432,17 @@
 
         // Add a path/driveway
         function createDriveway() {
-            // Create a more realistic path with texture and details
-            const pathGeometry = new THREE.PlaneGeometry(5, 50, 10, 30);
+            const pathGeometry = new THREE.PlaneGeometry(5, 50);
             const pathMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x808080, // Changed to gray color for the driveway
-                roughness: 0.9,
-                metalness: 0.1,
+                color: 0xBDBDBD,
+                roughness: 0.9
             });
-            
-            // Add subtle elevation variation to the path
-            const pathVertices = pathGeometry.attributes.position.array;
-            for (let i = 0; i < pathVertices.length; i += 3) {
-                // Get the current vertex z position (corresponds to path length)
-                const z = pathVertices[i + 2];
-                
-                // Add very subtle undulation based on position
-                // More pronounced at the edges, smoother in the center
-                const x = pathVertices[i];
-                const edgeFactor = Math.pow(Math.abs(x) / 2.5, 2); // Stronger effect at edges
-                
-                // Small random bumps along the path
-                pathVertices[i + 1] = (Math.sin(z * 0.5) * 0.03 + Math.cos(z * 0.2) * 0.02) * edgeFactor;
-            }
-            
             const path = new THREE.Mesh(pathGeometry, pathMaterial);
             path.rotation.x = -Math.PI / 2;
-            path.position.set(0, 0.03, 5); // Slightly above ground to prevent z-fighting
+            path.position.set(0, 0.02, 5); // Slightly above ground to prevent z-fighting
             path.receiveShadow = true;
             scene.add(path);
-            
-            // Add path borders for more definition (small stones/pebbles along the edges)
-            const borderMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x606060, // Darker gray for the borders
-                roughness: 1.0,
-                metalness: 0.05,
-            });
-            
-            // Left border
-            const leftBorderGeometry = new THREE.BoxGeometry(0.3, 0.1, 50);
-            const leftBorder = new THREE.Mesh(leftBorderGeometry, borderMaterial);
-            leftBorder.position.set(-2.65, 0.05, 5);
-            leftBorder.receiveShadow = true;
-            leftBorder.castShadow = true;
-            scene.add(leftBorder);
-            
-            // Right border
-            const rightBorderGeometry = new THREE.BoxGeometry(0.3, 0.1, 50);
-            const rightBorder = new THREE.Mesh(rightBorderGeometry, borderMaterial);
-            rightBorder.position.set(2.65, 0.05, 5);
-            rightBorder.receiveShadow = true;
-            rightBorder.castShadow = true;
-            scene.add(rightBorder);
-            
-            // Add a few small stone details along the path
-            addPathStones();
-            
-            // Removed the createPorchSteps() call since the house model has its own steps
         }
-        
-        // Add small decorative stones along the path
-        function addPathStones() {
-            const stoneMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x808080, 
-                roughness: 0.8, 
-                metalness: 0.2 
-            });
-            
-            // Create and place several small stones along the path
-            for (let i = 0; i < 15; i++) {
-                // Randomize position along path and slightly off-center
-                const zPos = -20 + (i * 3) + (Math.random() * 2 - 1);
-                const xPos = (Math.random() * 4 - 2) * 0.9; // Keep within path bounds
-                
-                const stoneSize = 0.15 + Math.random() * 0.15; // Random stone size
-                const stoneGeometry = new THREE.DodecahedronGeometry(stoneSize, 0);
-                
-                // Slightly flatten the stone
-                stoneGeometry.scale(1, 0.4, 1);
-                
-                const stone = new THREE.Mesh(stoneGeometry, stoneMaterial);
-                stone.position.set(xPos, 0.08, zPos);
-                
-                // Random rotation for natural look
-                stone.rotation.y = Math.random() * Math.PI * 2;
-                stone.rotation.x = Math.random() * 0.2;
-                stone.rotation.z = Math.random() * 0.2;
-                
-                stone.castShadow = true;
-                stone.receiveShadow = true;
-                scene.add(stone);
-            }
-        }
-        
-        // Create porch steps leading to the house
-        function createPorchSteps() {
-            // This function is no longer called as the house model has its own steps
-            // Kept for reference only
-        }
-        
-        // Function to add subtle edge detail to steps
-        function addStepEdge(width, height, depth, x, y, z) {
-            const edgeMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0xb0b0b0, // Slightly darker than the steps
-                roughness: 0.9,
-                metalness: 0.05 
-            });
-            
-            // Create a thin detail along the front edge of the step
-            const edgeGeometry = new THREE.BoxGeometry(width + 0.2, height * 0.2, depth * 0.1);
-            const edge = new THREE.Mesh(edgeGeometry, edgeMaterial);
-            
-            // Position at the front edge of the step
-            edge.position.set(x, y - height * 0.4, z + depth * 0.45);
-            
-            edge.castShadow = true;
-            edge.receiveShadow = true;
-            scene.add(edge);
-        }
-        
-        // Function to add decorative planters beside the porch
-        function addPorchPlanters() {
-            // Planter box material
-            const planterMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x8b4513, // Brown color for wooden planters
-                roughness: 0.9,
-                metalness: 0.1 
-            });
-            
-            // Create two planter boxes
-            for (let side = -1; side <= 1; side += 2) {
-                // Skip if side is 0 (only want -1 and 1)
-                if (side === 0) continue;
-                
-                // Create planter box
-                const planterGeometry = new THREE.BoxGeometry(1, 0.8, 1);
-                const planter = new THREE.Mesh(planterGeometry, planterMaterial);
-                
-                // Position on either side of the steps
-                planter.position.set(side * 2.5, 0.4, 26.5);
-                
-                planter.castShadow = true;
-                planter.receiveShadow = true;
-                planter.userData.isCollider = true;
-                scene.add(planter);
-                
-                // Add plants/flowers in the planter
-                addPlanterFlowers(side * 2.5, 0.8, 26.5);
-            }
-        }
-        
-        // Function to add flowers to planters
-        function addPlanterFlowers(x, y, z) {
-            // Flower stem material
-            const stemMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x006400, // Dark green
-                roughness: 0.8,
-                metalness: 0.0 
-            });
-            
-            // Flower petal materials with different colors
-            const petalMaterials = [
-                new THREE.MeshStandardMaterial({ color: 0xff5555, roughness: 0.7, metalness: 0.0 }), // Red
-                new THREE.MeshStandardMaterial({ color: 0xffff55, roughness: 0.7, metalness: 0.0 }), // Yellow
-                new THREE.MeshStandardMaterial({ color: 0x55ff55, roughness: 0.7, metalness: 0.0 })  // Green
-            ];
-            
-            // Create a few stems with flowers
-            for (let i = 0; i < 5; i++) {
-                // Create stem
-                const stemGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.5, 8);
-                const stem = new THREE.Mesh(stemGeometry, stemMaterial);
-                
-                // Position within the planter with random offsets
-                const offsetX = (Math.random() - 0.5) * 0.7;
-                const offsetZ = (Math.random() - 0.5) * 0.7;
-                stem.position.set(x + offsetX, y + 0.25, z + offsetZ);
-                
-                stem.castShadow = true;
-                scene.add(stem);
-                
-                // Create flower petals
-                const petalMaterial = petalMaterials[Math.floor(Math.random() * petalMaterials.length)];
-                const petalGeometry = new THREE.SphereGeometry(0.1, 8, 6);
-                petalGeometry.scale(1, 0.3, 1); // Flatten the sphere to make it more petal-like
-                
-                const petal = new THREE.Mesh(petalGeometry, petalMaterial);
-                petal.position.set(x + offsetX, y + 0.5, z + offsetZ);
-                petal.castShadow = true;
-                scene.add(petal);
-            }
-        }
-        
-        // Add some ambiance sounds
-        function setupAmbientSounds() {
-            // Create an audio listener and add it to the camera
-            const listener = new THREE.AudioListener();
-            camera.add(listener);
-            
-            // Create a global ambient sound
-            const ambientSound = new THREE.Audio(listener);
-            
-            // Load a sound and set it as the Audio object's buffer
-            const audioLoader = new THREE.AudioLoader();
-            audioLoader.load('./sounds/wind.mp3', function(buffer) {
-                ambientSound.setBuffer(buffer);
-                ambientSound.setLoop(true);
-                ambientSound.setVolume(0.2);
-                // Don't autoplay - let the user initiate sound
-                // ambientSound.play();
-                
-                // Add a play sound button
-                const soundButton = document.createElement('button');
-                soundButton.innerHTML = '🔊 Sound';
-                soundButton.style.position = 'absolute';
-                soundButton.style.bottom = '20px';
-                soundButton.style.left = '20px';
-                soundButton.style.zIndex = '1002';
-                soundButton.style.padding = '8px 12px';
-                soundButton.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
-                soundButton.style.border = 'none';
-                soundButton.style.borderRadius = '4px';
-                soundButton.style.cursor = 'pointer';
-                
-                soundButton.addEventListener('click', function() {
-                    if (ambientSound.isPlaying) {
-                        ambientSound.pause();
-                        soundButton.innerHTML = '🔇 Sound';
-                    } else {
-                        ambientSound.play();
-                        soundButton.innerHTML = '🔊 Sound';
-                    }
-                });
-                
-                document.body.appendChild(soundButton);
-            });
-        }
-        
-        // Commented out sound setup until we have the sound files
-        // setupAmbientSounds();
-
         createDriveway();
 
         // Models to load with adjusted positions
@@ -783,41 +453,33 @@
             // Car positioned at the beginning of the path
             { name: 'Car', file: './car.glb', position: [-5, 0, -20], scale: 0.5, rotationY: Math.PI/2 },
             
-            // House positioned at the end of the path, rotated 90 degrees clockwise (additional 45 degrees)
-            { name: 'House', file: './house.glb', position: [0, 0, 30], scale: 0.5, rotationY: Math.PI - Math.PI/2 },
+            // House positioned at the end of the path (far in front)
+            { name: 'House', file: './house.glb', position: [0, 0, 30], scale: 0.5, rotationY: Math.PI },
             
             // Bags ON TOP of the car - moved further back (more negative Z)
             { name: 'Car Bag 1', file: './newbag.glb', position: [-5, 3.5, -20.5], scale: 0.4, rotationY: 0 },
             { name: 'Car Bag 2', file: './bag2.glb', position: [-5, 3.5, -21.5], scale: 0.4, rotationY: Math.PI/4 },
-            { name: 'Car Bag 3', file: './newbag.glb', position: [-5.5, 3.5, -20], scale: 0.4, rotationY: Math.PI/6 },
-            { name: 'Car Bag 4', file: './bag2.glb', position: [-4.5, 3.5, -19.5], scale: 0.4, rotationY: -Math.PI/6 },
             
             // Bags on the GROUND near character
             { name: 'Ground Bag 1', file: './newbag.glb', position: [-13, 0, -19], scale: 0.4, rotationY: 0 },
             { name: 'Ground Bag 2', file: './bag2.glb', position: [-14, 0, -21], scale: 0.4, rotationY: Math.PI/4 },
-            { name: 'Ground Bag 3', file: './newbag.glb', position: [-15, 0, -17], scale: 0.4, rotationY: Math.PI/2 },
-            { name: 'Ground Bag 4', file: './bag2.glb', position: [-12, 0, -22], scale: 0.4, rotationY: -Math.PI/4 },
             
             // Environment objects properly spaced along the path
             { name: 'Tree', file: './tree.glb', position: [-10, 0, 0], scale: 0.5, rotationY: 0 },
             { name: 'Tree 2', file: './tree.glb', position: [10, 0, 10], scale: 0.4, rotationY: Math.PI/3 },
             { name: 'Rocks', file: './rocks.glb', position: [5, 0, -5], scale: 0.5, rotationY: 0 },
-            { name: 'Leaves', file: './leaves.glb', position: [2, 0, 15], scale: 0.5, rotationY: 0 },
-            
-            // These are individual grass models (not used for instancing)
-            { name: 'Grass Large 1', file: './grass_large1.glb', position: [-18, 0, -18], scale: 1.2, rotationY: Math.PI * 0.5 },
-            { name: 'Grass Medium 1', file: './grass_medium1.glb', position: [-10, 0, -25], scale: 1.0, rotationY: Math.PI * 0.25 },
-            { name: 'Grass Small 1', file: './grass_small1.glb', position: [-8, 0, -15], scale: 0.8, rotationY: Math.PI * 0.75 }
+            { name: 'Leaves', file: './leaves.glb', position: [2, 0, 15], scale: 0.5, rotationY: 0 }
         ];
 
         // Animation variables
-        let mixer, skeleton;
+        let mixer;
+        let animations = [];
         let upperBodyActions = {};
         let lowerBodyActions = {};
-        let lowerBodyClips = {};
-        let upperBodyClips = {};
-        let currentUpperBodyAnimation = 'idle';
-        let currentLowerBodyAnimation = 'idle';
+        let currentUpperBodyAction = null;
+        let currentLowerBodyAction = null;
+        let currentUpperBodyAnimation = 'walk';
+        let currentLowerBodyAnimation = 'walk';
         let balanceEnabled = false; // Set to false by default now
         let balanceValue = 0.5;
         let currentBalanceDirection = "center"; // left, center, right
@@ -831,18 +493,15 @@
         let isMoving = false;
         let targetRotation = 0;
         let movementAcceleration = 0;
-        let lastMouseMoveX = 0; // For balance control
-        let cameraOrbitAngle = 0; // Independent camera rotation angle
         let maxMovementSpeed = 0.08; // Reduced from 0.1
         let cameraMode = "thirdPerson"; // thirdPerson or orbit
         
         // Animation transition variables
-        let animationTransitionTime = 0.5; // Reduced from 1.2 for faster transitions
+        let animationTransitionTime = 1.2; // Increased blend time between animations
         let isAnimationTransitioning = false;
         let animationTransitionTimeout = null;
         let lastAnimationChange = 0;
-        let lastAnimationChangeTime = 0; // Track pickup animation start time
-        let animationChangeMinDelay = 250; // Reduced from 800ms to make animations more responsive
+        let animationChangeMinDelay = 800; // Minimum ms between animation changes
         
         // Joystick variables
         let joystickActive = false;
@@ -864,9 +523,6 @@
         let mouseRotationSensitivity = 0.003;
         let touchRotationSensitivity = 0.05;
         
-        // Collision detection variables
-        let collisionObjects = [];
-        
         // DOM elements
         const balanceDirectionEl = document.getElementById('balanceDirection');
         const pickupFeedbackEl = document.getElementById('pickupFeedback');
@@ -885,16 +541,6 @@
         let isDragging = false;
         let isCameraFollowing = true;
         
-        // Add device detection function
-        function isMobileDevice() {
-            return (
-                ('ontouchstart' in window) ||
-                (navigator.maxTouchPoints > 0) ||
-                (navigator.msMaxTouchPoints > 0) ||
-                (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent))
-            );
-        }
-        
         // Character tilt object for leaning
         let characterTilt = null;
         
@@ -910,12 +556,8 @@
         // References to bags for attaching
         let groundBag1 = null;
         let groundBag2 = null;
-        let groundBag3 = null;
-        let groundBag4 = null;
         let carBag1 = null;
         let carBag2 = null;
-        let carBag3 = null;
-        let carBag4 = null;
         
         // Currently attached bags with their metadata
         let attachedBags = [];
@@ -926,11 +568,14 @@
         let loadedCount = 0;
         let characterModel;
         
-        // Instead of using templates and instancing, modify the model loading function
         models.forEach(model => {
-            // No longer creating labels for models for a cleaner look
+            // Create label for this model
+            const labelMesh = createLabel(model.name, {
+                x: model.position[0],
+                y: model.position[1],
+                z: model.position[2]
+            });
             
-            // Load the model
             loader.load(
                 model.file,
                     (gltf) => {
@@ -953,20 +598,15 @@
                             }
                         });
                         
-                    // Add to the scene directly
                     scene.add(modelObj);
                     
                     // Store references to bags
                     if (model.name === 'Ground Bag 1') groundBag1 = modelObj;
                     if (model.name === 'Ground Bag 2') groundBag2 = modelObj;
-                    if (model.name === 'Ground Bag 3') groundBag3 = modelObj;
-                    if (model.name === 'Ground Bag 4') groundBag4 = modelObj;
                     if (model.name === 'Car Bag 1') carBag1 = modelObj;
                     if (model.name === 'Car Bag 2') carBag2 = modelObj;
-                    if (model.name === 'Car Bag 3') carBag3 = modelObj;
-                    if (model.name === 'Car Bag 4') carBag4 = modelObj;
                     
-                    // Special handling for character model
+                    // Set up character animations and bone references
                     if (model.name === 'Character') {
                         // Create tilt container to lean the character
                         characterTilt = new THREE.Object3D();
@@ -1009,12 +649,6 @@
                         setupAnimationMixing(gltf.animations);
                     }
                     
-                    // If it's a grass model, duplicate it to create more instances
-                    if (model.name.includes('Grass')) {
-                        // Create additional identical grass objects at different positions
-                        createAdditionalGrass(modelObj, model.file, model.scale);
-                    }
-                    
                     // Update loaded count
                     loadedCount++;
                     document.getElementById('info').textContent = 
@@ -1022,34 +656,7 @@
                     
                     if (loadedCount === models.length) {
                         document.getElementById('info').textContent = 
-                            `All models loaded - Ready to play!`;
-                        
-                        // Once all models are loaded, set up collision detection and start the game
-                        setupCollisionDetection();
-                        
-                        // Enhance the environment with forest and mountains
-                        console.log("All models loaded. Enhancing environment...");
-                        enhanceEnvironment();
-                        
-                        // Make sure we're in third-person camera mode for gameplay
-                        cameraMode = "thirdPerson";
-                        isCameraFollowing = true;
-                        
-                        // Ensure camera is properly set up
-                        if (thirdPersonCamera) {
-                            updateThirdPersonCamera();
-                        }
-                        
-                        // Ensure character is at the correct position
-                        if (characterTilt) {
-                            updateDebug("Character position set to: " + 
-                                characterTilt.position.x.toFixed(2) + ", " + 
-                                characterTilt.position.y.toFixed(2) + ", " + 
-                                characterTilt.position.z.toFixed(2));
-                        }
-                        
-                        // Make sure everything is ready for the game to run
-                        console.log("Game is ready to play!");
+                            `All models loaded - Use controls to test animations and balance system`;
                     }
                     },
                     (xhr) => {
@@ -1063,438 +670,6 @@
                 }
             );
         });
-        
-        // Simple function to create additional grass - no instancing, just clones
-        function createAdditionalGrass(originalGrass, modelFile, baseScale) {
-            // Increase grass count 10x for more density
-            const count = modelFile.includes('large') ? 1500 : 
-                         modelFile.includes('medium') ? 2500 : 3500;
-            
-            // Create more clusters for better distribution
-            const numClusters = 60; // Increased from 20 for more even coverage
-            const grassPerCluster = Math.floor(count / numClusters);
-            
-            // Playable area is now smaller
-            const playableRadius = 35; // Reduced from 80
-            
-            for (let cluster = 0; cluster < numClusters; cluster++) {
-                // Generate random cluster center within the playable area
-                const clusterRadius = Math.random() * playableRadius;
-                const clusterAngle = Math.random() * Math.PI * 2;
-                const clusterX = Math.cos(clusterAngle) * clusterRadius;
-                const clusterZ = Math.sin(clusterAngle) * clusterRadius;
-                
-                // Avoid the path area
-                if (Math.abs(clusterX) < 8 && clusterZ > -30 && clusterZ < 30) continue;
-                
-                // Create grass around this cluster center
-                for (let i = 0; i < grassPerCluster; i++) {
-                    const clone = originalGrass.clone();
-                    
-                    // Generate position within cluster (with gaussian-like distribution)
-                    const distFromCenter = Math.pow(Math.random(), 2) * 5; // Tighter clustering
-                    const angle = Math.random() * Math.PI * 2;
-                    const x = clusterX + Math.cos(angle) * distFromCenter;
-                    const z = clusterZ + Math.sin(angle) * distFromCenter;
-                    
-                    // Increase base scale for bigger grass
-                    const scaleFactor = modelFile.includes('large') ? 1.7 : 
-                                       modelFile.includes('medium') ? 1.4 : 
-                                       1.3;
-                    
-                    // Add some random scale variation
-                    const scale = baseScale * scaleFactor * (0.9 + Math.random() * 0.3);
-                    clone.scale.set(scale, scale, scale);
-                    
-                    // Set position and random rotation
-                    clone.position.set(x, 0, z);
-                    clone.rotation.y = Math.random() * Math.PI * 2;
-                    
-                    scene.add(clone);
-                }
-            }
-            
-            // Add some additional random grass for fill
-            const randomGrassCount = Math.floor(count * 0.3); // Increased from 0.2 for more coverage
-            for (let i = 0; i < randomGrassCount; i++) {
-                const clone = originalGrass.clone();
-                
-                // Generate completely random position
-                const angle = Math.random() * Math.PI * 2;
-                const radius = Math.random() * playableRadius;
-                const x = Math.cos(angle) * radius;
-                const z = Math.sin(angle) * radius;
-                
-                // Avoid the path area
-                if (Math.abs(x) < 8 && z > -30 && z < 30) continue;
-                
-                // Random scale with slight increase
-                const scaleFactor = modelFile.includes('large') ? 1.6 :
-                                   modelFile.includes('medium') ? 1.3 : 1.2;
-                
-                const scale = baseScale * scaleFactor * (0.8 + Math.random() * 0.4);
-                clone.scale.set(scale, scale, scale);
-                
-                // Set position and random rotation
-                clone.position.set(x, 0, z);
-                clone.rotation.y = Math.random() * Math.PI * 2;
-                
-                scene.add(clone);
-            }
-            
-            console.log(`Created ${count + randomGrassCount} instances of grass from model ${modelFile}`);
-        }
-        
-        // Function to create forest boundary - simplified approach similar to grass
-        function createForestBoundary() {
-            console.log("Creating forest boundary with simple cloning approach...");
-            
-            // Use the same loader that works with grass
-            loader.load('./tree.glb', function(gltf) {
-                const treeModel = gltf.scene;
-                console.log("Tree model loaded successfully");
-                
-                // Basic material setup for tree
-                treeModel.traverse(function(node) {
-                    if (node.isMesh) {
-                        node.castShadow = true;
-                        node.receiveShadow = true;
-                        node.visible = true; // Ensure visibility
-                        
-                        if (node.material) {
-                            // Clone material to prevent sharing
-                            node.material = node.material.clone();
-                            node.material.transparent = false;
-                            node.material.opacity = 1.0;
-                            node.material.depthWrite = true;
-                            node.material.depthTest = true;
-                            node.material.needsUpdate = true;
-                        }
-                    }
-                });
-                
-                // Create trees in a circle around the map
-                const numTrees = 100;
-                const boundaryRadius = 50;
-                
-                console.log(`Creating ${numTrees} trees around the boundary`);
-                
-                for (let i = 0; i < numTrees; i++) {
-                    const angle = (i / numTrees) * Math.PI * 2;
-                    
-                    // Add some variation to the radius
-                    const radius = boundaryRadius + (Math.random() * 10 - 5);
-                    
-                    const x = Math.cos(angle) * radius;
-                    const z = Math.sin(angle) * radius;
-                    
-                    // Skip a portion to allow for the path to the house
-                    if (Math.abs(x) < 10 && z > 0) continue;
-                    
-                    // Create a clone of the tree
-                    const treeClone = treeModel.clone();
-                    
-                    // Randomize the scale and rotation
-                    const scale = 0.7 + Math.random() * 0.3;
-                    treeClone.scale.set(scale, scale, scale);
-                    treeClone.rotation.y = Math.random() * Math.PI * 2;
-                    
-                    // Position the tree
-                    treeClone.position.set(x, 0, z);
-                    
-                    // Add the tree to the scene
-                    scene.add(treeClone);
-                    console.log(`Added tree at position: ${x.toFixed(2)}, 0, ${z.toFixed(2)}`);
-                }
-                
-                console.log("Forest boundary created successfully");
-            }, 
-            // Progress callback
-            function(xhr) {
-                console.log(`Tree model loading: ${(xhr.loaded / xhr.total * 100).toFixed(0)}%`);
-            },
-            // Error callback
-            function(error) {
-                console.error("Error loading tree model:", error);
-            });
-        }
-        
-        // Function to create distant mountains on the horizon
-        function createMountainBackdrop() {
-            // Create a mountain range backdrop for distance illusion
-            const mountainGeometry = new THREE.PlaneGeometry(500, 100, 50, 25);
-            const mountainMaterial = new THREE.MeshStandardMaterial({
-                color: 0x5d8272, // Slightly darker/bluer than ground for distance effect
-                roughness: 1.0,
-                metalness: 0.0,
-                side: THREE.DoubleSide
-            });
-            
-            // Create terrain-like mountains by modifying vertices
-            const mountainVertices = mountainGeometry.attributes.position.array;
-            for (let i = 0; i < mountainVertices.length; i += 3) {
-                const idx = i / 3;
-                const x = mountainVertices[i];
-                
-                // Height is based on x position to create mountain-like shapes
-                // Use multiple frequencies of noise to create realistic mountains
-                const height = 
-                    15 * Math.pow(Math.sin(x * 0.01 + 1.2), 2) * Math.pow(Math.cos(x * 0.02 + 0.5), 2) +
-                    5 * Math.pow(Math.sin(x * 0.05 - 0.8), 2) * Math.pow(Math.cos(x * 0.06 + 0.7), 2);
-                
-                // Apply height only to top vertices (y > 0)
-                if (mountainVertices[i + 1] >= 0) {
-                    mountainVertices[i + 1] += height;
-                }
-            }
-            
-            // Need to tell Three.js to update the geometry
-            mountainGeometry.attributes.position.needsUpdate = true;
-            mountainGeometry.computeVertexNormals(); // Recalculate normals for proper lighting
-            
-            const mountains = new THREE.Mesh(mountainGeometry, mountainMaterial);
-            mountains.position.set(0, 20, -200); // Place far behind scene
-            mountains.receiveShadow = true;
-            scene.add(mountains);
-        }
-        
-        // Function to create rocks around the edge of the map with proper instancing
-        function createRockBoundary() {
-            console.log("Creating rock boundary with simple cloning approach...");
-            
-            // Use the same loader that works with grass
-            loader.load('./rocks.glb', function(gltf) {
-                const rockModel = gltf.scene;
-                console.log("Rock model loaded successfully");
-                
-                // Basic material setup for rocks
-                rockModel.traverse(function(node) {
-                    if (node.isMesh) {
-                        node.castShadow = true;
-                        node.receiveShadow = true;
-                        node.visible = true; // Ensure visibility
-                        
-                        if (node.material) {
-                            // Clone material to prevent sharing
-                            node.material = node.material.clone();
-                            node.material.transparent = false;
-                            node.material.opacity = 1.0;
-                            node.material.depthWrite = true;
-                            node.material.depthTest = true;
-                            node.material.needsUpdate = true;
-                        }
-                    }
-                });
-                
-                // Create rocks in a circle around the map
-                const numRocks = 60;
-                const rockRadius = 55;
-                
-                console.log(`Creating ${numRocks} rocks around the boundary`);
-                
-                for (let i = 0; i < numRocks; i++) {
-                    const angle = (i / numRocks) * Math.PI * 2;
-                    
-                    // Add some variation to the radius
-                    const radius = rockRadius + (Math.random() * 8 - 4);
-                    
-                    const x = Math.cos(angle) * radius;
-                    const z = Math.sin(angle) * radius;
-                    
-                    // Skip a portion to allow for the path to the house
-                    if (Math.abs(x) < 15 && z > 0) continue;
-                    
-                    // Create a clone of the rock
-                    const rockClone = rockModel.clone();
-                    
-                    // Randomize the scale and rotation
-                    const scale = 1.0 + Math.random() * 0.6;
-                    rockClone.scale.set(
-                        scale,
-                        scale * (0.8 + Math.random() * 0.4),
-                        scale
-                    );
-                    rockClone.rotation.y = Math.random() * Math.PI * 2;
-                    rockClone.rotation.x = (Math.random() - 0.5) * 0.2;
-                    rockClone.rotation.z = (Math.random() - 0.5) * 0.2;
-                    
-                    // Position the rock, sometimes partially buried
-                    const yPos = Math.random() > 0.6 ? -scale * 0.3 : 0;
-                    rockClone.position.set(x, yPos, z);
-                    
-                    // Add the rock to the scene
-                    scene.add(rockClone);
-                    console.log(`Added rock at position: ${x.toFixed(2)}, ${yPos.toFixed(2)}, ${z.toFixed(2)}`);
-                    
-                    // Occasionally add rock clusters
-                    if (Math.random() > 0.7) {
-                        for (let j = 0; j < 2; j++) {
-                            const smallRock = rockModel.clone();
-                            const smallScale = scale * 0.4;
-                            smallRock.scale.set(smallScale, smallScale, smallScale);
-                            smallRock.rotation.y = Math.random() * Math.PI * 2;
-                            
-                            // Position near the main rock
-                            const offsetX = (Math.random() - 0.5) * 4;
-                            const offsetZ = (Math.random() - 0.5) * 4;
-                            smallRock.position.set(x + offsetX, 0, z + offsetZ);
-                            
-                            scene.add(smallRock);
-                        }
-                    }
-                }
-                
-                console.log("Rock boundary created successfully");
-            }, 
-            // Progress callback
-            function(xhr) {
-                console.log(`Rock model loading: ${(xhr.loaded / xhr.total * 100).toFixed(0)}%`);
-            },
-            // Error callback
-            function(error) {
-                console.error("Error loading rock model:", error);
-            });
-        }
-        
-        // Function to create mountain barrier with giant rocks
-        function createMountainBarrier() {
-            console.log("Creating mountain barrier with simple cloning approach...");
-            
-            // Use the same loader that works with grass and rocks
-            loader.load('./rocks.glb', function(gltf) {
-                const rockModel = gltf.scene;
-                console.log("Rock model loaded successfully for mountains");
-                
-                // Basic material setup for mountain rocks
-                rockModel.traverse(function(node) {
-                    if (node.isMesh) {
-                        node.castShadow = true;
-                        node.receiveShadow = true;
-                        node.visible = true; // Ensure visibility
-                        
-                        if (node.material) {
-                            // Clone material to prevent sharing
-                            node.material = node.material.clone();
-                            node.material.transparent = false;
-                            node.material.opacity = 1.0;
-                            node.material.depthWrite = true;
-                            node.material.depthTest = true;
-                            node.material.needsUpdate = true;
-                        }
-                    }
-                });
-                
-                // Create large rock formations in a circle around the map
-                const numSegments = 12;
-                const mountainRadius = 65;
-                
-                console.log(`Creating ${numSegments} mountain segments around the boundary`);
-                
-                for (let i = 0; i < numSegments; i++) {
-                    // Skip index 9 to create a gap for the entrance/exit
-                    if (i === 9) continue;
-                    
-                    const angle = (i / numSegments) * Math.PI * 2;
-                    const radius = mountainRadius + (Math.random() * 5 - 2.5);
-                    
-                    const x = Math.cos(angle) * radius;
-                    const z = Math.sin(angle) * radius;
-                    
-                    // Create a massive rock for the mountain
-                    const mountainRock = rockModel.clone();
-                    
-                    // Make it huge
-                    const scale = 6.0 + Math.random() * 4.0;
-                    mountainRock.scale.set(
-                        scale * (0.8 + Math.random() * 0.4),
-                        scale * (1.2 + Math.random() * 0.6),
-                        scale * (0.8 + Math.random() * 0.4)
-                    );
-                    
-                    // Random rotation
-                    mountainRock.rotation.y = Math.random() * Math.PI * 2;
-                    mountainRock.rotation.x = (Math.random() - 0.5) * 0.2;
-                    mountainRock.rotation.z = (Math.random() - 0.5) * 0.2;
-                    
-                    // Position partially underground
-                    mountainRock.position.set(x, -scale * 0.3, z);
-                    
-                    // Add to scene
-                    scene.add(mountainRock);
-                    console.log(`Added mountain at position: ${x.toFixed(2)}, ${(-scale * 0.3).toFixed(2)}, ${z.toFixed(2)}`);
-                    
-                    // Add secondary rocks around the main mountain
-                    const numRocksPerMountain = 5;
-                    for (let j = 0; j < numRocksPerMountain; j++) {
-                        const rockClone = rockModel.clone();
-                        
-                        // Medium-sized rocks
-                        const rockScale = scale * 0.4;
-                        rockClone.scale.set(
-                            rockScale * (0.8 + Math.random() * 0.4),
-                            rockScale * (0.8 + Math.random() * 0.4),
-                            rockScale * (0.8 + Math.random() * 0.4)
-                        );
-                        
-                        // Random rotation
-                        rockClone.rotation.y = Math.random() * Math.PI * 2;
-                        rockClone.rotation.x = (Math.random() - 0.5) * 0.3;
-                        rockClone.rotation.z = (Math.random() - 0.5) * 0.3;
-                        
-                        // Position around the main mountain
-                        const offsetAngle = Math.random() * Math.PI * 2;
-                        const offsetRadius = 6 + Math.random() * 4;
-                        const offsetX = Math.cos(offsetAngle) * offsetRadius;
-                        const offsetZ = Math.sin(offsetAngle) * offsetRadius;
-                        
-                        rockClone.position.set(
-                            x + offsetX,
-                            -rockScale * 0.2 + Math.random() * 2, 
-                            z + offsetZ
-                        );
-                        
-                        scene.add(rockClone);
-                    }
-                }
-                
-                console.log("Mountain barrier created successfully");
-            }, 
-            // Progress callback
-            function(xhr) {
-                console.log(`Mountain rock model loading: ${(xhr.loaded / xhr.total * 100).toFixed(0)}%`);
-            },
-            // Error callback
-            function(error) {
-                console.error("Error loading mountain rock model:", error);
-            });
-        }
-        
-        // Call the functions to create forest and mountains after all models are loaded
-        function enhanceEnvironment() {
-            try {
-                console.log("Starting environment enhancement with optimized instancing...");
-                
-                // Create forest boundary
-                console.log("Creating forest boundary...");
-                createForestBoundary();
-                
-                // Create distant mountain backdrop
-                console.log("Creating mountain backdrop...");
-                createMountainBackdrop();
-                
-                // Create rock boundary
-                console.log("Creating rock boundary...");
-                createRockBoundary();
-                
-                // Create mountain barrier
-                console.log("Creating mountain barrier...");
-                createMountainBarrier();
-                
-                console.log("Environment enhancement completed successfully.");
-            } catch (error) {
-                console.error("Error during environment enhancement:", error);
-            }
-        }
         
         // Set up animation mixing system
         function setupAnimationMixing(clipsList) {
@@ -1584,108 +759,6 @@
             setLowerBodyAnimation('walk');
             
             console.log(`Set up ${clipsList.length} animations for mixing`);
-            
-            // Preload all animations to avoid freezing
-            preloadAnimations();
-        }
-        
-        // Preload animations to avoid freezing when first used
-        function preloadAnimations() {
-            console.log("Preloading animations...");
-            
-            let preloadedCount = 0;
-            
-            // Preload all basic animations first
-            const basicAnims = ["idle", "walk", "run"];
-            for (const anim of basicAnims) {
-                // Preload for upper body
-                if (!upperBodyActions[anim] && upperBodyClips[anim]) {
-                    console.log(`Preloading basic animation (upper): ${anim}`);
-                    
-                    // Create action but don't play it
-                    const action = mixer.clipAction(upperBodyClips[anim]);
-                    action.weight = 0; // Zero weight = no visible effect
-                    action.play(); // Playing with zero weight = preload only
-                    
-                    // Store for future use
-                    upperBodyActions[anim] = action;
-                    preloadedCount++;
-                }
-                
-                // Preload for lower body
-                if (!lowerBodyActions[anim] && lowerBodyClips[anim]) {
-                    console.log(`Preloading basic animation (lower): ${anim}`);
-                    
-                    // Create action but don't play it
-                    const action = mixer.clipAction(lowerBodyClips[anim]);
-                    action.weight = 0;
-                    action.play();
-                    
-                    // Store for future use
-                    lowerBodyActions[anim] = action;
-                    preloadedCount++;
-                }
-            }
-            
-            // Preload all carry animations by creating them at startup
-            const weightClasses = ["light", "medium", "heavy"];
-            const animTypes = ["walk", "idle", "run"];
-            
-            for (const weight of weightClasses) {
-                for (const type of animTypes) {
-                    const animName = `carry_${type}_${weight}`;
-                    
-                    // Just access the animation to ensure it's created
-                    if (!upperBodyActions[animName] && upperBodyClips[animName]) {
-                        console.log(`Preloading carry animation: ${animName}`);
-                        
-                        // Create action but don't play it
-                        const action = mixer.clipAction(upperBodyClips[animName]);
-                        action.weight = 0; // Zero weight = no visible effect
-                        action.play(); // Playing with zero weight = preload only
-                        
-                        // Store for future use
-                        upperBodyActions[animName] = action;
-                        preloadedCount++;
-                    }
-                }
-            }
-            
-            // Also preload stumble animations
-            const stumbleAnims = ["stumble_lowerbody", "stumble_fall"];
-            for (const anim of stumbleAnims) {
-                if (!lowerBodyActions[anim] && lowerBodyClips[anim]) {
-                    console.log(`Preloading stumble animation: ${anim}`);
-                    
-                    // Create action but don't play it
-                    const action = mixer.clipAction(lowerBodyClips[anim]);
-                    action.weight = 0;
-                    action.play();
-                    
-                    // Store for future use
-                    lowerBodyActions[anim] = action;
-                    preloadedCount++;
-                }
-            }
-            
-            // Preload pickup animations
-            const pickupAnims = ["pickup_low", "pickup_high"];
-            for (const anim of pickupAnims) {
-                if (!upperBodyActions[anim] && upperBodyClips[anim]) {
-                    console.log(`Preloading pickup animation: ${anim}`);
-                    
-                    // Create action but don't play it
-                    const action = mixer.clipAction(upperBodyClips[anim]);
-                    action.weight = 0;
-                    action.play();
-                    
-                    // Store for future use
-                    upperBodyActions[anim] = action;
-                    preloadedCount++;
-                }
-            }
-            
-            console.log(`Animation preloading complete. Preloaded ${preloadedCount} animations.`);
         }
         
         // Update the animation selection and carrying code to use correct animation naming pattern
@@ -1714,45 +787,65 @@
 
         // Function to set upper body animation
         function setUpperBodyAnimation(name) {
-            // Don't change if same animation is already playing
-            if (name === currentUpperBodyAnimation) return;
-            
-            // Track animation change time
-            lastAnimationChange = Date.now();
-            
-            // If we have the animation, play it
-            if (upperBodyActions[name]) {
-                // Smoothly transition to new animation
-                updateDebug(`Upper body animation: ${name}`);
-                
-                // Fade out current animation
-                if (upperBodyActions[currentUpperBodyAnimation]) {
-                    upperBodyActions[currentUpperBodyAnimation].fadeOut(0.2);
-                }
-                
-                // Fade in new animation
-                upperBodyActions[name].reset();
-                upperBodyActions[name].fadeIn(0.2);
-                upperBodyActions[name].play();
-                
-                // Update current animation
-                currentUpperBodyAnimation = name;
-                
-                // For pickup animations, make sure lower body is in appropriate state
-                if (name.startsWith('pickup')) {
-                    // For pickups, upper body leads, but we want lower body to follow
-                    if (name === 'pickup_low') {
-                        setLowerBodyAnimation('idle'); // Stay in place for ground pickups
-                    } else if (name === 'pickup_high') {
-                        setLowerBodyAnimation('idle'); // Stay in place for car pickups
-                    }
-                }
-                
-                return true;
-            } else {
-                updateDebug(`Animation not found: ${name}`);
-                return false;
+            // Prevent rapid animation changes
+            const now = Date.now();
+            if (now - lastAnimationChange < animationChangeMinDelay) { // Use variable for min delay
+                updateDebug(`Ignoring animation change: too soon (${name})`);
+                return; // Ignore if we just changed animations
             }
+            
+            updateDebug(`Setting upper body anim: ${name}`);
+            
+            // Check if we should use a carry animation based on weight class
+            if (attachedBags.length > 0 && (name === 'walk' || name === 'idle' || name === 'run' || name.startsWith('carry'))) {
+                // For carrying, we use the special format: carry_[movement]_[weight]
+                name = getAnimationNameForCarrying(name, carryWeightClass);
+                updateDebug(`Using carry animation: ${name}`);
+            }
+            
+            if (!upperBodyActions[name]) {
+                updateDebug(`Upper body animation '${name}' not found, falling back to walk`);
+                
+                // Try to find a similar animation if the exact one isn't available
+                const simplifiedName = name.split('_')[0]; // Get base animation name
+                
+                if (simplifiedName === 'carry' && upperBodyActions['carry_walk_medium']) {
+                    name = 'carry_walk_medium'; // Fallback to a default carry animation
+                } else {
+                    name = 'walk'; // Fallback to basic walk
+                }
+            }
+            
+            // If already playing this animation, don't restart it
+            if (currentUpperBodyAnimation === name && currentUpperBodyAction) {
+                updateDebug(`Already playing ${name}, not restarting`);
+                return;
+            }
+            
+            // Set animation transitioning flag
+            isAnimationTransitioning = true;
+            
+            // Fade out current animation
+            if (currentUpperBodyAction) {
+                currentUpperBodyAction.fadeOut(animationTransitionTime);
+            }
+            
+            // Play new animation
+            const action = upperBodyActions[name];
+            action.reset();
+            action.fadeIn(animationTransitionTime);
+            action.play();
+            
+            currentUpperBodyAction = action;
+            currentUpperBodyAnimation = name;
+            lastAnimationChange = now;
+            
+            // Clear transition flag after transition completes
+            clearTimeout(animationTransitionTimeout);
+            animationTransitionTimeout = setTimeout(() => {
+                isAnimationTransitioning = false;
+                updateDebug(`Animation transition complete: ${name}`);
+            }, animationTransitionTime * 1000);
         }
         
         // Function to set lower body animation
@@ -1816,9 +909,6 @@
             // Current angle
             const currentAngle = characterTilt.rotation.z;
             
-            // Limit the maximum tilt angle to prevent extreme tilts
-            targetAngle = Math.max(-0.15, Math.min(0.15, targetAngle));
-            
             // If angles are very close, don't bother animating
             if (Math.abs(targetAngle - currentAngle) < 0.01) {
                 return;
@@ -1839,10 +929,6 @@
                 if (frame >= duration) return;
                 
                 characterTilt.rotation.z += angleStep;
-                
-                // Enforce ground collision after each tilt change
-                enforceGroundCollision();
-                
                 frame++;
                 
                 requestAnimationFrame(animateTilt);
@@ -1851,7 +937,7 @@
             animateTilt();
         }
         
-        // Function to attach bag to hand
+        // Function to attach a bag to the character's hand
         function attachBagToHand(bag, hand) {
             if (!bag || !hand || !characterModel) {
                 console.error("Cannot attach bag - missing references:", { 
@@ -1873,118 +959,42 @@
             console.log("Attaching bag to hand...");
             showPickupFeedback("Picked up bag!");
             
-            // Store original parent and transform for later restoration
+            // Get current world position of the bag
+            const bagWorldPos = new THREE.Vector3();
+            bag.getWorldPosition(bagWorldPos);
+            
+            // Get current world position of the hand
+            const handWorldPos = new THREE.Vector3();
+            hand.getWorldPosition(handWorldPos);
+            
+            console.log("Bag world position:", bagWorldPos);
+            console.log("Hand world position:", handWorldPos);
+            
+            // Store original parent and transform
             const originalParent = bag.parent;
             const originalPosition = bag.position.clone();
             const originalRotation = bag.rotation.clone();
             const originalScale = bag.scale.clone();
             
-            // Remove from current parent
+            // Remove from current parent and attach to hand
             originalParent.remove(bag);
+            hand.add(bag);
             
-            // Create a new container for the bag to better control positioning
-            const bagContainer = new THREE.Object3D();
-            bagContainer.name = "BagContainer_" + attachedBags.length;
-            
-            // Add bag to container
-            bagContainer.add(bag);
-            
-            // Reset bag position within container
-            bag.position.set(0, 0, 0);
-            
-            // Attach container to hand
-            hand.add(bagContainer);
-            
-            // Get offset position based on current attachedBags and which hand
+            // Set bag position relative to hand based on which hand it is
+            // and how many bags are already being carried
             const isLeftHand = hand.name === 'mixamorigLeftHand';
             const handOffset = getHandOffset(isLeftHand, attachedBags.length);
             
-            // Apply offset to container
-            bagContainer.position.set(handOffset.x, handOffset.y, handOffset.z);
-            
-            // Set bag rotation appropriate for carrying
-            if (isLeftHand) {
-                bag.rotation.set(0, Math.PI / 2, 0); // For left hand
-                // Slightly tilt bag based on hand
-                bagContainer.rotation.set(0.2, 0, 0.1);
-            } else {
-                bag.rotation.set(0, -Math.PI / 2, 0); // For right hand
-                // Slightly tilt bag based on hand
-                bagContainer.rotation.set(0.2, 0, -0.1);
-            }
-            
-            // Adjust scale to make bags more noticeable
-            const handScale = 1.2; // Increased from 1.0 for better visibility
-            bag.scale.set(
-                originalScale.x * handScale,
-                originalScale.y * handScale,
-                originalScale.z * handScale
-            );
-            
-            // Make sure the bag is visible and has proper materials
-            bag.traverse(node => {
-                if (node.isMesh) {
-                    node.castShadow = true;
-                    node.receiveShadow = true;
-                    node.visible = true; // Explicitly set visible flag
-                    console.log(`Mesh found in bag: ${node.name}, visible: ${node.visible}`);
-                    
-                    // Force material to non-transparent
-                    if (node.material) {
-                        console.log("Bag material details:", {
-                            type: node.material.type,
-                            transparent: node.material.transparent,
-                            opacity: node.material.opacity,
-                            visible: node.visible,
-                            depthWrite: node.material.depthWrite,
-                            depthTest: node.material.depthTest,
-                            colorHex: node.material.color ? '#' + node.material.color.getHexString() : 'N/A'
-                        });
-                        
-                        // IMPORTANT: Create a clone of the material to avoid modifying shared materials
-                        if (Array.isArray(node.material)) {
-                            node.material = node.material.map(mat => mat.clone());
-                        } else {
-                            node.material = node.material.clone();
-                        }
-                        
-                        // Apply aggressive visibility settings
-                        if (Array.isArray(node.material)) {
-                            node.material.forEach(mat => {
-                                mat.transparent = false;
-                                mat.opacity = 1.0;
-                                mat.depthWrite = true;
-                                mat.depthTest = true;
-                                mat.visible = true;
-                                mat.needsUpdate = true;
-                            });
-                        } else {
-                            node.material.transparent = false;
-                            node.material.opacity = 1.0;
-                            node.material.depthWrite = true;
-                            node.material.depthTest = true;
-                            node.material.visible = true;
-                            
-                            // If it's a standard material, set good rendering properties
-                            if (node.material.isMeshStandardMaterial) {
-                                node.material.roughness = 0.7;
-                                node.material.metalness = 0.3;
-                            }
-                            
-                            // Ensure material updates
-                            node.material.needsUpdate = true;
-                        }
-                    }
-                }
-            });
+            // Position relative to hand with offset
+            bag.position.set(handOffset.x, handOffset.y, handOffset.z);
+            bag.rotation.set(0, 0, 0);
             
             // Generate random weight between 1-5 kg
             const weight = Math.floor(Math.random() * 5) + 1;
             
-            // Add to attached bags list with the container reference
+            // Add to attached bags list
             attachedBags.push({
                 mesh: bag,
-                container: bagContainer,
                 originalParent: originalParent,
                 originalPosition: originalPosition,
                 originalRotation: originalRotation,
@@ -1996,30 +1006,28 @@
             // Update carrying stats
             updateCarryingStats();
             
-            // Log success
             console.log("Bag attached successfully to", hand.name);
-            updateDebug(`Bag attached to ${hand.name} with offset: x=${handOffset.x}, y=${handOffset.y}, z=${handOffset.z}`);
         }
         
         // Get appropriate hand offset based on which hand and how many bags are carried
         function getHandOffset(isLeftHand, bagCount) {
-            // Base position for the first bag - moved further out and forward
+            // Base position for the first bag
             if (bagCount === 0) {
                 return isLeftHand ? 
-                    { x: 0.5, y: 0.0, z: 0.2 } : // Left hand - first bag
-                    { x: -0.5, y: 0.0, z: 0.2 }; // Right hand - first bag
+                    { x: 0.2, y: 0, z: 0 } : 
+                    { x: -0.2, y: 0, z: 0 };
             }
-            // Second bag position - slightly shifted from first
+            // Second bag position
             else if (bagCount === 1) {
                 return isLeftHand ? 
-                    { x: 0.4, y: 0.2, z: 0.3 } : // Left hand - second bag (slightly above and behind)
-                    { x: -0.4, y: 0.2, z: 0.3 }; // Right hand - second bag (slightly above and behind)
+                    { x: 0.2, y: 0, z: 0.2 } : 
+                    { x: -0.2, y: 0, z: 0.2 };
             }
-            // Third bag position - on top
+            // Third bag position
             else {
                 return isLeftHand ? 
-                    { x: 0.5, y: 0.4, z: 0.0 } : // Left hand - third bag (on top)
-                    { x: -0.5, y: 0.4, z: 0.0 }; // Right hand - third bag (on top)
+                    { x: 0.2, y: 0.2, z: 0 } : 
+                    { x: -0.2, y: 0.2, z: 0 };
             }
         }
         
@@ -2044,24 +1052,14 @@
         
         // Update carrying statistics with new animation naming
         function updateCarryingStats() {
-            // Update counter
+            // Count bags
             bagCountEl.textContent = attachedBags.length;
             
-            // Recalculate total weight
+            // Calculate total weight
             totalBagWeight = attachedBags.reduce((total, bag) => total + bag.weight, 0);
-            totalWeightEl.textContent = totalBagWeight.toFixed(1) + " kg";
+            totalWeightEl.textContent = totalBagWeight + " kg";
             
-            // Update balance system if carrying bags
-            if (attachedBags.length > 0) {
-                // Automatically enable balance system when carrying bags
-                if (!balanceEnabled) {
-                    balanceEnabled = true;
-                    document.getElementById('balanceToggle').textContent = "Balance: ON";
-                    document.getElementById('balanceToggle').classList.add('active');
-                    updateDebug("Balance system enabled - avoid tipping over!");
-                }
-                
-                // Determine weight class based on total weight
+            // Determine weight class based on total weight or bag count
             let newWeightClass = "none";
             
             if (attachedBags.length > 0) {
@@ -2071,61 +1069,41 @@
                     newWeightClass = "medium";
                 } else {
                     newWeightClass = "heavy";
-                    }
                 }
                 
-                // Update weight class display
-                if (weightClassEl) {
-                    weightClassEl.textContent = newWeightClass.charAt(0).toUpperCase() + newWeightClass.slice(1);
-                }
-                
-                // If weight class changed, update the animation
-                if (newWeightClass !== carryWeightClass) {
-                    updateDebug(`Carry weight class changed: ${carryWeightClass} → ${newWeightClass}`);
-                    carryWeightClass = newWeightClass;
-                    
-                    // Update animation based on movement state
-                    if (isMoving) {
-                        forcedAnimationUpdate(`carry_walk_${carryWeightClass}`);
-                    } else {
-                        forcedAnimationUpdate(`carry_idle_${carryWeightClass}`);
-                    }
-                }
-                
-                // Show balance UI
-                const balanceUI = document.getElementById('balanceUI');
-                if (balanceUI) {
-                    balanceUI.style.display = 'block';
-                    
-                    // Reset balance slider to middle position (50%)
-                    const balanceSlider = document.getElementById('balanceSlider');
-                    if (balanceSlider) {
-                        balanceSlider.value = 50;
-                        balanceValue = 0.5; // Reset to middle
-                    }
+                // Enable balance system when carrying bags
+                if (!balanceEnabled) {
+                    balanceEnabled = true;
+                    updateDebug("Balance system enabled - carrying bags");
                 }
             } else {
                 // Disable balance system when not carrying bags
                 if (balanceEnabled) {
                     balanceEnabled = false;
-                    document.getElementById('balanceToggle').textContent = "Balance: OFF";
-                    document.getElementById('balanceToggle').classList.remove('active');
+                    updateDebug("Balance system disabled - no bags");
+                    
+                    // Reset any tilt when bags are dropped
+                    if (characterTilt) {
+                        gsapTilt(0);
+                    }
                 }
+            }
+            
+            // Update weight class display
+            if (weightClassEl) weightClassEl.textContent = newWeightClass.charAt(0).toUpperCase() + newWeightClass.slice(1);
+            
+            // If weight class changed, update the animation
+            if (newWeightClass !== carryWeightClass) {
+                carryWeightClass = newWeightClass;
                 
-                // Reset weight class
-                carryWeightClass = "none";
-                
-                // Hide balance UI
-                const balanceUI = document.getElementById('balanceUI');
-                if (balanceUI) balanceUI.style.display = 'none';
-                
-                // Reset balance to neutral when not carrying
-                balanceValue = 0.5;
-                
-                // Switch back to regular animations
-                if (currentUpperBodyAnimation.startsWith('carry')) {
-                    setUpperBodyAnimation('idle');
-                    setLowerBodyAnimation('idle');
+                // Update the animation based on current state and new weight class
+                if (attachedBags.length > 0) {
+                    // Determine the current movement state
+                    const movementState = isMoving ? "walk" : "stand";
+                    setUpperBodyAnimation(`carry_${movementState}_${carryWeightClass}`);
+                } else {
+                    // If no bags, go back to walk or idle depending on movement
+                    setUpperBodyAnimation(isMoving ? 'walk' : 'idle');
                 }
             }
         }
@@ -2144,20 +1122,18 @@
             // Get the last attached bag
             const bagData = attachedBags.pop();
             const bag = bagData.mesh;
-            const bagContainer = bagData.container;
             const originalParent = bagData.originalParent;
             
-            // First, remove the bag from the container
-            if (bagContainer) {
-                bagContainer.remove(bag);
-            }
+            // Get current world position and rotation
+            const worldPos = new THREE.Vector3();
+            const worldQuat = new THREE.Quaternion();
+            bag.getWorldPosition(worldPos);
+            bag.getWorldQuaternion(worldQuat);
             
-            // Remove container from hand
-            if (bagContainer && bagContainer.parent) {
-                bagContainer.parent.remove(bagContainer);
-            }
+            // Remove from hand
+            bag.parent.remove(bag);
             
-            // Add bag back to original parent
+            // Add back to original parent
             originalParent.add(bag);
             
             // Restore original transform
@@ -2169,88 +1145,26 @@
             updateCarryingStats();
             
             console.log("Bag detached successfully");
-            updateDebug("Bag dropped, returned to original position");
-        }
-        
-        // Add camera shake variables
-        let cameraShakeActive = false;
-        let cameraShakeIntensity = 0;
-        let cameraShakeDecay = 0.9;
-        let cameraOriginalPosition = new THREE.Vector3();
-        
-        // Function to apply camera shake effect
-        function applyCameraShake() {
-            if (!thirdPersonCamera || !cameraShakeActive) return;
-            
-            // Store original position if not already stored
-            if (cameraOriginalPosition.length() === 0) {
-                cameraOriginalPosition.copy(thirdPersonCamera.position);
-            }
-            
-            // Apply random offset based on intensity
-            const shakeX = (Math.random() * 2 - 1) * cameraShakeIntensity;
-            const shakeY = (Math.random() * 2 - 1) * cameraShakeIntensity;
-            
-            // Apply shake to camera position
-            thirdPersonCamera.position.x = cameraOriginalPosition.x + shakeX;
-            thirdPersonCamera.position.y = cameraOriginalPosition.y + shakeY;
-            
-            // Reduce shake intensity over time
-            cameraShakeIntensity *= cameraShakeDecay;
-            
-            // Stop shaking when intensity gets too low
-            if (cameraShakeIntensity < 0.01) {
-                cameraShakeActive = false;
-                cameraShakeIntensity = 0;
-                cameraOriginalPosition.set(0, 0, 0);
-            }
-        }
-        
-        // Function to start camera shake with given intensity
-        function startCameraShake(intensity) {
-            cameraShakeIntensity = intensity;
-            cameraShakeActive = true;
-            cameraOriginalPosition.set(0, 0, 0); // Reset so it gets updated on next frame
         }
         
         // Function to update the balance system
         function updateBalanceSystem(value) {
-            // Make sure UI elements exist before updating them
-            const balanceValueEl = document.getElementById('balanceValue');
-            const balanceIndicatorEl = document.getElementById('balanceIndicator');
-            const balanceDirectionEl = document.getElementById('balanceDirection');
+            document.getElementById('balanceValue').textContent = value.toFixed(2);
+            document.getElementById('balanceIndicator').style.left = `${value * 100}%`;
             
-            // Update balance value display
-            if (balanceValueEl) {
-                balanceValueEl.textContent = value.toFixed(2);
-            }
+            // Change indicator color based on balance
+            const indicator = document.getElementById('balanceIndicator');
             
-            // Update indicator position
-            if (balanceIndicatorEl) {
-                balanceIndicatorEl.style.left = `${value * 100}%`;
-            }
+            let newDirection = "center";
+            let intensity = 0;
             
             // If not carrying bags, always stay balanced
             if (attachedBags.length === 0) {
-                if (balanceIndicatorEl) {
-                    balanceIndicatorEl.style.background = '#ffffff'; // White for safe
-                }
-                if (balanceDirectionEl) {
+                indicator.style.background = '#ffffff'; // White for safe
                 balanceDirectionEl.textContent = "Balanced";
                 balanceDirectionEl.style.color = '#ffffff';
-                }
                 return;
             }
-            
-            // Make sure the balance UI is visible when carrying bags
-            const balanceUI = document.getElementById('balanceUI');
-            if (balanceUI) {
-                balanceUI.style.display = 'block';
-            }
-            
-            // Apply visual effects based on balance value
-            let newDirection = "center";
-            let intensity = 0;
             
             // Apply weight-based balance adjustments
             // The more bags the player carries, the more sensitive their balance becomes
@@ -2260,97 +1174,82 @@
                 weightFactor = 1.0 + (totalBagWeight * 0.08);
             }
             
-            // Define balance thresholds with weight-based adjustments
-            // These determine how far from center before imbalance effects start
-            const leftSevereThreshold = 0.1 / weightFactor;
-            const leftModerateThreshold = 0.3 / weightFactor;
-            const rightModerateThreshold = 0.7 / weightFactor;
-            const rightSevereThreshold = 0.9 / weightFactor;
+            // Adjust thresholds based on weight
+            const leftSevereThreshold = 0.3 * weightFactor; // Increased from 0.2
+            const leftModerateThreshold = 0.4 * weightFactor; // Increased from 0.3
+            const rightModerateThreshold = 0.6 / weightFactor; // Changed from 0.7
+            const rightSevereThreshold = 0.7 / weightFactor; // Changed from 0.8
             
             if (value < leftSevereThreshold) {
-                // Severe left imbalance
-                if (balanceIndicatorEl) {
-                    balanceIndicatorEl.style.background = '#ff0000'; // Red
-                }
+                // Left imbalance (severe)
+                indicator.style.background = '#ff4444'; // Red for danger
+                balanceDirectionEl.textContent = "Severe Left Imbalance";
+                balanceDirectionEl.style.color = '#ff4444';
                 newDirection = "left";
-                intensity = 1.0 - (value / leftSevereThreshold);
+                intensity = 0.4 - value; // Reduced range
             } else if (value < leftModerateThreshold) {
-                // Moderate left imbalance
-                if (balanceIndicatorEl) {
-                    balanceIndicatorEl.style.background = '#ff9900'; // Orange
-                }
+                // Left imbalance (moderate)
+                indicator.style.background = '#ffaa44'; // Orange for warning
+                balanceDirectionEl.textContent = "Left Imbalance";
+                balanceDirectionEl.style.color = '#ffaa44';
                 newDirection = "left";
-                intensity = (leftModerateThreshold - value) / (leftModerateThreshold - leftSevereThreshold);
+                intensity = 0.3 - value; // 0 to 0.3 range
             } else if (value > rightSevereThreshold) {
-                // Severe right imbalance
-                if (balanceIndicatorEl) {
-                    balanceIndicatorEl.style.background = '#ff0000'; // Red
-                }
+                // Right imbalance (severe)
+                indicator.style.background = '#ff4444'; // Red for danger
+                balanceDirectionEl.textContent = "Severe Right Imbalance";
+                balanceDirectionEl.style.color = '#ff4444';
                 newDirection = "right";
-                intensity = (value - rightSevereThreshold) / (1.0 - rightSevereThreshold);
+                intensity = value - 0.5; // Reduced range
             } else if (value > rightModerateThreshold) {
-                // Moderate right imbalance
-                if (balanceIndicatorEl) {
-                    balanceIndicatorEl.style.background = '#ff9900'; // Orange
-                }
+                // Right imbalance (moderate)
+                indicator.style.background = '#ffaa44'; // Orange for warning
+                balanceDirectionEl.textContent = "Right Imbalance";
+                balanceDirectionEl.style.color = '#ffaa44';
                 newDirection = "right";
-                intensity = (value - rightModerateThreshold) / (rightSevereThreshold - rightModerateThreshold);
+                intensity = value - 0.6; // Reduced range
                 } else {
                 // Balanced
-                if (balanceIndicatorEl) {
-                    balanceIndicatorEl.style.background = '#00ff00'; // Green
-                }
+                indicator.style.background = '#ffffff'; // White for safe
+                balanceDirectionEl.textContent = "Balanced";
+                balanceDirectionEl.style.color = '#ffffff';
                 newDirection = "center";
-                if (balanceDirectionEl) {
-                    balanceDirectionEl.textContent = "Balanced";
-                    balanceDirectionEl.style.color = '#00ff00';
-            }
+                intensity = 0;
             }
             
-            // If balance direction changed or intensity changed significantly, update animations
-            if (newDirection !== currentBalanceDirection || Math.abs(balanceIntensity - intensity) > 0.2) {
-                currentBalanceDirection = newDirection;
-                balanceIntensity = intensity;
-                
-                // Apply animation effects based on balance state
+            // Display carrying info in balance feedback
+            if (totalBagWeight > 0) {
+                balanceDirectionEl.textContent += ` (${totalBagWeight}kg)`;
+            }
+            
+            // Apply animation based on balance if enabled
+            if (balanceEnabled && newDirection !== currentBalanceDirection) {
                 updateAnimationsForBalance(newDirection, intensity);
+                currentBalanceDirection = newDirection;
             }
         }
         
-        // Apply animation effects based on balance status
+        // Function to update animations based on balance direction
         function updateAnimationsForBalance(direction, intensity) {
-            // First enforce ground collision to prevent clipping
-            enforceGroundCollision();
-            
-            // Check for fall condition - if intensity is very high, trigger a fall
-            if (intensity > 0.8 && !isGameOver) {
-                // High intensity imbalance triggers a fall
-                triggerGameOver();
-                return;
-            }
-            
             // Use stumble for lower body when imbalanced
             if (direction !== "center") {
                 // If moving, use stumble_lowerbody, otherwise use default animation
-                if (isMoving && !currentLowerBodyAnimation.startsWith('stumble') && !isGameOver) {
+                if (isMoving && !currentLowerBodyAnimation.startsWith('stumble')) {
                     setLowerBodyAnimation('stumble_lowerbody');
                 }
                 
                 // Apply a tilt to the entire character
-                if (characterTilt && !isGameOver) {
+                if (characterTilt) {
                     // Calculate tilt angle based on intensity but with reduced maximum tilt
-                    // Max tilt reduced to prevent extreme angles
-                    const tiltAmount = Math.min(0.15, Math.max(0, (intensity - 0.2) * 0.8 + 0.05));
-                    
-                    // Fix: Swap left/right direction for correct tilt
-                    const tiltAngle = (direction === 'right' ? -1 : 1) * tiltAmount;
+                    // Max tilt reduced from 0.5 to 0.3 radians (about 17 degrees instead of 29 degrees)
+                    const tiltAmount = Math.min(0.2, Math.max(0, (intensity - 0.2) * 1.0 + 0.05));
+                    const tiltAngle = (direction === 'left' ? -1 : 1) * tiltAmount;
                     
                     // Apply tilt with smooth transition
                     gsapTilt(tiltAngle);
                 }
             } else {
                 // Return to normal walking and no tilt
-                if (!isGameOver) {
                 if (isMoving && currentLowerBodyAnimation.startsWith('stumble')) {
                     setLowerBodyAnimation('walk');
                 } else if (!isMoving && currentLowerBodyAnimation.startsWith('stumble')) {
@@ -2359,7 +1258,6 @@
                 
                 if (characterTilt) {
                     gsapTilt(0);
-                    }
                 }
             }
         }
@@ -2442,6 +1340,20 @@
             detachBag();
         });
         
+        document.getElementById('balanceSlider').addEventListener('input', function() {
+            balanceValue = this.value / 100;
+            updateBalanceSystem(balanceValue);
+        });
+        
+        document.getElementById('toggleBalance').addEventListener('click', function() {
+            balanceEnabled = !balanceEnabled;
+            this.textContent = balanceEnabled ? 
+                'Disable Balance Effect' : 'Enable Balance Effect';
+            
+            // Apply current balance state immediately when toggled
+            updateBalanceSystem(balanceValue);
+        });
+        
         document.getElementById('gameView').addEventListener('click', () => {
             camera.position.set(-17, 2, -25);
             controls.target.set(-15, 1, -20);
@@ -2471,13 +1383,6 @@
                 balanceShift += turnDirection * 0.005; // Reduced from 0.01
             }
             
-            // Mouse movement can affect balance
-            if (lastMouseMoveX !== 0) {
-                // Use mouse movement to shift balance slightly
-                balanceShift += (lastMouseMoveX * 0.0001);
-                lastMouseMoveX = 0; // Reset after use
-            }
-            
             // Carrying weight makes balance harder
             const carryFactor = 1 + (totalBagWeight * 0.02); // Reduced from 0.03
             balanceShift *= carryFactor;
@@ -2486,10 +1391,7 @@
             balanceValue = Math.max(0, Math.min(1, balanceValue + (balanceShift * 0.5))); // Added 0.5 multiplier to slow changes
             
             // Update the UI
-            const balanceSlider = document.getElementById('balanceSlider');
-            if (balanceSlider) {
-                balanceSlider.value = balanceValue * 100;
-            }
+            document.getElementById('balanceSlider').value = balanceValue * 100;
             updateBalanceSystem(balanceValue);
         }
         
@@ -2522,7 +1424,7 @@
             thirdPersonCamera.lookAt(thirdPersonCameraTarget);
         }
         
-        // Update character movement and fix orientation - completely revised
+        // Update character movement and fix orientation
         function updateCharacterMovement(delta) {
             if (!characterTilt) return;
             
@@ -2535,7 +1437,7 @@
             let inputZ = 0;
             
             // Process joystick input if active
-            if (joystickActive && joystickDirection) {
+            if (joystickActive) {
                 // Add a small deadzone to prevent tiny movements
                 if (Math.abs(joystickDirection.x) > 0.15) {
                     inputX = joystickDirection.x;
@@ -2564,6 +1466,22 @@
                 }
             }
             
+            // Handle rotation separate from movement
+            // For rotation joystick (touch)
+            if (rotationJoystickActive) {
+                const rotationAmount = rotationJoystickDirection.x * touchRotationSensitivity;
+                characterTilt.rotation.y += rotationAmount;
+                
+                // Update target rotation for balance system
+                targetRotation = characterTilt.rotation.y;
+            }
+            // For mouse look (desktop)
+            else if (mouseLookActive && cameraMode === "thirdPerson") {
+                // Rotation handled in mouse move event
+                // Update target rotation for balance system
+                targetRotation = characterTilt.rotation.y;
+            }
+            
             // Process movement input (independent of rotation)
             if (Math.abs(inputX) > 0.1 || Math.abs(inputZ) > 0.1) {
                 isMoving = true;
@@ -2571,45 +1489,67 @@
                 // Calculate movement speed with acceleration/deceleration
                 const targetSpeed = maxMovementSpeed * Math.sqrt(inputX*inputX + inputZ*inputZ);
                 const speedDiff = targetSpeed - movementAcceleration;
-                movementAcceleration += speedDiff * 0.1 * (delta * 60); // Make framerate independent
+                movementAcceleration += speedDiff * 0.08;
                 
-                // Calculate camera-relative movement vectors
-                // This makes WASD always move relative to camera view
+                // Create movement vector based on current camera perspective
                 const cameraForward = new THREE.Vector3(0, 0, -1);
                 const cameraRight = new THREE.Vector3(1, 0, 0);
                 
-                // Apply camera orbit rotation to the movement vectors
-                cameraForward.applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraOrbitAngle);
-                cameraForward.y = 0; // Keep movement on horizontal plane
-                cameraForward.normalize();
-                
-                // Calculate right vector properly (cross UP with FORWARD to get RIGHT)
-                const up = new THREE.Vector3(0, 1, 0);
-                cameraRight.crossVectors(up, cameraForward);
-                cameraRight.normalize();
+                if (cameraMode === "thirdPerson" && thirdPersonCamera) {
+                    // Get camera's forward and right vectors
+                    thirdPersonCamera.getWorldDirection(cameraForward);
+                    cameraForward.y = 0; // Keep movement on horizontal plane
+                    cameraForward.normalize();
+                    
+                    // Right is perpendicular to forward in horizontal plane
+                    cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraForward);
+                } else {
+                    // Use character's orientation for non-third-person
+                    cameraForward.set(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
+                    cameraRight.set(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
+                }
                 
                 // Calculate movement direction relative to camera
                 moveDirection.set(0, 0, 0)
-                    .add(cameraRight.multiplyScalar(inputX))
+                    .add(cameraRight.multiplyScalar(-inputX))  // Keep the fix for left/right
                     .add(cameraForward.multiplyScalar(-inputZ));
                 
-                // Normalize and apply movement speed
-                if (moveDirection.length() > 0) {
-                    moveDirection.normalize().multiplyScalar(movementAcceleration);
-                    
-                    // Update character position
-                    characterTilt.position.add(moveDirection);
-                    
-                    // Rotate character to face movement direction
-                    // We need to negate the x or z component to get the correct facing direction
-                    // Using atan2(x, -z) because we want character to face TOWARD the direction of movement
-                    targetRotation = Math.atan2(moveDirection.x, -moveDirection.z);
+                moveDirection.normalize().multiplyScalar(movementAcceleration);
+                
+                // Update character position
+                characterTilt.position.add(moveDirection);
+                
+                // If moving, rotate character mesh to face movement direction (keep characterTilt.rotation separate)
+                if (characterModel && moveDirection.length() > 0.01) {
+                    // Get current rotation of character mesh (not tilt container)
+                    const angle = Math.atan2(moveDirection.x, moveDirection.z);
+                    characterModel.rotation.y = angle;
                 }
                 
-                // Smoothly rotate the character model to face the movement direction
-                if (characterTilt.rotation.y !== targetRotation) {
-                    const rotDiff = ((targetRotation - characterTilt.rotation.y + Math.PI) % (Math.PI * 2)) - Math.PI;
-                    characterTilt.rotation.y += rotDiff * 0.2; // Increased rotation speed
+                // Update animations based on movement state change - ONLY if state actually changed
+                if (!wasMoving || !lastMovementState) {
+                    // Just started moving or continuing to move
+                    if (!wasMoving) {
+                        updateDebug("State change: idle → moving");
+                    }
+                    
+                    // Force animation update on movement state change, overriding the time check
+                    if (attachedBags.length > 0) {
+                        const animName = `carry_walk_${carryWeightClass}`;
+                        updateDebug(`Forcing animation update to: ${animName}`);
+                        
+                        // Bypass the time check in setUpperBodyAnimation
+                        forcedAnimationUpdate(animName);
+                    } else {
+                        forcedAnimationUpdate('walk');
+                    }
+                    
+                    if (currentBalanceDirection === "center") {
+                        setLowerBodyAnimation('walk');
+                    } else {
+                        setLowerBodyAnimation('stumble_lowerbody');
+                    }
+                    lastMovementState = true;
                 }
             } else {
                 // Character is not moving, slow down gradually
@@ -2617,54 +1557,34 @@
                 if (movementAcceleration < 0.001) {
                     movementAcceleration = 0;
                 }
-            }
-            
-            // Update character animations based on movement state
-            if (isMoving) {
-                // Set appropriate animations for moving based on weight class
-                if (attachedBags.length > 0) {
-                    // Use weight-based carry animations
-                    const animName = `carry_walk_${carryWeightClass}`;
-                    if (currentUpperBodyAnimation !== animName) {
-                        forcedAnimationUpdate(animName);
-                    }
-                } else {
-                    // Regular walking animation when not carrying
-                    if (currentUpperBodyAnimation !== 'walk') {
-                        // Always set both upper and lower body explicitly
-                        setUpperBodyAnimation('walk');
-                        // Ensure lower body is always set for walk animation
-                        if (currentLowerBodyAnimation !== 'walk') {
-                            setLowerBodyAnimation('walk');
+                
+                // Update animations for idle state ONLY if we were previously moving
+                if (wasMoving && lastMovementState) {
+                    // Just stopped moving
+                    updateDebug("State change: moving → idle");
+                    
+                    if (!currentUpperBodyAnimation.startsWith('pickup')) {
+                        if (attachedBags.length > 0) {
+                            // Force animation update, bypassing the time check
+                            forcedAnimationUpdate(`carry_stand_${carryWeightClass}`);
+                        } else {
+                            forcedAnimationUpdate('idle');
                         }
                     }
-                }
-            } else {
-                // Set appropriate animations for idle
-                if (attachedBags.length > 0) {
-                    // Use weight-based carry animations for idle
-                    const animName = `carry_idle_${carryWeightClass}`;
-                    if (currentUpperBodyAnimation !== animName) {
-                        forcedAnimationUpdate(animName);
+                    
+                    if (!currentLowerBodyAnimation.startsWith('stumble') && currentLowerBodyAnimation !== 'idle') {
+                        setLowerBodyAnimation('idle');
                     }
-                } else {
-                    // Regular idle animation when not carrying
-                    if (currentUpperBodyAnimation !== 'idle') {
-                        setUpperBodyAnimation('idle');
-                        // Ensure lower body is always set for idle animation
-                        if (currentLowerBodyAnimation !== 'idle') {
-                            setLowerBodyAnimation('idle');
-                        }
-                    }
+                    lastMovementState = false;
                 }
             }
             
-            // Enforce ground collision
-            enforceGroundCollision();
+            // Update balance based on movement and carrying
+            updateMovementBasedBalance();
             
-            // Update balance if carrying bags
-            if (attachedBags.length > 0 && balanceEnabled) {
-                updateMovementBasedBalance();
+            // Update camera if in third-person mode and following
+            if (cameraMode === "thirdPerson" && isCameraFollowing) {
+                updateThirdPersonCamera();
             }
         }
         
@@ -2673,13 +1593,6 @@
             // Skip "too soon" check for state transitions
             
             updateDebug(`Forcing animation: ${name}`);
-            
-            // Update animation change tracking for both general and pickup animations
-            lastAnimationChange = Date.now();
-            lastAnimationChangeTime = Date.now();
-            
-            // Get the original animation name before modifications
-            const originalName = name;
             
             // Check if we should use a carry animation based on weight class
             if (attachedBags.length > 0 && (name === 'walk' || name === 'idle' || name === 'run')) {
@@ -2701,68 +1614,36 @@
                 }
             }
             
+            // If already playing this animation, don't restart it
+            if (currentUpperBodyAnimation === name && currentUpperBodyAction) {
+                updateDebug(`Already playing ${name}, not restarting`);
+                return;
+            }
+            
             // Set animation transitioning flag
             isAnimationTransitioning = true;
             
-            // Fade out current upper body animation - use a short transition time for forced updates
-            const shortTransitionTime = 0.15; // Faster transitions for forced updates (was 0.5)
-            
+            // Fade out current animation
             if (currentUpperBodyAction) {
-                currentUpperBodyAction.fadeOut(shortTransitionTime);
+                currentUpperBodyAction.fadeOut(animationTransitionTime);
             }
             
-            // Play new animation with short fade in
+            // Play new animation
             const action = upperBodyActions[name];
-            if (action) {
-                action.reset();
-                action.fadeIn(shortTransitionTime);
-                action.play();
-                
-                currentUpperBodyAction = action;
-                currentUpperBodyAnimation = name;
-            }
+            action.reset();
+            action.fadeIn(animationTransitionTime);
+            action.play();
             
-            // Also make sure lower body matches if needed for specific animations
-            if (name.startsWith('pickup_') || name === 'idle' || name === 'stumble_fall') {
-                // For certain animations, make sure lower body is synchronized
-                if (lowerBodyActions['idle']) {
-                    const lowerAction = lowerBodyActions['idle'];
-                    
-                    if (currentLowerBodyAction) {
-                        currentLowerBodyAction.fadeOut(shortTransitionTime);
-                    }
-                    
-                    lowerAction.reset();
-                    lowerAction.fadeIn(shortTransitionTime);
-                    lowerAction.play();
-                    
-                    currentLowerBodyAction = lowerAction;
-                    currentLowerBodyAnimation = 'idle';
-                }
-            } else if (name.startsWith('walk') || name.startsWith('carry_walk')) {
-                // For walk animations, make sure lower body also walks
-                if (lowerBodyActions['walk']) {
-                    const lowerAction = lowerBodyActions['walk'];
-                    
-                    if (currentLowerBodyAction) {
-                        currentLowerBodyAction.fadeOut(shortTransitionTime);
-                    }
-                    
-                    lowerAction.reset();
-                    lowerAction.fadeIn(shortTransitionTime);
-                    lowerAction.play();
-                    
-                    currentLowerBodyAction = lowerAction;
-                    currentLowerBodyAnimation = 'walk';
-                }
-            }
+            currentUpperBodyAction = action;
+            currentUpperBodyAnimation = name;
+            lastAnimationChange = Date.now();
             
             // Clear transition flag after transition completes
             clearTimeout(animationTransitionTimeout);
             animationTransitionTimeout = setTimeout(() => {
                 isAnimationTransitioning = false;
                 updateDebug(`Animation transition complete: ${name}`);
-            }, shortTransitionTime * 1000);
+            }, animationTransitionTime * 1000);
         }
         
         // Set up joystick controls
@@ -2772,19 +1653,6 @@
             const rotationJoystick = document.getElementById('rotationJoystick');
             const rotationKnob = document.getElementById('rotationJoystickKnob');
             const interact = document.getElementById('interactButton');
-            const touchControls = document.getElementById('touchControls');
-            
-            // Check if we're on mobile or desktop
-            isUsingTouch = isMobileDevice();
-            
-            // Show/hide appropriate controls based on device
-            if (isUsingTouch) {
-                // Mobile - show touch controls
-                if (touchControls) touchControls.style.display = 'block';
-            } else {
-                // Desktop - hide touch controls
-                if (touchControls) touchControls.style.display = 'none';
-            }
             
             // Get joystick positions
             const joystickRect = joystick.getBoundingClientRect();
@@ -2816,7 +1684,6 @@
             // Touch move for all joysticks
             document.addEventListener('touchmove', function(e) {
                 e.preventDefault();
-                isUsingTouch = true;
                 
                 // Handle multiple touches
                 for (let i = 0; i < e.touches.length; i++) {
@@ -2892,61 +1759,7 @@
                 }
             });
             
-            // Desktop-specific mouse controls (only if not mobile)
-            if (!isUsingTouch) {
-                // Mouse move for camera rotation (no need to click and hold)
-                renderer.domElement.addEventListener('mousemove', function(e) {
-                    if (cameraMode === "thirdPerson" && !controls.enabled && !isGameOver) {
-                        // Only rotate camera if in game view mode and not in game over state
-                        const dx = e.movementX || e.mozMovementX || e.webkitMovementX || 0;
-                        
-                        // Always capture mouse movement for balance control when balance is enabled
-                        if (balanceEnabled && attachedBags.length > 0) {
-                            lastMouseMoveX = dx;
-                        }
-                        
-                        // Always apply camera rotation without requiring mouseLookActive
-                        if (dx !== 0) {
-                            // Calculate rotation amount with sensitivity
-                            const rotationAmount = -dx * mouseRotationSensitivity;
-                            
-                            // Update camera orbit angle 
-                            cameraOrbitAngle = (cameraOrbitAngle + rotationAmount) % (Math.PI * 2);
-                            
-                            // Update camera position based on new orbit angle
-                            updateCameraPositionSafely();
-                        }
-                    }
-                });
-                
-                // Capture pointer for smoother mouse movement
-                renderer.domElement.addEventListener('click', function() {
-                    if (cameraMode === "thirdPerson" && !mouseLookActive && !controls.enabled) {
-                        // Request pointer lock for smoother mouse controls
-                        renderer.domElement.requestPointerLock = 
-                            renderer.domElement.requestPointerLock || 
-                            renderer.domElement.mozRequestPointerLock || 
-                            renderer.domElement.webkitRequestPointerLock;
-                        
-                        renderer.domElement.requestPointerLock();
-                        
-                        // Show a small notification to indicate pointer is locked
-                        showPickupFeedback("Mouse locked - press ESC to unlock");
-                    }
-                });
-                
-                // Add ESC key handler to exit pointer lock
-                document.addEventListener('keydown', function(e) {
-                    if (e.key === 'Escape' && mouseLookActive) {
-                        document.exitPointerLock = document.exitPointerLock || 
-                            document.mozExitPointerLock || 
-                            document.webkitExitPointerLock;
-                            
-                        document.exitPointerLock();
-                    }
-                });
-            } else {
-                // Mobile-specific mouse events for testing on desktop
+            // Mouse events for testing
             joystick.addEventListener('mousedown', function(e) {
                 e.preventDefault();
                 joystickActive = true;
@@ -2968,32 +1781,47 @@
                     e.preventDefault();
                     updateRotationJoystickPosition(e.clientX, e.clientY);
                 }
+                
+                // Handle mouse look if in 3rd person mode & mouse button pressed
+                if (mouseLookActive && cameraMode === "thirdPerson" && characterTilt) {
+                    const dx = e.clientX - lastMouseX;
+                    characterTilt.rotation.y -= dx * mouseRotationSensitivity;
+                    lastMouseX = e.clientX;
+                }
             });
             
             document.addEventListener('mouseup', function() {
                 joystickActive = false;
                 rotationJoystickActive = false;
+                mouseLookActive = false;
                 resetJoystick();
                 resetRotationJoystick();
             });
-            }
             
-            // Mouse right-click for rotation - disabled for new control scheme
+            // Mouse right-click for rotation
             renderer.domElement.addEventListener('contextmenu', function(e) {
                 e.preventDefault(); // Prevent right-click menu
             });
             
-            // Interact button for pickups - use keyboard for desktop, touch for mobile
-            if (isUsingTouch) {
-                interact.addEventListener('touchstart', function(e) {
+            // Mouse down for rotation (right button)
+            renderer.domElement.addEventListener('mousedown', function(e) {
+                if (e.button === 2 && cameraMode === "thirdPerson") { // Right mouse button
                     e.preventDefault();
-                    attemptPickupInteraction();
-                });
-            } else {
-                // For desktop, keyboard controls will handle pickups
-                // Hide the interact button
-                if (interact) interact.style.display = 'none';
-            }
+                    mouseLookActive = true;
+                    lastMouseX = e.clientX;
+                }
+            });
+            
+            // Interact button for pickups
+            interact.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                attemptPickupInteraction();
+            });
+            
+            interact.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                attemptPickupInteraction();
+            });
             
             // Camera toggle button
             document.getElementById('gameViewBtn').addEventListener('click', function() {
@@ -3014,23 +1842,6 @@
                     y: rotationJoystickRect.top + rotationJoystickRect.height / 2
                 };
             });
-            
-            // Check for pointer lock change
-            document.addEventListener('pointerlockchange', handlePointerLockChange);
-            document.addEventListener('mozpointerlockchange', handlePointerLockChange);
-            document.addEventListener('webkitpointerlockchange', handlePointerLockChange);
-            
-            function handlePointerLockChange() {
-                if (document.pointerLockElement === renderer.domElement || 
-                    document.mozPointerLockElement === renderer.domElement ||
-                    document.webkitPointerLockElement === renderer.domElement) {
-                    // Pointer is locked - enable camera movement
-                    mouseLookActive = true;
-                } else {
-                    // Pointer is unlocked - disable camera movement
-                    mouseLookActive = false;
-                }
-            }
         }
         
         // Update joystick position and calculate direction
@@ -3112,37 +1923,17 @@
                 cameraMode = "orbit";
                 isCameraFollowing = false;
                 
-                // Enable orbit controls
-                controls.enabled = true;
-                
-                // Exit pointer lock if active
-                if (document.pointerLockElement === renderer.domElement ||
-                    document.mozPointerLockElement === renderer.domElement ||
-                    document.webkitPointerLockElement === renderer.domElement) {
-                    document.exitPointerLock = document.exitPointerLock || 
-                        document.mozExitPointerLock || 
-                        document.webkitExitPointerLock;
-                    document.exitPointerLock();
-                }
-                
                 // Set orbit camera
                 camera.position.set(0, 20, 30);
                 controls.target.set(0, 0, 0);
                 controls.update();
-                
-                document.getElementById('gameViewBtn').textContent = 'Game View';
             } else {
                 // Switch to third-person mode
                 cameraMode = "thirdPerson";
                 isCameraFollowing = true;
                 
-                // Disable orbit controls
-                controls.enabled = false;
-                
                 // Re-enable third-person camera
                 updateThirdPersonCamera();
-                
-                document.getElementById('gameViewBtn').textContent = 'Orbit View';
             }
         }
         
@@ -3153,13 +1944,13 @@
         window.addEventListener('keydown', function(e) {
             keysPressed[e.key.toLowerCase()] = true;
             
-            // Space = interact/pickup (E is now used for balance)
-            if (e.key === ' ') {
+            // Space or E = interact/pickup
+            if (e.key === ' ' || e.key.toLowerCase() === 'e') {
                 attemptPickupInteraction();
             }
             
-            // R = drop bag (Q is now used for balance)
-            if (e.key.toLowerCase() === 'r') {
+            // Q or R = drop bag
+            if (e.key.toLowerCase() === 'q' || e.key.toLowerCase() === 'r') {
                 detachBag();
             }
             
@@ -3175,55 +1966,16 @@
         
         // Animation loop
         const clock = new THREE.Clock();
-        let lastFrameTime = 0;
-        let cameraUpdateScheduled = false; // Flag to ensure camera only updates once per frame
-        
-        // A single source of truth for camera updates
-        function animate(currentTime) {
+        function animate() {
             requestAnimationFrame(animate);
             
-            // Calculate delta time
             const delta = clock.getDelta();
             
-            // Skip movement updates during game over
-            if (!isGameOver) {
-                // Process input and update character position first
-                // We DO NOT update camera here
-                updateCharacterMovement(delta);
-                
-                // Reset camera update flag for this frame
-                cameraUpdateScheduled = false;
-                
-                // Update animations
-                if (mixer) mixer.update(delta);
-                
-                // Handle balance updates based on control input
-                updateBalanceBasedOnControls();
-                
-                // Ensure attached bags remain visible
-                ensureAttachedBagsVisibility();
-                
-                // Reset lastMouseMoveX at the very end of the frame to prevent accumulation
-                // but after it's been used for both camera and balance control
-                lastMouseMoveX = 0;
-            } else {
-                // Still update animations during game over
-                if (mixer) mixer.update(delta);
-            }
+            // Update character movement
+            updateCharacterMovement(delta);
             
-            // Always enforce ground collision
-            enforceGroundCollision();
-            
-            // ONLY update the camera once per frame, and only after all movement is complete
-            if (cameraMode === "thirdPerson" && thirdPersonCamera && characterTilt) {
-                // Use a completely decoupled camera update system
-                updateCameraPositionSafely();
-            }
-            
-            // Apply camera shake if active
-            if (cameraShakeActive) {
-                applyCameraShake();
-            }
+            // Update character animations
+            if (mixer) mixer.update(delta);
             
             // Update pickup button highlight
             updatePickupButtonHighlight();
@@ -3246,275 +1998,14 @@
             } else {
                 renderer.render(scene, camera);
             }
-            
-            lastFrameTime = currentTime;
         }
-        
-        // A safer, more controlled camera update function
-        function updateCameraPositionSafely() {
-            if (!characterTilt || !thirdPersonCamera) return;
-            
-            // Get character position
-            const characterPos = new THREE.Vector3();
-            characterTilt.getWorldPosition(characterPos);
-            
-            // Store old camera position
-            const oldCameraPos = thirdPersonCamera.position.clone();
-            
-            // Calculate camera position based on cameraOrbitAngle instead of character rotation
-            // This allows for independent camera rotation with WASD movement relative to camera
-            const cameraOffset = thirdPersonCameraOffset.clone();
-            cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraOrbitAngle);
-            
-            // Calculate target camera position
-            const newCameraPos = characterPos.clone().add(cameraOffset);
-            
-            // Smoothly interpolate camera position for a less jarring movement
-            thirdPersonCamera.position.lerp(newCameraPos, 0.2);
-            
-            // Ensure the target is properly updated to follow character
-            thirdPersonCameraTarget.copy(characterPos);
-            thirdPersonCameraTarget.y += 1.5; // Look slightly above character's feet
-            
-            // Update camera view direction
-            thirdPersonCamera.lookAt(thirdPersonCameraTarget);
-            
-            // Flag that camera has been updated this frame
-            cameraUpdateScheduled = true;
-        }
-        
-        // Function for handling balance changes based on controls
-        function updateBalanceBasedOnControls() {
-            // Skip if no bags or balance not enabled
-            if (!balanceEnabled || attachedBags.length === 0) return;
-            
-            // Get horizontal input from mouse/joystick for balance
-            let horizontalInput = 0;
-            
-            // Mouse input takes priority if available
-            if (lastMouseMoveX !== 0) {
-                // Use mouse movement for balance control with increased sensitivity
-                horizontalInput = lastMouseMoveX * 0.05;
-                console.log(`Balance using mouse input: ${horizontalInput.toFixed(2)}`);
-            } 
-            // Joystick rotation is another source of input 
-            else if (rotationJoystickActive) {
-                // Use joystick for balance control with high sensitivity
-                horizontalInput = rotationJoystickDirection.x * 0.8;
-                console.log(`Balance using joystick input: ${horizontalInput.toFixed(2)}`);
-            }
-            // Keyboard controls as fallback
-            else if (keysPressed['q']) {
-                // Q key - lean left
-                horizontalInput = -1.0;
-            } else if (keysPressed['e']) {
-                // E key - lean right
-                horizontalInput = 1.0;
-            }
-            
-            // Apply a balance change based on the horizontal input
-            // This is completely independent from movement
-            if (horizontalInput !== 0) {
-                // Moving mouse/joystick right tilts balance right, and vice versa
-                const balanceImpact = horizontalInput * 0.15;
-                
-                // Apply the balance impact
-                balanceValue += balanceImpact;
-                
-                // Create visual feedback proportional to input
-                if (Math.abs(balanceImpact) > 0.01) {
-                    // Debug message for when balance changes significantly
-                    console.log(`Balance impact: ${balanceImpact.toFixed(3)}, New balance: ${balanceValue.toFixed(2)}`);
-                }
-            }
-            
-            // Reduced natural centering force to make manual control more important
-            const centeringForce = (0.5 - balanceValue) * 0.002; // Reduced from 0.005
-            balanceValue += centeringForce;
-            
-            // Apply random balance disturbances based on weight carried
-            if (Math.random() < 0.01 * totalBagWeight) {
-                // Random disturbance proportional to weight
-                const disturbance = (Math.random() - 0.5) * 0.05 * totalBagWeight;
-                balanceValue += disturbance;
-                console.log(`Random balance disturbance: ${disturbance.toFixed(3)}`);
-            }
-            
-            // Clamp balance value
-            balanceValue = Math.max(0, Math.min(1, balanceValue));
-            
-            // Update UI
-            const balanceSlider = document.getElementById('balanceSlider');
-            if (balanceSlider) {
-                balanceSlider.value = balanceValue * 100;
-            }
-            
-            // Apply visual effects based on balance
-            updateBalanceSystem(balanceValue);
-        }
-        
-        // Update character movement and fix orientation - completely revised
-        function updateCharacterMovement(delta) {
-            if (!characterTilt) return;
-            
-            // Store previous movement state to detect changes
-            const wasMoving = isMoving;
-            isMoving = false;
-            
-            // Get joystick or keyboard input for movement
-            let inputX = 0;
-            let inputZ = 0;
-            
-            // Process joystick input if active
-            if (joystickActive && joystickDirection) {
-                // Add a small deadzone to prevent tiny movements
-                if (Math.abs(joystickDirection.x) > 0.15) {
-                    inputX = joystickDirection.x;
-                }
-                if (Math.abs(joystickDirection.y) > 0.15) {
-                    inputZ = joystickDirection.y;
-                }
-            } 
-            // Otherwise process keyboard input
-            else {
-                // W or Up Arrow - Forward movement relative to camera
-                if (keysPressed['w'] || keysPressed['ArrowUp']) {
-                    inputZ = -1;
-                }
-                // S or Down Arrow - Backward movement relative to camera
-                if (keysPressed['s'] || keysPressed['ArrowDown']) {
-                    inputZ = 1;
-                }
-                // A or Left Arrow - Strafe left relative to camera
-                if (keysPressed['a'] || keysPressed['ArrowLeft']) {
-                    inputX = -1;
-                }
-                // D or Right Arrow - Strafe right relative to camera
-                if (keysPressed['d'] || keysPressed['ArrowRight']) {
-                    inputX = 1;
-                }
-            }
-            
-            // Process movement input (independent of rotation)
-            if (Math.abs(inputX) > 0.1 || Math.abs(inputZ) > 0.1) {
-                isMoving = true;
-                
-                // Calculate movement speed with acceleration/deceleration
-                const targetSpeed = maxMovementSpeed * Math.sqrt(inputX*inputX + inputZ*inputZ);
-                const speedDiff = targetSpeed - movementAcceleration;
-                movementAcceleration += speedDiff * 0.1 * (delta * 60); // Make framerate independent
-                
-                // Calculate camera-relative movement vectors
-                // This makes WASD always move relative to camera view
-                const cameraForward = new THREE.Vector3(0, 0, -1);
-                const cameraRight = new THREE.Vector3(1, 0, 0);
-                
-                // Apply camera orbit rotation to the movement vectors
-                cameraForward.applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraOrbitAngle);
-                cameraForward.y = 0; // Keep movement on horizontal plane
-                cameraForward.normalize();
-                
-                // Calculate right vector properly (cross UP with FORWARD to get RIGHT)
-                const up = new THREE.Vector3(0, 1, 0);
-                cameraRight.crossVectors(up, cameraForward);
-                cameraRight.normalize();
-                
-                // Calculate movement direction relative to camera
-                moveDirection.set(0, 0, 0)
-                    .add(cameraRight.multiplyScalar(inputX))
-                    .add(cameraForward.multiplyScalar(-inputZ));
-                
-                // Normalize and apply movement speed
-                if (moveDirection.length() > 0) {
-                    moveDirection.normalize().multiplyScalar(movementAcceleration);
-                    
-                    // Update character position
-                    characterTilt.position.add(moveDirection);
-                    
-                    // Rotate character to face movement direction
-                    // We need to negate the x or z component to get the correct facing direction
-                    // Using atan2(x, -z) because we want character to face TOWARD the direction of movement
-                    targetRotation = Math.atan2(moveDirection.x, -moveDirection.z);
-                }
-                
-                // Smoothly rotate the character model to face the movement direction
-                if (characterTilt.rotation.y !== targetRotation) {
-                    const rotDiff = ((targetRotation - characterTilt.rotation.y + Math.PI) % (Math.PI * 2)) - Math.PI;
-                    characterTilt.rotation.y += rotDiff * 0.2; // Increased rotation speed
-                }
-            } else {
-                // Character is not moving, slow down gradually
-                movementAcceleration *= 0.8;
-                if (movementAcceleration < 0.001) {
-                    movementAcceleration = 0;
-                }
-            }
-            
-            // Update character animations based on movement state
-            if (isMoving) {
-                // Set appropriate animations for moving based on weight class
-                if (attachedBags.length > 0) {
-                    // Use weight-based carry animations
-                    const animName = `carry_walk_${carryWeightClass}`;
-                    if (currentUpperBodyAnimation !== animName) {
-                        forcedAnimationUpdate(animName);
-                    }
-                } else {
-                    // Regular walking animation when not carrying
-                    if (currentUpperBodyAnimation !== 'walk') {
-                        // Always set both upper and lower body explicitly
-                        setUpperBodyAnimation('walk');
-                        // Ensure lower body is always set for walk animation
-                        if (currentLowerBodyAnimation !== 'walk') {
-                            setLowerBodyAnimation('walk');
-                        }
-                    }
-                }
-            } else {
-                // Set appropriate animations for idle
-                if (attachedBags.length > 0) {
-                    // Use weight-based carry animations for idle
-                    const animName = `carry_idle_${carryWeightClass}`;
-                    if (currentUpperBodyAnimation !== animName) {
-                        forcedAnimationUpdate(animName);
-                    }
-                } else {
-                    // Regular idle animation when not carrying
-                    if (currentUpperBodyAnimation !== 'idle') {
-                        setUpperBodyAnimation('idle');
-                        // Ensure lower body is always set for idle animation
-                        if (currentLowerBodyAnimation !== 'idle') {
-                            setLowerBodyAnimation('idle');
-                        }
-                    }
-                }
-            }
-            
-            // Enforce ground collision
-            enforceGroundCollision();
-            
-            // Update balance if carrying bags
-            if (attachedBags.length > 0 && balanceEnabled) {
-                updateMovementBasedBalance();
-            }
-        }
-        
-        // Update third-person camera position
-        function updateThirdPersonCamera() {
-            // Now handled by updateCameraPositionSafely() in the animation loop
-            return;
-        }
+        animate();
         
         // Initialize controls when everything is loaded
         window.addEventListener('load', function() {
             setupJoystickControls();
-            
-            // Hide debug elements and optimize UI for the current device
-            hideDebugElements();
-            optimizeUIForDevice();
-            
-            // Balance system will be automatically enabled/disabled when bags are picked up/dropped
-            
+            // Start with balance system disabled
+            document.getElementById('toggleBalance').textContent = 'Enable Balance Effect';
             document.getElementById('helpOverlay').style.display = 'block'; // Show help on start
             
             // Set initial balance to center
@@ -3522,67 +2013,13 @@
             document.getElementById('balanceSlider').value = 50;
             updateBalanceSystem(balanceValue);
             
-            // Set default camera mode
-            cameraMode = "thirdPerson";
-            isCameraFollowing = true;
-            
-            // For desktop mode, disable orbit controls by default
-            if (!isUsingTouch) {
-                controls.enabled = false;
-                document.getElementById('gameViewBtn').textContent = 'Orbit View';
-            }
-            
-            // Make sure the camera is positioned correctly at start
-            if (thirdPersonCamera && characterTilt) {
-                updateThirdPersonCamera();
-                // Log the camera position for debugging
-                console.log('Camera position set to:', 
-                    thirdPersonCamera.position.x.toFixed(2),
-                    thirdPersonCamera.position.y.toFixed(2),
-                    thirdPersonCamera.position.z.toFixed(2));
-            }
-            
             // Add help button event listener
             document.getElementById('helpBtn').addEventListener('click', function() {
                 document.getElementById('helpOverlay').style.display = 'block';
             });
             
-            // Update help text based on device
-            const helpText = document.querySelector('#helpOverlay p:first-of-type');
-            if (helpText) {
-                if (isUsingTouch) {
-                    helpText.textContent = "Touch Controls: Left joystick to move, right joystick to rotate and balance, button to pick up bags";
-                } else {
-                    helpText.textContent = "Keyboard/Mouse: WASD or arrows to move, mouse to look around, SPACE to pick up, R to drop";
-                }
-            }
-            
-            // Update the second paragraph of help text for balance instructions
-            const balanceHelpText = document.querySelector('#helpOverlay p:nth-of-type(3)');
-            if (balanceHelpText) {
-                if (isUsingTouch) {
-                    balanceHelpText.textContent = "Balance: Tilt the right joystick left/right to control balance when carrying bags";
-                } else {
-                    balanceHelpText.textContent = "Balance: Use Q and E keys to control balance when carrying bags";
-                }
-            }
-            
-            // Ensure initial camera and character positions are in sync
-            if (characterTilt) {
-                // Set up initial animation state
-                if (mixer) {
-                    // Make sure mixer is updated on first frame
-                    mixer.update(0);
-                }
-                console.log('Character position:', 
-                    characterTilt.position.x.toFixed(2),
-                    characterTilt.position.y.toFixed(2),
-                    characterTilt.position.z.toFixed(2));
-            }
-            
             // Add a simple debug message
             updateDebug('Game loaded successfully');
-            updateDebug(isUsingTouch ? 'Using touch controls' : 'Using desktop controls');
         });
         
         // Handle window resize
@@ -3617,12 +2054,8 @@
                 const bags = [];
                 if (groundBag1 && !attachedBags.some(b => b.mesh === groundBag1)) bags.push(groundBag1);
                 if (groundBag2 && !attachedBags.some(b => b.mesh === groundBag2)) bags.push(groundBag2);
-                if (groundBag3 && !attachedBags.some(b => b.mesh === groundBag3)) bags.push(groundBag3);
-                if (groundBag4 && !attachedBags.some(b => b.mesh === groundBag4)) bags.push(groundBag4);
                 if (carBag1 && !attachedBags.some(b => b.mesh === carBag1)) bags.push(carBag1);
                 if (carBag2 && !attachedBags.some(b => b.mesh === carBag2)) bags.push(carBag2);
-                if (carBag3 && !attachedBags.some(b => b.mesh === carBag3)) bags.push(carBag3);
-                if (carBag4 && !attachedBags.some(b => b.mesh === carBag4)) bags.push(carBag4);
                 
                 // Check distance to each bag
                 for (const bag of bags) {
@@ -3638,7 +2071,7 @@
                         highlightBag(bag);
                         
                         // Determine if it's a ground bag or car bag
-                        if (bag === groundBag1 || bag === groundBag2 || bag === groundBag3 || bag === groundBag4) {
+                        if (bag === groundBag1 || bag === groundBag2) {
                             return { bag, isGroundBag: true };
                         } else {
                             return { bag, isGroundBag: false };
@@ -3651,12 +2084,8 @@
                 const bags = [];
                 if (groundBag1 && !attachedBags.some(b => b.mesh === groundBag1)) bags.push(groundBag1);
                 if (groundBag2 && !attachedBags.some(b => b.mesh === groundBag2)) bags.push(groundBag2);
-                if (groundBag3 && !attachedBags.some(b => b.mesh === groundBag3)) bags.push(groundBag3);
-                if (groundBag4 && !attachedBags.some(b => b.mesh === groundBag4)) bags.push(groundBag4);
                 if (carBag1 && !attachedBags.some(b => b.mesh === carBag1)) bags.push(carBag1);
                 if (carBag2 && !attachedBags.some(b => b.mesh === carBag2)) bags.push(carBag2);
-                if (carBag3 && !attachedBags.some(b => b.mesh === carBag3)) bags.push(carBag3);
-                if (carBag4 && !attachedBags.some(b => b.mesh === carBag4)) bags.push(carBag4);
                 
                 // Find all meshes in the bags
                 const bagMeshes = [];
@@ -3680,20 +2109,7 @@
                 if (intersects.length > 0) {
                     // Find which bag this mesh belongs to
                     const hitMesh = intersects[0].object;
-                    // Fix for isAncestorOf error - use a simpler approach to find the parent bag
-                    const bagInfo = bagMeshes.find(item => {
-                        // Check if it's the same mesh
-                        if (item.mesh === hitMesh) return true;
-                        
-                        // Or check if the hit mesh is a child of the bag mesh
-                        // by comparing UUIDs or checking parent chain
-                        let parent = hitMesh.parent;
-                        while (parent) {
-                            if (parent === item.bag) return true;
-                            parent = parent.parent;
-                        }
-                        return false;
-                    });
+                    const bagInfo = bagMeshes.find(item => item.mesh === hitMesh || item.mesh.isAncestorOf(hitMesh));
                     
                     if (bagInfo) {
                         const bag = bagInfo.bag;
@@ -3702,7 +2118,7 @@
                         highlightBag(bag);
                         
                         // Determine if it's a ground bag or car bag
-                        if (bag === groundBag1 || bag === groundBag2 || bag === groundBag3 || bag === groundBag4) {
+                        if (bag === groundBag1 || bag === groundBag2) {
                             return { bag, isGroundBag: true };
                         } else {
                             return { bag, isGroundBag: false };
@@ -3751,22 +2167,11 @@
         
         // Interactive pickup function for touch/click
         function attemptPickupInteraction() {
-            // If game is in game over state, don't allow pickups
-            if (isGameOver) return false;
-            
-            // If we're already in a pickup animation but haven't finished the 
-            // attachment process, allow a new pickup to override it
+            // Don't allow pickups during pickup animations
             if (currentUpperBodyAnimation.startsWith('pickup')) {
-                // Check how long we've been in this pickup animation
-                const now = Date.now();
-                const pickupDuration = now - lastAnimationChangeTime;
-                
-                // If we've been in pickup animation for over 150ms, we can force completion
-                if (pickupDuration > 150) {
-                    updateDebug("Force completing previous pickup animation");
-                    // Force the animation to end early
-                    setUpperBodyAnimation('idle');
-                }
+                updateDebug("Cannot pickup: already in pickup animation");
+                showPickupFeedback("Wait for pickup to finish");
+                return false;
             }
             
             const bagInView = findInteractableBagInViewDirection();
@@ -3775,61 +2180,28 @@
                 updateDebug(`Found bag to pick up: ${bagInView.isGroundBag ? 'ground' : 'car'} bag`);
                 showPickupFeedback(bagInView.isGroundBag ? "Picking up bag..." : "Grabbing from car...");
                 
-                // Track when we started the animation
-                lastAnimationChangeTime = Date.now();
-                
                 if (bagInView.isGroundBag) {
-                    // Ground pickup - preload with zero timeout
-                    if (upperBodyActions['pickup_low']) {
-                        // Make sure it's preloaded
-                        upperBodyActions['pickup_low'].reset();
-                    }
-                    
-                    // Start the animation
+                    // Ground pickup
                     setUpperBodyAnimation('pickup_low');
                     
-                    // Reduced timeout for more responsive gameplay - use requestAnimationFrame for better timing
-                    requestAnimationFrame(() => {
-                        // Process in next frame for smoother performance
-                        setTimeout(() => {
-                            if (rightHand && bagInView.bag && !attachedBags.some(b => b.mesh === bagInView.bag)) {
-                                attachBagToHand(bagInView.bag, rightHand);
-                            }
-                            // Force animation to end and transition to carry state
-                            if (attachedBags.length > 0) {
-                                const animName = `carry_idle_${carryWeightClass}`;
-                                forcedAnimationUpdate(animName);
-                            } else {
-                                setUpperBodyAnimation('idle');
-                            }
-                        }, 250); // Further reduced time but still allows animation to be visible
-                    });
+                    setTimeout(() => {
+                        if (rightHand && bagInView.bag && !attachedBags.some(b => b.mesh === bagInView.bag)) {
+                            attachBagToHand(bagInView.bag, rightHand);
+                        } else {
+                            showPickupFeedback("Cannot pick up this bag");
+                        }
+                    }, 500);
                 } else {
-                    // Car pickup - preload with zero timeout
-                    if (upperBodyActions['pickup_high']) {
-                        // Make sure it's preloaded
-                        upperBodyActions['pickup_high'].reset();
-                    }
-                    
-                    // Start the animation
+                    // Car pickup
                     setUpperBodyAnimation('pickup_high');
                     
-                    // Reduced timeout for more responsive gameplay - use requestAnimationFrame for better timing
-                    requestAnimationFrame(() => {
-                        // Process in next frame for smoother performance
-                        setTimeout(() => {
-                            if (leftHand && bagInView.bag && !attachedBags.some(b => b.mesh === bagInView.bag)) {
-                                attachBagToHand(bagInView.bag, leftHand);
-                            }
-                            // Force animation to end and transition to carry state
-                            if (attachedBags.length > 0) {
-                                const animName = `carry_idle_${carryWeightClass}`;
-                                forcedAnimationUpdate(animName);
-                            } else {
-                                setUpperBodyAnimation('idle');
-                            }
-                        }, 250); // Further reduced time but still allows animation to be visible
-                    });
+                    setTimeout(() => {
+                        if (leftHand && bagInView.bag && !attachedBags.some(b => b.mesh === bagInView.bag)) {
+                            attachBagToHand(bagInView.bag, leftHand);
+                        } else {
+                            showPickupFeedback("Cannot pick up this bag");
+                        }
+                    }, 500);
                 }
                 return true;
             } else {
@@ -3843,7 +2215,6 @@
         // Setup a simple debug display
         const debugEl = document.getElementById('debug');
         function updateDebug(message) {
-            const debugEl = document.getElementById('debug');
             if (!debugEl) return;
             
             // Add message to debug log
@@ -3887,420 +2258,24 @@
         function updatePickupButtonHighlight() {
             const bagInView = findInteractableBagInViewDirection();
             const interactBtn = document.getElementById('interactButton');
+            const rangeIndicator = document.getElementById('bagInRangeIndicator');
             
             if (bagInView && interactBtn) {
                 interactBtn.classList.add('highlight');
                 interactBtn.textContent = bagInView.isGroundBag ? 'Pickup' : 'Grab';
+                
+                // Show range indicator
+                if (rangeIndicator) {
+                    rangeIndicator.style.opacity = '1';
+                }
             } else if (interactBtn) {
                 interactBtn.classList.remove('highlight');
                 interactBtn.textContent = 'Pick';
-            }
-        }
-
-        // Function to set up collision detection
-        function setupCollisionDetection() {
-            // Clear the array first (in case this function is called multiple times)
-            collisionObjects = [];
-            
-            // Add collision objects (house, car, environment objects)
-            scene.traverse(function(object) {
-                // Add objects that should block movement to collision list
-                if (object.userData && object.userData.isCollider) {
-                    collisionObjects.push(object);
+                
+                // Hide range indicator
+                if (rangeIndicator) {
+                    rangeIndicator.style.opacity = '0';
                 }
-                // Add house, car and other large objects that should be collidable
-                else if (object.name && (
-                    object.name.includes('House') || 
-                    object.name.includes('Car') ||
-                    object.name.includes('Tree') ||
-                    object.name.includes('Rocks'))) {
-                    collisionObjects.push(object);
-                    // For debugging
-                    updateDebug(`Added collision object: ${object.name}`);
-                }
-            });
-            
-            console.log(`Added ${collisionObjects.length} collision objects to the scene`);
-        }
-        
-        // Function to check if movement would cause a collision - make sure it handles empty collisionObjects
-        function checkCollision(position, moveDirection, radius = 0.5) {
-            // If no collision objects, return false
-            if (!collisionObjects || collisionObjects.length === 0) {
-                return false;
-            }
-            
-            // Create a ray from the character position in the direction of movement
-            const raycaster = new THREE.Raycaster(
-                position.clone(), 
-                moveDirection.clone().normalize(),
-                0,
-                radius + moveDirection.length()
-            );
-            
-            // Check for collisions with objects
-            const intersects = raycaster.intersectObjects(collisionObjects, true);
-            
-            if (intersects.length > 0) {
-                // Check if we're close enough to consider this a collision
-                if (intersects[0].distance < radius) {
-                    return true;
-                }
-            }
-            
-            return false;
-        }
-        
-        // Function to handle step climbing
-        function handleStepClimbing(position, moveDirection) {
-            // Only check step climbing if we're moving forward enough
-            if (moveDirection.length() < 0.01) return false;
-            
-            // Cast a ray downward from in front of the character to check for steps
-            const stepCheckPosition = position.clone().add(
-                moveDirection.clone().normalize().multiplyScalar(0.5)
-            );
-            stepCheckPosition.y += 0.5; // Raise the starting point a bit
-            
-            const raycaster = new THREE.Raycaster(
-                stepCheckPosition,
-                new THREE.Vector3(0, -1, 0), // Cast ray downward
-                0,
-                1.0 // Maximum step height
-            );
-            
-            const intersects = raycaster.intersectObjects(collisionObjects, true);
-            
-            if (intersects.length > 0) {
-                // This is a step we can climb - adjust y position
-                position.y = intersects[0].point.y;
-                updateDebug(`Climbing step: new Y = ${position.y.toFixed(2)}`);
-                return true;
-            }
-            
-            return false;
-        }
-
-        // Update debug display
-        function updateDebug(message) {
-            const debugEl = document.getElementById('debug');
-            if (!debugEl) return;
-            
-            // Add message to debug log
-            const now = new Date().toLocaleTimeString();
-            debugEl.innerHTML = `[${now}] ${message}<br>` + debugEl.innerHTML.split('<br>').slice(0, 10).join('<br>');
-        }
-
-        // Hide debug elements by default (but leave them available for development)
-        function hideDebugElements() {
-            // Debug elements to hide by default
-            const debugElements = [
-                'controls',
-                'debug',
-                'pickupControls'
-            ];
-            
-            // Hide debug elements
-            debugElements.forEach(id => {
-                const element = document.getElementById(id);
-                if (element) {
-                    element.style.display = 'none';
-                }
-            });
-        }
-        
-        // Optimize UI for PC or mobile
-        function optimizeUIForDevice() {
-            // Get necessary elements
-            const carryInfo = document.getElementById('carryInfo');
-            const balanceUI = document.getElementById('balanceUI');
-            const touchControls = document.getElementById('touchControls');
-            
-            if (isUsingTouch) {
-                // Mobile-specific UI adjustments
-                if (touchControls) touchControls.style.display = 'block';
-                
-                // Move balance UI to a better position for mobile
-                if (balanceUI) {
-                    balanceUI.style.bottom = '150px';
-                    balanceUI.style.right = '10px';
-                    balanceUI.style.maxWidth = '150px';
-                }
-                
-                // Make carry info more compact
-                if (carryInfo) {
-                    carryInfo.style.top = '10px';
-                    carryInfo.style.left = '10px';
-                    carryInfo.style.padding = '5px';
-                    carryInfo.style.fontSize = '14px';
-                }
-            } else {
-                // PC-specific UI adjustments
-                if (touchControls) touchControls.style.display = 'none';
-                
-                // Show minimal UI by default on PC
-                if (balanceUI) {
-                    balanceUI.style.bottom = '10px';
-                    balanceUI.style.right = '10px';
-                    balanceUI.style.width = '200px';
-                }
-                
-                // Make carry info visible at top-left
-                if (carryInfo) {
-                    carryInfo.style.display = 'block';
-                    carryInfo.style.top = '10px';
-                    carryInfo.style.left = '10px';
-                    carryInfo.style.padding = '10px';
-                    carryInfo.style.fontSize = '16px';
-                }
-            }
-            
-            // Hide balance UI initially (will show when carrying bags)
-            if (balanceUI) balanceUI.style.display = 'none';
-        }
-
-        // Handle rotation joystick (for mobile)
-        function handleRotationJoystick() {
-            if (!rotationJoystickActive || !characterTilt || isGameOver) return;
-            
-            // Calculate rotation amount based on joystick position
-            const rotationAmount = rotationJoystickDirection.x * touchRotationSensitivity;
-            
-            if (Math.abs(rotationAmount) > 0.001) {
-                // Update camera orbit angle
-                cameraOrbitAngle = (cameraOrbitAngle + rotationAmount) % (Math.PI * 2);
-                
-                // Update camera position based on new orbit angle
-                updateCameraPositionSafely();
-                
-                // Note: The rotation joystick input is used for both camera orbit and balance
-                // Balance control happens in updateBalanceBasedOnControls using rotationJoystickDirection
-                // This way players can control both camera view and balance with the same input
-            }
-        }
-
-        function setupTouchControls() {
-            // ... existing code ...
-            
-            // Add a function to regularly process rotation joystick input for mobile
-            function updateTouchControls() {
-                if (isUsingTouch) {
-                    handleRotationJoystick();
-                }
-                
-                // Continue updating
-                requestAnimationFrame(updateTouchControls);
-            }
-            
-            // Start the update loop
-            updateTouchControls();
-        }
-        
-        // Function to switch animations for both upper and lower body
-        function switchAnimation(upperAnim, forceUpper, lowerAnim, forceLower) {
-            if (forceUpper) {
-                forcedAnimationUpdate(upperAnim);
-            } else {
-                setUpperBodyAnimation(upperAnim);
-            }
-            
-            if (lowerAnim && forceLower) {
-                setLowerBodyAnimation(lowerAnim);
-            } else if (lowerAnim) {
-                setLowerBodyAnimation(lowerAnim);
-            }
-        }
-        
-        // Function to update carrying effects based on total weight and number of bags
-        function updateCarryingEffects() {
-            // Determine weight class based on total weight or bag count
-            let newWeightClass = "none";
-            
-            if (attachedBags.length > 0) {
-                if (totalBagWeight <= 3) {
-                    newWeightClass = "light";
-                } else if (totalBagWeight <= 7) {
-                    newWeightClass = "medium";
-                } else {
-                    newWeightClass = "heavy";
-                }
-            }
-            
-            // Update weight class display
-            if (weightClassEl) weightClassEl.textContent = newWeightClass.charAt(0).toUpperCase() + newWeightClass.slice(1);
-            
-            // If weight class changed, update the animation
-            if (newWeightClass !== carryWeightClass) {
-                updateDebug(`Carry weight class changed: ${carryWeightClass} → ${newWeightClass}`);
-                carryWeightClass = newWeightClass;
-                
-                // Update animation if we're already carrying and moving
-                if (attachedBags.length > 0) {
-                    if (isMoving) {
-                        forcedAnimationUpdate(`carry_walk_${carryWeightClass}`);
-                    } else {
-                        forcedAnimationUpdate(`carry_idle_${carryWeightClass}`);
-                    }
-                }
-            }
-            
-            // Update movement speed based on weight
-            if (attachedBags.length > 0) {
-                // Reduce max speed based on weight (heavier = slower)
-                const weightFactor = 1.0 - (totalBagWeight * 0.03);
-                maxMovementSpeed = 0.08 * Math.max(0.6, weightFactor);
-            } else {
-                // Reset to default speed when not carrying
-                maxMovementSpeed = 0.08;
-            }
-        }
-        
-        // Global variable to track game state
-        let isGameOver = false;
-        let fallRecoveryTimer = null;
-
-        // Function to reset position to ground level and prevent clipping
-        function enforceGroundCollision() {
-            if (characterTilt) {
-                // Ensure character never goes below ground level (y=0)
-                if (characterTilt.position.y < 0) {
-                    characterTilt.position.y = 0;
-                }
-            }
-        }
-        
-        // Function to handle game over state
-        function triggerGameOver() {
-            if (isGameOver) return; // Prevent multiple triggers
-            
-            isGameOver = true;
-            updateDebug("GAME OVER - You fell!");
-            showPickupFeedback("GAME OVER - You fell! Recovering in 3 seconds...");
-            
-            // Make the feedback message stay visible during recovery
-            pickupFeedbackEl.style.opacity = "1";
-            pickupFeedbackEl.style.background = "rgba(255, 50, 50, 0.9)"; // Brighter red
-            pickupFeedbackEl.style.fontSize = "18px"; // Larger text
-            pickupFeedbackEl.style.padding = "15px 30px"; // Larger padding
-            
-            // Drop all bags when you fall
-            while (attachedBags.length > 0) {
-                detachBag(true); // Force detach all bags
-            }
-            
-            // Play fall animation
-            if (upperBodyActions['stumble_fall']) {
-                forcedAnimationUpdate('stumble_fall');
-            } else {
-                // Fallback to idle if fall animation isn't available
-                forcedAnimationUpdate('idle');
-            }
-            
-            // Set a timer to recover
-            clearTimeout(fallRecoveryTimer); // Clear any existing timer
-            fallRecoveryTimer = setTimeout(() => {
-                // Reset game state
-                isGameOver = false;
-                
-                // Reset balance
-                balanceValue = 0.5;
-                updateBalanceSystem(balanceValue);
-                
-                // Reset character position and rotation if needed
-                if (characterTilt) {
-                    characterTilt.rotation.z = 0;
-                }
-                
-                // Show recovery message
-                showPickupFeedback("Recovered! Be more careful next time!");
-                
-                // Make recovery message prominent
-                pickupFeedbackEl.style.background = "rgba(76, 175, 80, 0.9)"; // Brighter green
-                
-                updateDebug("Recovered from fall");
-                
-                // Reset animations
-                forcedAnimationUpdate('idle');
-            }, 3000); // 3 second recovery time
-        }
-        
-        // Function to drop all bags at once
-        function dropAllBags() {
-            // Drop bags one by one until none are left
-            while (attachedBags.length > 0) {
-                detachBag();
-            }
-        }
-
-        // Function to ensure all attached bags are visible
-        function ensureAttachedBagsVisibility() {
-            // Skip if no bags are attached
-            if (attachedBags.length === 0) return;
-            
-            // Check each attached bag
-            attachedBags.forEach(bagData => {
-                const bag = bagData.mesh;
-                
-                // Ensure the bag and all its children are visible
-                bag.traverse(node => {
-                    if (node.isMesh) {
-                        // Make sure the mesh is visible
-                        node.visible = true;
-                        
-                        // Ensure material is properly set
-                        if (node.material) {
-                            node.material.transparent = false;
-                            node.material.opacity = 1.0;
-                            node.material.depthWrite = true;
-                            node.material.depthTest = true;
-                            node.material.needsUpdate = true;
-                        }
-                    }
-                });
-            });
-        }
-
-        // Start the main animation loop
-        animate(0);
-
-        // Variable is already declared at line 789
-        // let lastMouseMoveX = 0;
-        let lastPickupFeedbackTime = 0; // Track when we last showed feedback
-        let pickupTimeoutSet = false; // Flag to prevent multiple timeouts
-
-        document.addEventListener('mousedown', function(e) {
-            if (e.button === 0 && cameraMode === "thirdPerson" && !controls.enabled) { // Left mouse button
-                mouseLookActive = true;
-                document.body.requestPointerLock = document.body.requestPointerLock || 
-                                                 document.body.mozRequestPointerLock ||
-                                                 document.body.webkitRequestPointerLock;
-                document.body.requestPointerLock();
-            }
-        });
-        
-        // Also activate balance control when carrying bags, regardless of mouse look
-        document.addEventListener('keydown', function(e) {
-            // When picking up a bag, activate mouse controls for balance
-            if (e.code === 'Space') {
-                if (!mouseLookActive && balanceEnabled && attachedBags.length > 0) {
-                    document.body.requestPointerLock = document.body.requestPointerLock || 
-                                                     document.body.mozRequestPointerLock ||
-                                                     document.body.webkitRequestPointerLock;
-                    document.body.requestPointerLock();
-                }
-            }
-        });
-
-        // Update the mobile help text
-        function showHelpText() {
-            const helpText = document.getElementById('helpTextContent');
-            if (!helpText) return;
-            
-            // Set appropriate text based on device
-            if (isUsingTouch) {
-                helpText.textContent = "Touch Controls: Left joystick to move, right joystick to rotate and balance, button to pick up bags. Be careful with your balance!";
-            } else {
-                helpText.textContent = "Keyboard/Mouse: WASD or arrows to move, mouse to look around, SPACE to pick up, R to drop, Q/E to balance";
             }
         }
     </script>
