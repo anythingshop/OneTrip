@@ -299,22 +299,17 @@
         <button id="pickupHighBtn">Pickup High (Car)</button>
         <button id="attachBagBtn">Attach Bag to Hand</button>
         <button id="detachBagBtn">Detach Bag</button>
-            </div>
+    </div>
     
     <div id="balanceUI">
-        <h3>Balance System</h3>
-        <div>
-            <label for="balanceSlider">Balance: </label>
-            <input type="range" id="balanceSlider" min="0" max="100" value="50" disabled>
-            <span id="balanceValue">0.5</span>
-        </div>
+        <h3>Balance</h3>
         <div id="balanceMeter">
             <div class="balanceZone"></div>
             <div id="balanceIndicator"></div>
         </div>
         <div id="balanceDirection">Balanced</div>
-        </div>
-        
+    </div>
+    
     <div id="carryInfo">
         <div>Bags: <span id="bagCount">0</span></div>
         <div>Weight: <span id="totalWeight">0</span> kg</div>
@@ -492,6 +487,7 @@
         let movementAcceleration = 0;
         let maxMovementSpeed = 0.08; // Reduced from 0.1
         let cameraMode = "thirdPerson"; // thirdPerson or orbit
+        let cameraRotationY = 0; // Track camera's Y rotation independently from character
         
         // Animation transition variables
         let animationTransitionTime = 1.2; // Increased blend time between animations
@@ -1372,11 +1368,9 @@
             // Movement speed affects balance - reduced sensitivity
             balanceShift += movementAcceleration * 0.15; // Reduced from 0.3
             
-            // Turning affects balance - reduced sensitivity
-            if (Math.abs(targetRotation - characterTilt.rotation.y) > 0.1) { // Increased threshold from 0.05 to 0.1
-                const turnDirection = ((targetRotation - characterTilt.rotation.y) + Math.PI) % (Math.PI * 2) - Math.PI;
-                balanceShift += turnDirection * 0.005; // Reduced from 0.01
-            }
+            // Turning affects balance when character is rotating quickly
+            const characterRotationSpeed = Math.abs(moveDirection.length()) > 0.01 ? 0.005 : 0;
+            balanceShift += characterRotationSpeed;
             
             // Carrying weight makes balance harder
             const carryFactor = 1 + (totalBagWeight * 0.02); // Reduced from 0.03
@@ -1394,16 +1388,16 @@
         function setupThirdPersonCamera() {
             thirdPersonCamera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
             
-            // Position camera higher and behind the character
-            thirdPersonCameraOffset = new THREE.Vector3(0, 3, 6);
+            // Adjust the camera offset for a better view behind the character
+            thirdPersonCameraOffset = new THREE.Vector3(0, 3, 6); // Position camera slightly higher and closer
             
-            // Initialize camera target and rotation angle
-            cameraOrbitAngle = 0; // Initial camera angle (behind character)
+            // Initialize camera rotation
+            cameraRotationY = 0;
             
             updateThirdPersonCamera();
         }
         
-        // Update third-person camera position with orbital movement
+        // Update third-person camera position for better view
         function updateThirdPersonCamera() {
             if (!characterTilt || !thirdPersonCamera) return;
             
@@ -1411,12 +1405,9 @@
             const characterPos = new THREE.Vector3();
             characterTilt.getWorldPosition(characterPos);
             
-            // Calculate camera position based on orbital angle around character
-            const cameraOffset = new THREE.Vector3(
-                Math.sin(cameraOrbitAngle) * thirdPersonCameraOffset.z,
-                thirdPersonCameraOffset.y,
-                Math.cos(cameraOrbitAngle) * thirdPersonCameraOffset.z
-            );
+            // Calculate camera position based on camera rotation, not character rotation
+            const cameraOffset = thirdPersonCameraOffset.clone();
+            cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraRotationY);
             
             // Set camera position and target
             thirdPersonCamera.position.copy(characterPos).add(cameraOffset);
@@ -1467,22 +1458,24 @@
                 }
             }
             
-            // Handle rotation for camera orbiting - not character rotation
-            // For rotation joystick (touch)
+            // Handle rotation separate from movement
+            // For rotation joystick (touch) - ROTATE CAMERA INSTEAD OF CHARACTER
             if (rotationJoystickActive) {
                 const rotationAmount = rotationJoystickDirection.x * touchRotationSensitivity;
-                // Update camera orbit angle instead of character rotation
-                cameraOrbitAngle -= rotationAmount;
                 
-                // Update camera position after rotation
+                // Update camera rotation instead of character rotation
+                cameraRotationY += rotationAmount;
+                
+                // Update the camera view
                 updateThirdPersonCamera();
             }
-            // For mouse look (desktop)
+            // For mouse look (desktop) - ROTATE CAMERA INSTEAD OF CHARACTER
             else if (mouseLookActive && cameraMode === "thirdPerson") {
-                // Camera rotation is handled in mouse move event
+                // Mouse rotation is handled in the mouse move event handler
+                // The event handler updates cameraRotationY
             }
             
-            // Process movement input (independent of rotation)
+            // Process movement input (independent of camera rotation)
             if (Math.abs(inputX) > 0.1 || Math.abs(inputZ) > 0.1) {
                 isMoving = true;
                 
@@ -1492,16 +1485,15 @@
                 movementAcceleration += speedDiff * 0.08;
                 
                 // Create movement vector based on current camera perspective
-                // Use the camera's forward direction, not the character's
                 const cameraForward = new THREE.Vector3(0, 0, -1);
                 const cameraRight = new THREE.Vector3(1, 0, 0);
                 
                 if (cameraMode === "thirdPerson" && thirdPersonCamera) {
-                    // Use camera orbit angle for movement direction
-                    cameraForward.set(Math.sin(cameraOrbitAngle), 0, Math.cos(cameraOrbitAngle)).normalize();
-                    cameraRight.set(Math.sin(cameraOrbitAngle + Math.PI/2), 0, Math.cos(cameraOrbitAngle + Math.PI/2)).normalize();
+                    // Get camera's forward and right vectors based on camera rotation
+                    cameraForward.set(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraRotationY);
+                    cameraRight.set(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraRotationY);
                 } else {
-                    // For any other mode, use character's orientation
+                    // Use character's orientation for non-third-person
                     cameraForward.set(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
                     cameraRight.set(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
                 }
@@ -1516,19 +1508,17 @@
                 // Update character position
                 characterTilt.position.add(moveDirection);
                 
-                // If moving, rotate character model to face movement direction
-                // This doesn't change the overall character tilt container's rotation
+                // Set character rotation to face movement direction
                 if (characterModel && moveDirection.length() > 0.01) {
                     // Get current rotation of character mesh (not tilt container)
                     const angle = Math.atan2(moveDirection.x, moveDirection.z);
                     characterModel.rotation.y = angle;
                     
-                    // Also update the target rotation for balance calculations
-                    // This ensures balance effects remain tied to movement direction
+                    // Update target rotation for balance system
                     targetRotation = angle;
                 }
                 
-                // Update animations based on movement state change
+                // Update animations based on movement state change - ONLY if state actually changed
                 if (!wasMoving || !lastMovementState) {
                     // Just started moving or continuing to move
                     if (!wasMoving) {
@@ -1619,9 +1609,9 @@
             // If already playing this animation, don't restart it
             if (currentUpperBodyAnimation === name && currentUpperBodyAction) {
                 updateDebug(`Already playing ${name}, not restarting`);
-                return;
-            }
-            
+                    return;
+                }
+                
             // Set animation transitioning flag
             isAnimationTransitioning = true;
             
@@ -1784,13 +1774,15 @@
                     updateRotationJoystickPosition(e.clientX, e.clientY);
                 }
                 
-                // Handle mouse look for camera rotation (not character rotation)
+                // Handle mouse look if in 3rd person mode & mouse button pressed
                 if (mouseLookActive && cameraMode === "thirdPerson") {
                     const dx = e.clientX - lastMouseX;
-                    // Update camera orbit angle instead of character rotation
-                    cameraOrbitAngle -= dx * mouseRotationSensitivity;
-                    updateThirdPersonCamera();
+                    // Update camera rotation around character instead of character rotation
+                    cameraRotationY -= dx * mouseRotationSensitivity;
                     lastMouseX = e.clientX;
+                    
+                    // Update camera position after rotation change
+                    updateThirdPersonCamera();
                 }
             });
             
@@ -2297,9 +2289,6 @@
                 }
             }
         }
-
-        // Add camera orbit angle variable
-        let cameraOrbitAngle = 0;
     </script>
 </body>
 </html> 
