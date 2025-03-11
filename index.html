@@ -37,7 +37,7 @@
             padding: 10px;
             font-family: Arial, sans-serif;
             border-radius: 5px;
-            display: none; /* Hide balance UI */
+            display: none; /* Hide by default until bags are picked up */
         }
         #pickupControls {
             position: absolute;
@@ -787,11 +787,10 @@
 
         // Function to set upper body animation
         function setUpperBodyAnimation(name) {
-            // Prevent rapid animation changes
-            const now = Date.now();
-            if (now - lastAnimationChange < animationChangeMinDelay) { // Use variable for min delay
-                updateDebug(`Ignoring animation change: too soon (${name})`);
-                return; // Ignore if we just changed animations
+            // Check if we're transitioning or if the animation is already playing
+            if (isAnimationTransitioning && name !== 'pickup_low' && name !== 'pickup_high') {
+                updateDebug(`Skipping animation during transition: ${name}`);
+                return;
             }
             
             updateDebug(`Setting upper body anim: ${name}`);
@@ -838,7 +837,7 @@
             
             currentUpperBodyAction = action;
             currentUpperBodyAnimation = name;
-            lastAnimationChange = now;
+            lastAnimationChange = Date.now();
             
             // Clear transition flag after transition completes
             clearTimeout(animationTransitionTimeout);
@@ -850,16 +849,9 @@
         
         // Function to set lower body animation
         function setLowerBodyAnimation(name) {
-            // Prevent rapid animation changes
-            const now = Date.now();
-            if (now - lastAnimationChange < animationChangeMinDelay) { // Use variable for min delay
-                updateDebug(`Ignoring lower body animation change: too soon (${name})`);
-                return; // Ignore if we just changed animations
-            }
-            
-            // Don't change animations if we're in the middle of a transition
-            if (isAnimationTransitioning) {
-                updateDebug(`Ignoring animation during transition: ${name}`);
+            // Check if we're transitioning
+            if (isAnimationTransitioning && name !== 'stumble_lowerbody') {
+                updateDebug(`Skipping lower body animation during transition: ${name}`);
                 return;
             }
             
@@ -892,7 +884,7 @@
             
             currentLowerBodyAction = action;
             currentLowerBodyAnimation = name;
-            lastAnimationChange = now;
+            lastAnimationChange = Date.now();
             
             // Clear transition flag after transition completes
             clearTimeout(animationTransitionTimeout);
@@ -1071,12 +1063,18 @@
                     newWeightClass = "heavy";
                 }
                 
+                // Show balance UI and enable balance system when carrying bags
+                document.getElementById('balanceUI').style.display = 'block';
+                
                 // Enable balance system when carrying bags
                 if (!balanceEnabled) {
                     balanceEnabled = true;
                     updateDebug("Balance system enabled - carrying bags");
                 }
             } else {
+                // Hide balance UI and disable balance system when not carrying bags
+                document.getElementById('balanceUI').style.display = 'none';
+                
                 // Disable balance system when not carrying bags
                 if (balanceEnabled) {
                     balanceEnabled = false;
@@ -1409,11 +1407,11 @@
         function updateThirdPersonCamera() {
             if (!characterTilt || !thirdPersonCamera) return;
             
-            // Get character position and rotation
+            // Get character position
             const characterPos = new THREE.Vector3();
             characterTilt.getWorldPosition(characterPos);
             
-            // Calculate camera position based on character position and rotation
+            // Calculate camera position based on character position and character's Y rotation only
             const cameraOffset = thirdPersonCameraOffset.clone();
             cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
             
@@ -1470,10 +1468,15 @@
             // For rotation joystick (touch)
             if (rotationJoystickActive) {
                 const rotationAmount = rotationJoystickDirection.x * touchRotationSensitivity;
+                
+                // Use the rotation joystick to rotate both character and camera
                 characterTilt.rotation.y += rotationAmount;
                 
                 // Update target rotation for balance system
                 targetRotation = characterTilt.rotation.y;
+                
+                // Rotate the camera with character
+                updateThirdPersonCamera();
             }
             // For mouse look (desktop)
             else if (mouseLookActive && cameraMode === "thirdPerson") {
@@ -1927,6 +1930,12 @@
                 camera.position.set(0, 20, 30);
                 controls.target.set(0, 0, 0);
                 controls.update();
+                
+                // Show control UI for development/testing
+                document.getElementById('controls').style.display = 'block';
+                // Only show balanceUI if carrying bags, even in development mode
+                document.getElementById('balanceUI').style.display = attachedBags.length > 0 ? 'block' : 'none';
+                document.getElementById('pickupControls').style.display = 'block';
             } else {
                 // Switch to third-person mode
                 cameraMode = "thirdPerson";
@@ -1934,6 +1943,12 @@
                 
                 // Re-enable third-person camera
                 updateThirdPersonCamera();
+                
+                // Hide development UI in gameplay mode
+                document.getElementById('controls').style.display = 'none';
+                // Only show balanceUI if carrying bags
+                document.getElementById('balanceUI').style.display = attachedBags.length > 0 ? 'block' : 'none';
+                document.getElementById('pickupControls').style.display = 'none';
             }
         }
         
@@ -2004,8 +2019,11 @@
         // Initialize controls when everything is loaded
         window.addEventListener('load', function() {
             setupJoystickControls();
-            // Start with balance system disabled
+            
+            // Start with balance system disabled (until bags are picked up)
             document.getElementById('toggleBalance').textContent = 'Enable Balance Effect';
+            balanceEnabled = false;
+            
             document.getElementById('helpOverlay').style.display = 'block'; // Show help on start
             
             // Set initial balance to center
