@@ -416,21 +416,6 @@
             metalness: 0.1,
         });
         
-        // Add a backup darker ground plane to ensure we don't see through to the background
-        const backupGroundGeometry = new THREE.PlaneGeometry(200, 200); // Larger to cover everything
-        const backupGroundMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x1A2E1D, // Much darker green for the backup ground
-            roughness: 0.9,
-            metalness: 0.0,
-        });
-        
-        // Create and add the backup ground slightly below the main ground
-        const backupGround = new THREE.Mesh(backupGroundGeometry, backupGroundMaterial);
-        backupGround.rotation.x = -Math.PI / 2;
-        backupGround.position.y = -0.02; // Slightly below main ground
-        backupGround.receiveShadow = true;
-        scene.add(backupGround);
-        
         // Add some variation to the ground vertices for a more natural look
         const vertices = groundGeometry.attributes.position.array;
         for (let i = 0; i < vertices.length; i += 3) {
@@ -492,7 +477,7 @@
             // Create a more realistic path with texture and details
             const pathGeometry = new THREE.PlaneGeometry(5, 50, 10, 30);
             const pathMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x808080, // Changed to gray color for the driveway
+                color: 0xc2b280, // Sandy color for the path
                 roughness: 0.9,
                 metalness: 0.1,
             });
@@ -520,7 +505,7 @@
             
             // Add path borders for more definition (small stones/pebbles along the edges)
             const borderMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x606060, // Darker gray for the borders
+                color: 0xa8a198, // Slightly darker than the path
                 roughness: 1.0,
                 metalness: 0.05,
             });
@@ -544,7 +529,8 @@
             // Add a few small stone details along the path
             addPathStones();
             
-            // Removed the createPorchSteps() call since the house model has its own steps
+            // Add steps leading to the house
+            createPorchSteps();
         }
         
         // Add small decorative stones along the path
@@ -583,8 +569,47 @@
         
         // Create porch steps leading to the house
         function createPorchSteps() {
-            // This function is no longer called as the house model has its own steps
-            // Kept for reference only
+            const stepWidth = 4;
+            const stepDepth = 0.8;
+            const stepMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xdcdcdc, // Lighter grey for concrete steps
+                roughness: 0.7,
+                metalness: 0.1 
+            });
+            
+            // Add three steps of increasing height
+            for (let i = 0; i < 3; i++) {
+                const stepHeight = 0.2 + (i * 0.2); // Increasing height for each step
+                const stepGeometry = new THREE.BoxGeometry(stepWidth, stepHeight, stepDepth);
+                const step = new THREE.Mesh(stepGeometry, stepMaterial);
+                
+                // Position each step - offset in z direction to line up with the house porch
+                const zPosition = 28 - (i * stepDepth);
+                step.position.set(0, stepHeight / 2, zPosition);
+                
+                step.castShadow = true;
+                step.receiveShadow = true;
+                
+                // Mark as a collidable object
+                step.userData.isCollider = true;
+                
+                scene.add(step);
+                
+                // Add subtle edge details to steps
+                addStepEdge(stepWidth, stepHeight, stepDepth, 0, stepHeight / 2, zPosition);
+            }
+            
+            // Add a porch platform
+            const porchGeometry = new THREE.BoxGeometry(stepWidth, 0.8, 2);
+            const porch = new THREE.Mesh(porchGeometry, stepMaterial);
+            porch.position.set(0, 0.4, 25.5);
+            porch.castShadow = true;
+            porch.receiveShadow = true;
+            porch.userData.isCollider = true;
+            scene.add(porch);
+            
+            // Add decorative planters on either side of the porch
+            addPorchPlanters();
         }
         
         // Function to add subtle edge detail to steps
@@ -738,8 +763,8 @@
             // Car positioned at the beginning of the path
             { name: 'Car', file: './car.glb', position: [-5, 0, -20], scale: 0.5, rotationY: Math.PI/2 },
             
-            // House positioned at the end of the path, rotated 45 degrees clockwise
-            { name: 'House', file: './house.glb', position: [0, 0, 30], scale: 0.5, rotationY: Math.PI - Math.PI/4 },
+            // House positioned at the end of the path (far in front)
+            { name: 'House', file: './house.glb', position: [0, 0, 30], scale: 0.5, rotationY: Math.PI },
             
             // Bags ON TOP of the car - moved further back (more negative Z)
             { name: 'Car Bag 1', file: './newbag.glb', position: [-5, 3.5, -20.5], scale: 0.4, rotationY: 0 },
@@ -787,8 +812,6 @@
         let isMoving = false;
         let targetRotation = 0;
         let movementAcceleration = 0;
-        let lastMouseMoveX = 0; // For balance control
-        let cameraOrbitAngle = 0; // Independent camera rotation angle
         let maxMovementSpeed = 0.08; // Reduced from 0.1
         let cameraMode = "thirdPerson"; // thirdPerson or orbit
         
@@ -987,7 +1010,6 @@
                         setupCollisionDetection();
                         
                         // Enhance the environment with forest and mountains
-                        console.log("All models loaded. Enhancing environment...");
                         enhanceEnvironment();
                         
                         // Make sure we're in third-person camera mode for gameplay
@@ -1103,15 +1125,12 @@
         
         // Function to create forest boundary
         function createForestBoundary() {
-            console.log("Creating forest boundary...");
-            
             // Create a dense forest boundary ring around the playable area
-            const numTrees = 140; // Increased from 120 for more density
+            const numTrees = 120;
             const boundaryRadius = 40; // Just outside the playable area
             
             // Use the existing tree model
             loader.load('./tree.glb', (gltf) => {
-                console.log("Tree model loaded for forest boundary");
                 const treeModel = gltf.scene;
                 
                 // Enable shadows on tree
@@ -1119,14 +1138,6 @@
                     if (node.isMesh) {
                         node.castShadow = true;
                         node.receiveShadow = true;
-                        
-                        // Improve tree materials
-                        if (node.material) {
-                            // Clone material to avoid shared material issues
-                            node.material = node.material.clone();
-                            node.material.roughness = 0.8;
-                            node.material.needsUpdate = true;
-                        }
                     }
                 });
                 
@@ -1145,18 +1156,15 @@
                     
                     const treeClone = treeModel.clone();
                     
-                    // Randomize tree size and rotation, scaled up by 1.2x as requested
-                    const baseScale = 0.4 + Math.random() * 0.2;
-                    const scale = baseScale * 1.2; // Increase size by 20%
+                    // Randomize tree size and rotation
+                    const scale = 0.4 + Math.random() * 0.2;
                     treeClone.scale.set(scale, scale, scale);
                     treeClone.rotation.y = Math.random() * Math.PI * 2;
                     
                     // Position the tree
                     treeClone.position.set(x, 0, z);
                     
-                    // Add the tree to the scene
                     scene.add(treeClone);
-                    console.log(`Added tree at position: ${x.toFixed(2)}, 0, ${z.toFixed(2)} with scale: ${scale.toFixed(2)}`);
                 }
                 
                 // Add a second row of trees for density
@@ -1174,27 +1182,16 @@
                     
                     const treeClone = treeModel.clone();
                     
-                    // Randomize tree size and rotation, scaled up by 1.2x as requested
-                    const baseScale = 0.4 + Math.random() * 0.3;
-                    const scale = baseScale * 1.2; // Increase size by 20%
+                    // Randomize tree size and rotation
+                    const scale = 0.4 + Math.random() * 0.3;
                     treeClone.scale.set(scale, scale, scale);
                     treeClone.rotation.y = Math.random() * Math.PI * 2;
                     
                     // Position the tree
                     treeClone.position.set(x, 0, z);
                     
-                    // Add the tree to the scene
                     scene.add(treeClone);
                 }
-                
-                console.log("Forest boundary created successfully");
-            }, 
-            // Add progress and error handlers
-            (xhr) => {
-                console.log(`Tree model ${(xhr.loaded / xhr.total * 100).toFixed(0)}% loaded`);
-            },
-            (error) => {
-                console.error('Error loading tree model:', error);
             });
         }
         
@@ -1237,235 +1234,10 @@
             scene.add(mountains);
         }
         
-        // Function to create rocks around the edge of the map
-        function createRockBoundary() {
-            console.log("Creating rock boundary...");
-            
-            // Use the rocks.glb model
-            loader.load('./rocks.glb', (gltf) => {
-                console.log("Rock model loaded for boundary");
-                const rockModel = gltf.scene;
-                
-                // Enable shadows on rocks
-                rockModel.traverse(node => {
-                    if (node.isMesh) {
-                        node.castShadow = true;
-                        node.receiveShadow = true;
-                        
-                        // Improve rock materials
-                        if (node.material) {
-                            // Clone material to avoid shared material issues
-                            node.material = node.material.clone();
-                            node.material.roughness = 0.9;
-                            node.material.metalness = 0.1;
-                            node.material.needsUpdate = true;
-                        }
-                    }
-                });
-                
-                // Create rocks in a circular pattern just outside the tree line
-                const numRocks = 50; // Increased from 40 for more density
-                const rockRadius = 55; // Outside the tree boundary
-                
-                for (let i = 0; i < numRocks; i++) {
-                    const angle = (i / numRocks) * Math.PI * 2;
-                    
-                    // Add variation to the radius
-                    const radius = rockRadius + (Math.random() * 8 - 4);
-                    
-                    const x = Math.cos(angle) * radius;
-                    const z = Math.sin(angle) * radius;
-                    
-                    // Skip a portion to allow for the path to the house
-                    if (Math.abs(x) < 15 && z > 5) continue;
-                    
-                    const rockClone = rockModel.clone();
-                    
-                    // Randomize rock size and rotation
-                    const scale = 1.0 + Math.random() * 0.6; // Larger rocks
-                    rockClone.scale.set(scale, scale * (0.8 + Math.random() * 0.4), scale);
-                    rockClone.rotation.y = Math.random() * Math.PI * 2;
-                    
-                    // Slightly randomize tilt for natural look
-                    rockClone.rotation.x = (Math.random() - 0.5) * 0.2;
-                    rockClone.rotation.z = (Math.random() - 0.5) * 0.2;
-                    
-                    // Position the rock
-                    rockClone.position.set(x, 0, z);
-                    
-                    // Add some rocks that are partially buried
-                    if (Math.random() > 0.6) {
-                        rockClone.position.y = -scale * 0.3;
-                    }
-                    
-                    scene.add(rockClone);
-                    console.log(`Added rock at position: ${x.toFixed(2)}, ${rockClone.position.y.toFixed(2)}, ${z.toFixed(2)} with scale: ${scale.toFixed(2)}`);
-                    
-                    // Occasionally add rock clusters
-                    if (Math.random() > 0.7) {
-                        for (let j = 0; j < Math.floor(Math.random() * 3) + 1; j++) {
-                            const smallRock = rockModel.clone();
-                            const smallScale = scale * (0.3 + Math.random() * 0.3);
-                            smallRock.scale.set(smallScale, smallScale, smallScale);
-                            smallRock.rotation.y = Math.random() * Math.PI * 2;
-                            
-                            // Position near the main rock
-                            const offsetX = (Math.random() - 0.5) * 5;
-                            const offsetZ = (Math.random() - 0.5) * 5;
-                            smallRock.position.set(x + offsetX, 0, z + offsetZ);
-                            
-                            scene.add(smallRock);
-                        }
-                    }
-                }
-                
-                console.log("Rock boundary created successfully");
-            },
-            // Add progress and error handlers
-            (xhr) => {
-                console.log(`Rock model ${(xhr.loaded / xhr.total * 100).toFixed(0)}% loaded`);
-            },
-            (error) => {
-                console.error('Error loading rock model:', error);
-            });
-        }
-        
-        // Function to create procedural mountain barrier around the edge of the map
-        function createMountainBarrier() {
-            console.log("Creating procedural mountain barrier...");
-            
-            // Create procedural mountains that encircle the play area
-            const numSegments = 12; // Divide the circle into segments
-            const barrierRadius = 65; // Outside the rock boundary
-            
-            for (let i = 0; i < numSegments; i++) {
-                // Calculate the start and end angles for this segment
-                const startAngle = (i / numSegments) * Math.PI * 2;
-                const endAngle = ((i + 1) / numSegments) * Math.PI * 2;
-                
-                // Skip a segment to create an entrance/exit path
-                if (i === 9) continue; // Skip a segment at a specific location
-                
-                // Create mountain segment geometry
-                // Use a custom geometry instead of primitives
-                const mountainGeometry = new THREE.BufferGeometry();
-                
-                // Create mountain profile with multiple peaks and valleys
-                const vertices = [];
-                const indices = [];
-                const uvs = [];
-                
-                // Resolution parameters
-                const radialSegments = 10; // Segments from inner to outer edge
-                const heightSegments = 20; // Segments along the arc
-                
-                // Create vertices for the mountain segment
-                for (let r = 0; r <= radialSegments; r++) {
-                    const radiusFactor = r / radialSegments;
-                    const radius = barrierRadius + radiusFactor * 15; // Thickness of the mountain
-                    
-                    for (let h = 0; h <= heightSegments; h++) {
-                        const angle = startAngle + (h / heightSegments) * (endAngle - startAngle);
-                        const x = Math.cos(angle) * radius;
-                        const z = Math.sin(angle) * radius;
-                        
-                        // Create mountain height based on noise and position
-                        const angleNoise = Math.sin(angle * 5) * Math.cos(angle * 3);
-                        const radiusNoise = Math.sin(radius * 0.1) * Math.cos(radius * 0.05);
-                        
-                        // Height is highest in the middle of the radial segments
-                        let height = 0;
-                        if (r > 0) { // Keep inner edge at ground level
-                            // Profile that rises and then falls
-                            const peakFactor = 4 * radiusFactor * (1 - radiusFactor);
-                            height = 30 * peakFactor; // Base height
-                            
-                            // Add noise for natural look
-                            height += (angleNoise + radiusNoise) * 5;
-                            
-                            // Add peaks
-                            if (Math.random() > 0.95 && r > radialSegments * 0.3 && r < radialSegments * 0.8) {
-                                height += Math.random() * 10;
-                            }
-                        }
-                        
-                        // Add vertex
-                        vertices.push(x, height, z);
-                        
-                        // Simple UVs for texturing
-                        uvs.push(r / radialSegments, h / heightSegments);
-                    }
-                }
-                
-                // Create faces using indices
-                for (let r = 0; r < radialSegments; r++) {
-                    const row1 = r * (heightSegments + 1);
-                    const row2 = (r + 1) * (heightSegments + 1);
-                    
-                    for (let h = 0; h < heightSegments; h++) {
-                        // Triangle 1
-                        indices.push(row1 + h, row2 + h, row1 + h + 1);
-                        
-                        // Triangle 2
-                        indices.push(row1 + h + 1, row2 + h, row2 + h + 1);
-                    }
-                }
-                
-                // Create buffers for the geometry
-                const positionBuffer = new Float32Array(vertices);
-                const indexBuffer = new Uint32Array(indices);
-                const uvBuffer = new Float32Array(uvs);
-                
-                // Set the attributes for the geometry
-                mountainGeometry.setAttribute('position', new THREE.BufferAttribute(positionBuffer, 3));
-                mountainGeometry.setAttribute('uv', new THREE.BufferAttribute(uvBuffer, 2));
-                mountainGeometry.setIndex(new THREE.BufferAttribute(indexBuffer, 1));
-                
-                // Compute normals for proper lighting
-                mountainGeometry.computeVertexNormals();
-                
-                // Create mountain material with realistic texture
-                const mountainMaterial = new THREE.MeshStandardMaterial({
-                    color: 0x6b7d6d,
-                    roughness: 0.9,
-                    metalness: 0.1,
-                    side: THREE.DoubleSide
-                });
-                
-                // Create mesh and add to scene
-                const mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
-                mountain.castShadow = true;
-                mountain.receiveShadow = true;
-                
-                // Add the mountain to the scene
-                scene.add(mountain);
-                console.log(`Added mountain segment ${i} with ${vertices.length / 3} vertices and ${indices.length / 3} triangles`);
-            }
-            
-            console.log("Mountain barrier created successfully");
-        }
-        
         // Call the functions to create forest and mountains after all models are loaded
         function enhanceEnvironment() {
-            console.log("Starting environment enhancement...");
-            
-            try {
-                console.log("Creating forest boundary...");
-                createForestBoundary();
-                
-                console.log("Creating mountain backdrop...");
-                createMountainBackdrop();
-                
-                console.log("Creating rock boundary...");
-                createRockBoundary();
-                
-                console.log("Creating mountain barrier...");
-                createMountainBarrier();
-                
-                console.log("Environment enhancement completed successfully.");
-            } catch (error) {
-                console.error("Error during environment enhancement:", error);
-            }
+            createForestBoundary();
+            createMountainBackdrop();
         }
         
         // Set up animation mixing system
@@ -1556,55 +1328,6 @@
             setLowerBodyAnimation('walk');
             
             console.log(`Set up ${clipsList.length} animations for mixing`);
-            
-            // Preload all animations to avoid freezing
-            preloadAnimations();
-        }
-        
-        // Preload animations to avoid freezing when first used
-        function preloadAnimations() {
-            console.log("Preloading animations...");
-            
-            // Preload all carry animations by creating them at startup
-            const weightClasses = ["light", "medium", "heavy"];
-            const animTypes = ["walk", "idle", "run"];
-            
-            for (const weight of weightClasses) {
-                for (const type of animTypes) {
-                    const animName = `carry_${type}_${weight}`;
-                    
-                    // Just access the animation to ensure it's created
-                    if (!upperBodyActions[animName] && upperBodyClips[animName]) {
-                        console.log(`Preloading animation: ${animName}`);
-                        
-                        // Create action but don't play it
-                        const action = mixer.clipAction(upperBodyClips[animName]);
-                        action.weight = 0; // Zero weight = no visible effect
-                        action.play(); // Playing with zero weight = preload only
-                        
-                        // Store for future use
-                        upperBodyActions[animName] = action;
-                    }
-                }
-            }
-            
-            // Also preload stumble animations
-            const stumbleAnims = ["stumble_lowerbody", "stumble_fall"];
-            for (const anim of stumbleAnims) {
-                if (!lowerBodyActions[anim] && lowerBodyClips[anim]) {
-                    console.log(`Preloading animation: ${anim}`);
-                    
-                    // Create action but don't play it
-                    const action = mixer.clipAction(lowerBodyClips[anim]);
-                    action.weight = 0;
-                    action.play();
-                    
-                    // Store for future use
-                    lowerBodyActions[anim] = action;
-                }
-            }
-            
-            console.log("Animation preloading complete");
         }
         
         // Update the animation selection and carrying code to use correct animation naming pattern
@@ -1755,9 +1478,6 @@
             // Current angle
             const currentAngle = characterTilt.rotation.z;
             
-            // Limit the maximum tilt angle to prevent extreme tilts
-            targetAngle = Math.max(-0.15, Math.min(0.15, targetAngle));
-            
             // If angles are very close, don't bother animating
             if (Math.abs(targetAngle - currentAngle) < 0.01) {
                 return;
@@ -1778,10 +1498,6 @@
                 if (frame >= duration) return;
                 
                 characterTilt.rotation.z += angleStep;
-                
-                // Enforce ground collision after each tilt change
-                enforceGroundCollision();
-                
                 frame++;
                 
                 requestAnimationFrame(animateTilt);
@@ -1790,7 +1506,7 @@
             animateTilt();
         }
         
-        // Function to attach bag to hand
+        // Function to attach a bag to the character's hand
         function attachBagToHand(bag, hand) {
             if (!bag || !hand || !characterModel) {
                 console.error("Cannot attach bag - missing references:", { 
@@ -1853,7 +1569,7 @@
             }
             
             // Adjust scale to make bags more noticeable
-            const handScale = 1.2; // Increased from 1.0 for better visibility
+            const handScale = 1.0; // Increased from 0.8 for better visibility
             bag.scale.set(
                 originalScale.x * handScale,
                 originalScale.y * handScale,
@@ -1865,54 +1581,23 @@
                 if (node.isMesh) {
                     node.castShadow = true;
                     node.receiveShadow = true;
-                    node.visible = true; // Explicitly set visible flag
-                    console.log(`Mesh found in bag: ${node.name}, visible: ${node.visible}`);
                     
-                    // Force material to non-transparent
+                    // Ensure materials are visible and have good rendering properties
                     if (node.material) {
-                        console.log("Bag material details:", {
-                            type: node.material.type,
-                            transparent: node.material.transparent,
-                            opacity: node.material.opacity,
-                            visible: node.visible,
-                            depthWrite: node.material.depthWrite,
-                            depthTest: node.material.depthTest,
-                            colorHex: node.material.color ? '#' + node.material.color.getHexString() : 'N/A'
-                        });
+                        // Make sure material is not transparent unless it needs to be
+                        node.material.transparent = false;
+                        node.material.opacity = 1.0;
+                        node.material.depthWrite = true;
+                        node.material.depthTest = true;
                         
-                        // IMPORTANT: Create a clone of the material to avoid modifying shared materials
-                        if (Array.isArray(node.material)) {
-                            node.material = node.material.map(mat => mat.clone());
-                        } else {
-                            node.material = node.material.clone();
+                        // If it's a standard material, set good rendering properties
+                        if (node.material.isMeshStandardMaterial) {
+                            node.material.roughness = 0.7;
+                            node.material.metalness = 0.3;
                         }
                         
-                        // Apply aggressive visibility settings
-                        if (Array.isArray(node.material)) {
-                            node.material.forEach(mat => {
-                                mat.transparent = false;
-                                mat.opacity = 1.0;
-                                mat.depthWrite = true;
-                                mat.depthTest = true;
-                                mat.visible = true;
-                                mat.needsUpdate = true;
-                            });
-                        } else {
-                            node.material.transparent = false;
-                            node.material.opacity = 1.0;
-                            node.material.depthWrite = true;
-                            node.material.depthTest = true;
-                            node.material.visible = true;
-                            
-                            // If it's a standard material, set good rendering properties
-                            if (node.material.isMeshStandardMaterial) {
-                                node.material.roughness = 0.7;
-                                node.material.metalness = 0.3;
-                            }
-                            
-                            // Ensure material updates
-                            node.material.needsUpdate = true;
-                        }
+                        // Ensure material updates
+                        node.material.needsUpdate = true;
                     }
                 }
             });
@@ -1983,90 +1668,71 @@
         
         // Update carrying statistics with new animation naming
         function updateCarryingStats() {
-            // Update counter
+            // Count bags
             bagCountEl.textContent = attachedBags.length;
             
-            // Recalculate total weight
+            // Calculate total weight
             totalBagWeight = attachedBags.reduce((total, bag) => total + bag.weight, 0);
-            totalWeightEl.textContent = totalBagWeight.toFixed(1) + " kg";
+            totalWeightEl.textContent = totalBagWeight + " kg";
             
-            // Update balance system if carrying bags
+            // Show/hide balance UI based on whether bags are being carried
+            const balanceUI = document.getElementById('balanceUI');
             if (attachedBags.length > 0) {
-                // Automatically enable balance system when carrying bags
+                if (balanceUI) balanceUI.style.display = 'block';
+                
+                // Always enable balance system when carrying bags
                 if (!balanceEnabled) {
                     balanceEnabled = true;
-                    document.getElementById('balanceToggle').textContent = "Balance: ON";
-                    document.getElementById('balanceToggle').classList.add('active');
-                    updateDebug("Balance system enabled - avoid tipping over!");
-                }
-                
-                // Determine weight class based on total weight
-                let newWeightClass = "none";
-                
-                if (attachedBags.length > 0) {
-                    if (totalBagWeight <= 3) {
-                        newWeightClass = "light";
-                    } else if (totalBagWeight <= 7) {
-                        newWeightClass = "medium";
-                    } else {
-                        newWeightClass = "heavy";
-                    }
-                }
-                
-                // Update weight class display
-                if (weightClassEl) {
-                    weightClassEl.textContent = newWeightClass.charAt(0).toUpperCase() + newWeightClass.slice(1);
-                }
-                
-                // If weight class changed, update the animation
-                if (newWeightClass !== carryWeightClass) {
-                    updateDebug(`Carry weight class changed: ${carryWeightClass} → ${newWeightClass}`);
-                    carryWeightClass = newWeightClass;
-                    
-                    // Update animation based on movement state
-                    if (isMoving) {
-                        forcedAnimationUpdate(`carry_walk_${carryWeightClass}`);
-                    } else {
-                        forcedAnimationUpdate(`carry_idle_${carryWeightClass}`);
-                    }
-                }
-                
-                // Show balance UI
-                const balanceUI = document.getElementById('balanceUI');
-                if (balanceUI) {
-                    balanceUI.style.display = 'block';
-                    
-                    // Reset balance slider to middle position (50%)
-                    const balanceSlider = document.getElementById('balanceSlider');
-                    if (balanceSlider) {
-                        balanceSlider.value = 50;
-                        balanceValue = 0.5; // Reset to middle
-                    }
+                    updateDebug("Balance system enabled - carrying bags");
                 }
             } else {
+                if (balanceUI) balanceUI.style.display = 'none';
+                
                 // Disable balance system when not carrying bags
                 if (balanceEnabled) {
                     balanceEnabled = false;
-                    document.getElementById('balanceToggle').textContent = "Balance: OFF";
-                    document.getElementById('balanceToggle').classList.remove('active');
-                }
-                
-                // Reset weight class
-                carryWeightClass = "none";
-                
-                // Hide balance UI
-                const balanceUI = document.getElementById('balanceUI');
-                if (balanceUI) balanceUI.style.display = 'none';
-                
-                // Reset balance to neutral when not carrying
-                balanceValue = 0.5;
-                
-                // Switch back to regular animations
-                if (currentUpperBodyAnimation.startsWith('carry')) {
-                    setUpperBodyAnimation('idle');
-                    setLowerBodyAnimation('idle');
+                    updateDebug("Balance system disabled - no bags");
+                    
+                    // Reset any tilt when bags are dropped
+                    if (characterTilt) {
+                        gsapTilt(0);
+                    }
                 }
             }
+            
+            // Determine weight class based on total weight or bag count
+            let newWeightClass = "none";
+            
+            if (attachedBags.length > 0) {
+                if (totalBagWeight <= 3) {
+                    newWeightClass = "light";
+                } else if (totalBagWeight <= 7) {
+                    newWeightClass = "medium";
+                } else {
+                    newWeightClass = "heavy";
+                }
+            }
+            
+            // Update weight class display
+            if (weightClassEl) weightClassEl.textContent = newWeightClass.charAt(0).toUpperCase() + newWeightClass.slice(1);
+            
+            // If weight class changed, update the animation
+            if (newWeightClass !== carryWeightClass) {
+                updateDebug(`Carry weight class changed: ${carryWeightClass} → ${newWeightClass}`);
+                carryWeightClass = newWeightClass;
+                
+                // Update animation if we're already carrying and moving
+                if (attachedBags.length > 0) {
+                    if (isMoving) {
+                        forcedAnimationUpdate(`carry_walk_${carryWeightClass}`);
+                } else {
+                        forcedAnimationUpdate(`carry_stand_${carryWeightClass}`);
+                }
+            }
+            }
+            
+            // Update the balance UI to reflect current state
+            updateBalanceSystem(balanceValue);
         }
         
         // Function to detach bag
@@ -2154,42 +1820,22 @@
         
         // Function to update the balance system
         function updateBalanceSystem(value) {
-            // Make sure UI elements exist before updating them
-            const balanceValueEl = document.getElementById('balanceValue');
-            const balanceIndicatorEl = document.getElementById('balanceIndicator');
-            const balanceDirectionEl = document.getElementById('balanceDirection');
+            document.getElementById('balanceValue').textContent = value.toFixed(2);
+            document.getElementById('balanceIndicator').style.left = `${value * 100}%`;
             
-            // Update balance value display
-            if (balanceValueEl) {
-                balanceValueEl.textContent = value.toFixed(2);
-            }
+            // Change indicator color based on balance
+            const indicator = document.getElementById('balanceIndicator');
             
-            // Update indicator position
-            if (balanceIndicatorEl) {
-                balanceIndicatorEl.style.left = `${value * 100}%`;
-            }
+            let newDirection = "center";
+            let intensity = 0;
             
             // If not carrying bags, always stay balanced
             if (attachedBags.length === 0) {
-                if (balanceIndicatorEl) {
-                    balanceIndicatorEl.style.background = '#ffffff'; // White for safe
-                }
-                if (balanceDirectionEl) {
+                indicator.style.background = '#ffffff'; // White for safe
                 balanceDirectionEl.textContent = "Balanced";
                 balanceDirectionEl.style.color = '#ffffff';
-                }
                 return;
             }
-            
-            // Make sure the balance UI is visible when carrying bags
-            const balanceUI = document.getElementById('balanceUI');
-            if (balanceUI) {
-                balanceUI.style.display = 'block';
-            }
-            
-            // Apply visual effects based on balance value
-            let newDirection = "center";
-            let intensity = 0;
             
             // Apply weight-based balance adjustments
             // The more bags the player carries, the more sensitive their balance becomes
@@ -2199,51 +1845,57 @@
                 weightFactor = 1.0 + (totalBagWeight * 0.08);
             }
             
-            // Define balance thresholds with weight-based adjustments
-            // These determine how far from center before imbalance effects start
-            const leftSevereThreshold = 0.1 / weightFactor;
-            const leftModerateThreshold = 0.3 / weightFactor;
-            const rightModerateThreshold = 0.7 / weightFactor;
-            const rightSevereThreshold = 0.9 / weightFactor;
+            // Adjust thresholds based on weight
+            const leftSevereThreshold = 0.3 * weightFactor; // Increased from 0.2
+            const leftModerateThreshold = 0.4 * weightFactor; // Increased from 0.3
+            const rightModerateThreshold = 0.6 / weightFactor; // Changed from 0.7
+            const rightSevereThreshold = 0.7 / weightFactor; // Changed from 0.8
             
+            // Determine balance direction based on value
             if (value < leftSevereThreshold) {
                 // Severe left imbalance
-                if (balanceIndicatorEl) {
-                    balanceIndicatorEl.style.background = '#ff0000'; // Red
-                }
+                indicator.style.background = '#ff0000'; // Red
                 newDirection = "left";
                 intensity = 1.0 - (value / leftSevereThreshold);
+                balanceDirectionEl.textContent = "Severe Left Imbalance!";
+                balanceDirectionEl.style.color = '#ff0000';
+                
+                // Add camera shake for severe imbalance
+                if (Math.random() < 0.05) {
+                    startCameraShake(intensity * 0.1);
+                }
             } else if (value < leftModerateThreshold) {
                 // Moderate left imbalance
-                if (balanceIndicatorEl) {
-                    balanceIndicatorEl.style.background = '#ff9900'; // Orange
-                }
+                indicator.style.background = '#ff9900'; // Orange
                 newDirection = "left";
                 intensity = (leftModerateThreshold - value) / (leftModerateThreshold - leftSevereThreshold);
+                balanceDirectionEl.textContent = "Left Imbalance";
+                balanceDirectionEl.style.color = '#ff9900';
             } else if (value > rightSevereThreshold) {
                 // Severe right imbalance
-                if (balanceIndicatorEl) {
-                    balanceIndicatorEl.style.background = '#ff0000'; // Red
-                }
+                indicator.style.background = '#ff0000'; // Red
                 newDirection = "right";
                 intensity = (value - rightSevereThreshold) / (1.0 - rightSevereThreshold);
+                balanceDirectionEl.textContent = "Severe Right Imbalance!";
+                balanceDirectionEl.style.color = '#ff0000';
+                
+                // Add camera shake for severe imbalance
+                if (Math.random() < 0.05) {
+                    startCameraShake(intensity * 0.1);
+                }
             } else if (value > rightModerateThreshold) {
                 // Moderate right imbalance
-                if (balanceIndicatorEl) {
-                    balanceIndicatorEl.style.background = '#ff9900'; // Orange
-                }
+                indicator.style.background = '#ff9900'; // Orange
                 newDirection = "right";
                 intensity = (value - rightModerateThreshold) / (rightSevereThreshold - rightModerateThreshold);
+                balanceDirectionEl.textContent = "Right Imbalance";
+                balanceDirectionEl.style.color = '#ff9900';
                 } else {
                 // Balanced
-                if (balanceIndicatorEl) {
-                    balanceIndicatorEl.style.background = '#00ff00'; // Green
-                }
+                indicator.style.background = '#00ff00'; // Green
                 newDirection = "center";
-                if (balanceDirectionEl) {
-                    balanceDirectionEl.textContent = "Balanced";
-                    balanceDirectionEl.style.color = '#00ff00';
-            }
+                balanceDirectionEl.textContent = "Balanced";
+                balanceDirectionEl.style.color = '#00ff00';
             }
             
             // If balance direction changed or intensity changed significantly, update animations
@@ -2258,38 +1910,25 @@
         
         // Apply animation effects based on balance status
         function updateAnimationsForBalance(direction, intensity) {
-            // First enforce ground collision to prevent clipping
-            enforceGroundCollision();
-            
-            // Check for fall condition - if intensity is very high, trigger a fall
-            if (intensity > 0.8 && !isGameOver) {
-                // High intensity imbalance triggers a fall
-                triggerGameOver();
-                return;
-            }
-            
             // Use stumble for lower body when imbalanced
             if (direction !== "center") {
                 // If moving, use stumble_lowerbody, otherwise use default animation
-                if (isMoving && !currentLowerBodyAnimation.startsWith('stumble') && !isGameOver) {
+                if (isMoving && !currentLowerBodyAnimation.startsWith('stumble')) {
                     setLowerBodyAnimation('stumble_lowerbody');
                 }
                 
                 // Apply a tilt to the entire character
-                if (characterTilt && !isGameOver) {
+                if (characterTilt) {
                     // Calculate tilt angle based on intensity but with reduced maximum tilt
-                    // Max tilt reduced to prevent extreme angles
-                    const tiltAmount = Math.min(0.15, Math.max(0, (intensity - 0.2) * 0.8 + 0.05));
-                    
-                    // Fix: Swap left/right direction for correct tilt
-                    const tiltAngle = (direction === 'right' ? -1 : 1) * tiltAmount;
+                    // Max tilt reduced from 0.5 to 0.3 radians (about 17 degrees instead of 29 degrees)
+                    const tiltAmount = Math.min(0.2, Math.max(0, (intensity - 0.2) * 1.0 + 0.05));
+                    const tiltAngle = (direction === 'left' ? -1 : 1) * tiltAmount;
                     
                     // Apply tilt with smooth transition
                     gsapTilt(tiltAngle);
                 }
             } else {
                 // Return to normal walking and no tilt
-                if (!isGameOver) {
                 if (isMoving && currentLowerBodyAnimation.startsWith('stumble')) {
                     setLowerBodyAnimation('walk');
                 } else if (!isMoving && currentLowerBodyAnimation.startsWith('stumble')) {
@@ -2298,7 +1937,6 @@
                 
                 if (characterTilt) {
                     gsapTilt(0);
-                    }
                 }
             }
         }
@@ -2410,13 +2048,6 @@
                 balanceShift += turnDirection * 0.005; // Reduced from 0.01
             }
             
-            // Mouse movement can affect balance
-            if (lastMouseMoveX !== 0) {
-                // Use mouse movement to shift balance slightly
-                balanceShift += (lastMouseMoveX * 0.0001);
-                lastMouseMoveX = 0; // Reset after use
-            }
-            
             // Carrying weight makes balance harder
             const carryFactor = 1 + (totalBagWeight * 0.02); // Reduced from 0.03
             balanceShift *= carryFactor;
@@ -2425,10 +2056,7 @@
             balanceValue = Math.max(0, Math.min(1, balanceValue + (balanceShift * 0.5))); // Added 0.5 multiplier to slow changes
             
             // Update the UI
-            const balanceSlider = document.getElementById('balanceSlider');
-            if (balanceSlider) {
-                balanceSlider.value = balanceValue * 100;
-            }
+            document.getElementById('balanceSlider').value = balanceValue * 100;
             updateBalanceSystem(balanceValue);
         }
         
@@ -2461,7 +2089,7 @@
             thirdPersonCamera.lookAt(thirdPersonCameraTarget);
         }
         
-        // Update character movement and fix orientation - completely revised
+        // Update character movement and fix orientation
         function updateCharacterMovement(delta) {
             if (!characterTilt) return;
             
@@ -2474,7 +2102,7 @@
             let inputZ = 0;
             
             // Process joystick input if active
-            if (joystickActive && joystickDirection) {
+            if (joystickActive) {
                 // Add a small deadzone to prevent tiny movements
                 if (Math.abs(joystickDirection.x) > 0.15) {
                     inputX = joystickDirection.x;
@@ -2503,6 +2131,36 @@
                 }
             }
             
+            // Handle rotation based on input device
+            if (isUsingTouch) {
+                // For touch devices, use the rotation joystick to rotate the character and camera together
+            
+                const rotationAmount = rotationJoystickDirection.x * touchRotationSensitivity;
+                // We update targetRotation instead of directly updating characterTilt
+                targetRotation += rotationAmount;
+                    
+                // When carrying bags, use joystick rotation to affect balance
+                if (attachedBags.length > 0 && balanceEnabled) {
+                    // Rotation joystick movements add subtle balance shifts
+                    // Speed of rotation causes more balance disruption
+                    const balanceDisruption = Math.min(0.01, Math.abs(rotationAmount) * 0.3);
+                    
+                    // If rotation is to the right, shift balance left
+                    if (rotationAmount > 0) {
+                        balanceValue = Math.max(0, balanceValue - balanceDisruption);
+                    } 
+                    // If rotation is to the left, shift balance right
+                    else if (rotationAmount < 0) {
+                        balanceValue = Math.min(1, balanceValue + balanceDisruption);
+                    }
+                    
+                    // Update the UI and apply effects
+                    document.getElementById('balanceSlider').value = balanceValue * 100;
+                    updateBalanceSystem(balanceValue);
+                }
+            }
+            // For desktop, rotation is handled by mouse movement in the mousemove event handler
+            
             // Process movement input (independent of rotation)
             if (Math.abs(inputX) > 0.1 || Math.abs(inputZ) > 0.1) {
                 isMoving = true;
@@ -2510,43 +2168,99 @@
                 // Calculate movement speed with acceleration/deceleration
                 const targetSpeed = maxMovementSpeed * Math.sqrt(inputX*inputX + inputZ*inputZ);
                 const speedDiff = targetSpeed - movementAcceleration;
-                movementAcceleration += speedDiff * 0.1 * (delta * 60); // Make framerate independent
+                movementAcceleration += speedDiff * 0.08;
                 
-                // Calculate camera-relative movement vectors
-                // This makes WASD always move relative to camera view
+                // Always use camera direction for movement, not character direction
                 const cameraForward = new THREE.Vector3(0, 0, -1);
                 const cameraRight = new THREE.Vector3(1, 0, 0);
                 
-                // Apply camera orbit rotation to the movement vectors
-                cameraForward.applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraOrbitAngle);
-                cameraForward.y = 0; // Keep movement on horizontal plane
-                cameraForward.normalize();
-                
-                // Right is perpendicular to forward in horizontal plane
-                cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraForward);
+                if (cameraMode === "thirdPerson" && thirdPersonCamera) {
+                    // Get camera's forward and right vectors (ignoring Y component for horizontal movement)
+                    thirdPersonCamera.getWorldDirection(cameraForward);
+                    cameraForward.y = 0; // Keep movement on horizontal plane
+                    cameraForward.normalize();
+                    
+                    // Right is perpendicular to forward in horizontal plane
+                    cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraForward);
+                } else {
+                    // Use character's orientation for non-third-person
+                    cameraForward.set(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
+                    cameraRight.set(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
+                }
                 
                 // Calculate movement direction relative to camera
                 moveDirection.set(0, 0, 0)
-                    .add(cameraRight.multiplyScalar(inputX))
+                    .add(cameraRight.multiplyScalar(-inputX))  // Changed from positive to negative
                     .add(cameraForward.multiplyScalar(-inputZ));
                 
-                // Normalize and apply movement speed
-                if (moveDirection.length() > 0) {
-                    moveDirection.normalize().multiplyScalar(movementAcceleration);
+                moveDirection.normalize().multiplyScalar(movementAcceleration);
+                
+                // Update character position
+                const oldPosition = characterTilt.position.clone();
+                const newPosition = oldPosition.clone().add(moveDirection);
+                
+                // Check for collisions before applying movement
+                if (!checkCollision(oldPosition, moveDirection)) {
+                    // No collision, move normally
+                    characterTilt.position.copy(newPosition);
                     
-                    // Update character position
-                    characterTilt.position.add(moveDirection);
+                    // Check if we need to handle step climbing
+                    handleStepClimbing(characterTilt.position, moveDirection);
+                } else {
+                    // Collision detected, try to slide along the obstacle
+                    updateDebug("Collision detected, attempting to slide");
                     
-                    // Rotate character to face movement direction
-                    // We need to negate the x or z component to get the correct facing direction
-                    // Using atan2(x, -z) because we want character to face TOWARD the direction of movement
-                    targetRotation = Math.atan2(moveDirection.x, -moveDirection.z);
+                    // Try moving only in X direction
+                    const xMovement = new THREE.Vector3(moveDirection.x, 0, 0);
+                    if (xMovement.length() > 0.01 && !checkCollision(oldPosition, xMovement)) {
+                        characterTilt.position.add(xMovement);
+                    }
+                    
+                    // Try moving only in Z direction
+                    const zMovement = new THREE.Vector3(0, 0, moveDirection.z);
+                    if (zMovement.length() > 0.01 && !checkCollision(oldPosition, zMovement)) {
+                        characterTilt.position.add(zMovement);
+                    }
                 }
                 
-                // Smoothly rotate the character model to face the movement direction
-                if (characterTilt.rotation.y !== targetRotation) {
-                    const rotDiff = ((targetRotation - characterTilt.rotation.y + Math.PI) % (Math.PI * 2)) - Math.PI;
-                    characterTilt.rotation.y += rotDiff * 0.2; // Increased rotation speed
+                // If moving, rotate character mesh to face movement direction
+                if (characterModel && moveDirection.length() > 0.01) {
+                    // Get current rotation of character mesh (not tilt container)
+                    const angle = Math.atan2(moveDirection.x, moveDirection.z);
+                    
+                    // Apply the rotation to the character model to match the movement direction
+                    characterModel.rotation.y = angle;
+                    
+                    // Update target rotation - NOT directly updating characterTilt rotation here
+                    targetRotation = angle;
+                }
+                
+                // Update animations based on movement state change - ONLY if state actually changed
+                if (!wasMoving || !lastMovementState) {
+                    // Just started moving or continuing to move
+                    if (!wasMoving) {
+                        updateDebug("State change: idle → moving");
+                    }
+                    
+                    // Force animation update on movement state change, overriding the time check
+                    if (attachedBags.length > 0) {
+                        const animName = `carry_walk_${carryWeightClass}`;
+                        updateDebug(`Forcing animation update to: ${animName}`);
+                        
+                        // Bypass the time check in setUpperBodyAnimation
+                        forcedAnimationUpdate(animName);
+                    } else {
+                        forcedAnimationUpdate('walk');
+                    }
+                    
+                    // Check if we should use the stumble animation based on current balance direction
+                    if (currentBalanceDirection === "center") {
+                        setLowerBodyAnimation('walk');
+                    } else {
+                        // Use stumble animation if we're imbalanced
+                        setLowerBodyAnimation('stumble_lowerbody');
+                    }
+                    lastMovementState = true;
                 }
             } else {
                 // Character is not moving, slow down gradually
@@ -2554,47 +2268,34 @@
                 if (movementAcceleration < 0.001) {
                     movementAcceleration = 0;
                 }
-            }
-            
-            // Update character animations based on movement state
-            if (isMoving) {
-                // Set appropriate animations for moving based on weight class
-                if (attachedBags.length > 0) {
-                    // Use weight-based carry animations
-                    const animName = `carry_walk_${carryWeightClass}`;
-                    if (currentUpperBodyAnimation !== animName) {
-                        forcedAnimationUpdate(animName);
+                
+                // Update animations for idle state ONLY if we were previously moving
+                if (wasMoving && lastMovementState) {
+                    // Just stopped moving
+                    updateDebug("State change: moving → idle");
+                    
+                    if (!currentUpperBodyAnimation.startsWith('pickup')) {
+                        if (attachedBags.length > 0) {
+                            // Force animation update, bypassing the time check
+                            forcedAnimationUpdate(`carry_stand_${carryWeightClass}`);
+                        } else {
+                            forcedAnimationUpdate('idle');
+                        }
                     }
-                } else {
-                    // Regular walking animation when not carrying
-                    if (currentUpperBodyAnimation !== 'walk') {
-                        setUpperBodyAnimation('walk');
-                        setLowerBodyAnimation('walk');
-                    }
-                }
-            } else {
-                // Set appropriate animations for idle
-                if (attachedBags.length > 0) {
-                    // Use weight-based carry animations for idle
-                    const animName = `carry_idle_${carryWeightClass}`;
-                    if (currentUpperBodyAnimation !== animName) {
-                        forcedAnimationUpdate(animName);
-                    }
-                } else {
-                    // Regular idle animation when not carrying
-                    if (currentUpperBodyAnimation !== 'idle') {
-                        setUpperBodyAnimation('idle');
+                    
+                    if (!currentLowerBodyAnimation.startsWith('stumble') && currentLowerBodyAnimation !== 'idle') {
                         setLowerBodyAnimation('idle');
                     }
+                    lastMovementState = false;
                 }
             }
             
-            // Enforce ground collision
-            enforceGroundCollision();
+            // Update balance based on movement and carrying
+            updateMovementBasedBalance();
             
-            // Update balance if carrying bags
-            if (attachedBags.length > 0 && balanceEnabled) {
-                updateMovementBasedBalance();
+            // Update camera if in third-person mode and following
+            if (cameraMode === "thirdPerson" && isCameraFollowing) {
+                updateThirdPersonCamera();
             }
         }
         
@@ -2787,26 +2488,34 @@
             if (!isUsingTouch) {
                 // Mouse move for camera rotation (no need to click and hold)
                 renderer.domElement.addEventListener('mousemove', function(e) {
-                    if (cameraMode === "thirdPerson" && !controls.enabled && !isGameOver) {
-                        // Only rotate camera if in game view mode and not in game over state
+                    if (cameraMode === "thirdPerson" && !controls.enabled) {
+                        // Only rotate camera if in game view mode
                         const dx = e.movementX || e.mozMovementX || e.webkitMovementX || 0;
                         if (dx !== 0 && mouseLookActive) {
-                            // Store mouse movement for balance control
-                            // Use the same input for both balance and camera rotation
-                            lastMouseMoveX = dx;
-                            
-                            // Calculate rotation amount with sensitivity
+                            // Traditional third-person control: rotate character and camera together
+                            // Calculate new rotation based on mouse movement
                             const rotationAmount = -dx * mouseRotationSensitivity;
+                            characterTilt.rotation.y += rotationAmount;
                             
-                            // Update camera orbit angle 
-                            cameraOrbitAngle = (cameraOrbitAngle + rotationAmount) % (Math.PI * 2);
+                            // Rotate character model to match
+                            if (characterModel) {
+                                characterModel.rotation.y = characterTilt.rotation.y;
+                            }
                             
-                            // Update camera position based on new orbit angle
-                            updateCameraPositionSafely();
-                            
-                            // When carrying bags and balance is enabled, the same mouse movement
-                            // will be used to update balance in updateBalanceBasedOnControls
-                            // This gives us dual control with a single input
+                            // When carrying bags, mouse movement directly affects balance
+                            if (attachedBags.length > 0 && balanceEnabled) {
+                                // Mouse movements shift balance - main control for balance
+                                // Faster mouse movements cause more balance disruption
+                                const balanceDisruption = Math.min(0.03, Math.abs(dx) * 0.001);
+                                
+                                // Direction affects which way balance shifts
+                                if (dx < 0) { // Right movement
+                                    balanceValue = Math.max(0, balanceValue - balanceDisruption);
+                                } 
+                                else if (dx > 0) { // Left movement
+                                    balanceValue = Math.min(1, balanceValue + balanceDisruption);
+                                }
+                            }
                         }
                     }
                 });
@@ -3068,7 +2777,6 @@
         // Animation loop
         const clock = new THREE.Clock();
         let lastFrameTime = 0;
-        let cameraUpdateScheduled = false; // Flag to ensure camera only updates once per frame
         
         // A single source of truth for camera updates
         function animate(currentTime) {
@@ -3077,39 +2785,18 @@
             // Calculate delta time
             const delta = clock.getDelta();
             
-            // Skip movement updates during game over
-            if (!isGameOver) {
-                // Process input and update character position first
-                // We DO NOT update camera here
-                updateCharacterMovement(delta);
-                
-                // Reset camera update flag for this frame
-                cameraUpdateScheduled = false;
-                
-                // Update animations
-                if (mixer) mixer.update(delta);
-                
-                // Handle balance updates based on control input
-                updateBalanceBasedOnControls();
-                
-                // Reset lastMouseMoveX at the end of the frame to prevent accumulation
-                // but after it's been used for both camera and balance control
-                lastMouseMoveX = 0;
-                
-                // Ensure attached bags remain visible
-                ensureAttachedBagsVisibility();
-            } else {
-                // Still update animations during game over
-                if (mixer) mixer.update(delta);
-            }
+            // Process input and update character position
+            updateCharacterMovement(delta);
             
-            // Always enforce ground collision
-            enforceGroundCollision();
+            // Update animations
+            if (mixer) mixer.update(delta);
             
-            // ONLY update the camera once per frame, and only after all movement is complete
+            // Handle balance updates based on control input
+            updateBalanceBasedOnControls();
+            
+            // Only update camera once per frame - a crucial fix
             if (cameraMode === "thirdPerson" && thirdPersonCamera && characterTilt) {
-                // Use a completely decoupled camera update system
-                updateCameraPositionSafely();
+                updateThirdPersonCamera();
             }
             
             // Apply camera shake if active
@@ -3142,99 +2829,32 @@
             lastFrameTime = currentTime;
         }
         
-        // A safer, more controlled camera update function
-        function updateCameraPositionSafely() {
-            if (!characterTilt || !thirdPersonCamera) return;
-            
-            // Get character position
-            const characterPos = new THREE.Vector3();
-            characterTilt.getWorldPosition(characterPos);
-            
-            // Store old camera position
-            const oldCameraPos = thirdPersonCamera.position.clone();
-            
-            // Calculate camera position based on cameraOrbitAngle instead of character rotation
-            // This allows for independent camera rotation with WASD movement relative to camera
-            const cameraOffset = thirdPersonCameraOffset.clone();
-            cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraOrbitAngle);
-            
-            // Calculate target camera position
-            const newCameraPos = characterPos.clone().add(cameraOffset);
-            
-            // Smoothly interpolate camera position for a less jarring movement
-            thirdPersonCamera.position.lerp(newCameraPos, 0.2);
-            
-            // Ensure the target is properly updated to follow character
-            thirdPersonCameraTarget.copy(characterPos);
-            thirdPersonCameraTarget.y += 1.5; // Look slightly above character's feet
-            
-            // Update camera view direction
-            thirdPersonCamera.lookAt(thirdPersonCameraTarget);
-            
-            // Flag that camera has been updated this frame
-            cameraUpdateScheduled = true;
-        }
-        
         // Function for handling balance changes based on controls
         function updateBalanceBasedOnControls() {
-            // Skip if no bags or balance not enabled
             if (!balanceEnabled || attachedBags.length === 0) return;
             
-            // Get horizontal input from mouse/joystick for balance
-            let horizontalInput = 0;
-            
-            // Mouse input takes priority if available
-            if (lastMouseMoveX !== 0) {
-                // Increased sensitivity for more responsive balance control
-                horizontalInput = lastMouseMoveX * 0.02; // Doubled from 0.01
-                // Don't reset lastMouseMoveX here - let it affect both camera and balance
-            } 
-            // Joystick rotation is another source of input
-            else if (rotationJoystickActive) {
-                // Increased sensitivity for more responsive balance control
-                horizontalInput = rotationJoystickDirection.x * 0.2; // Doubled from 0.1
-            }
-            
-            // Apply a balance change based on the horizontal input
-            // This is completely independent from movement
-            if (horizontalInput !== 0) {
-                // Increased sensitivity and made sign more intuitive:
-                // Moving mouse or joystick right tilts balance right, and vice versa
-                const balanceImpact = horizontalInput * 0.08; // Increased from 0.05
-                
-                // Apply the balance impact
-                balanceValue += balanceImpact;
-                
-                // Create visual feedback proportional to input
-                if (Math.abs(balanceImpact) > 0.01) {
-                    // Debug message for when balance changes significantly
-                    console.log(`Balance impact: ${balanceImpact.toFixed(3)}, New balance: ${balanceValue.toFixed(2)}`);
-                }
-            }
-            
-            // Natural centering force - stronger when further from center
-            // Make the centering force weaker to make manual control more important
-            const centeringForce = (0.5 - balanceValue) * 0.005; // Reduced from 0.01
+            // Balance naturally tries to return to center
+            const centeringForce = (0.5 - balanceValue) * 0.01;
             balanceValue += centeringForce;
             
-            // Apply random balance disturbances based on weight carried
-            if (Math.random() < 0.01 * totalBagWeight) {
-                // Random disturbance proportional to weight
-                const disturbance = (Math.random() - 0.5) * 0.05 * totalBagWeight;
-                balanceValue += disturbance;
-                console.log(`Random balance disturbance: ${disturbance.toFixed(3)}`);
+            // Apply the small movement contribution
+            // Movement only makes balancing slightly harder, doesn't control it directly
+            if (isMoving) {
+                // Apply a subtle random drift based on speed
+                const speedFactor = Math.min(1, movementAcceleration / maxMovementSpeed);
+                const randomDrift = (Math.random() - 0.5) * 0.008 * speedFactor;
+                balanceValue += randomDrift;
+                
+                // Weight increases imbalance effects
+                const weightEffect = totalBagWeight * 0.001;
+                balanceValue += (Math.random() - 0.5) * weightEffect;
             }
             
             // Clamp balance value
             balanceValue = Math.max(0, Math.min(1, balanceValue));
             
             // Update UI
-            const balanceSlider = document.getElementById('balanceSlider');
-            if (balanceSlider) {
-                balanceSlider.value = balanceValue * 100;
-            }
-            
-            // Apply visual effects based on balance
+            document.getElementById('balanceSlider').value = balanceValue * 100;
             updateBalanceSystem(balanceValue);
         }
         
@@ -3251,7 +2871,7 @@
             let inputZ = 0;
             
             // Process joystick input if active
-            if (joystickActive && joystickDirection) {
+            if (joystickActive) {
                 // Add a small deadzone to prevent tiny movements
                 if (Math.abs(joystickDirection.x) > 0.15) {
                     inputX = joystickDirection.x;
@@ -3287,98 +2907,134 @@
                 // Calculate movement speed with acceleration/deceleration
                 const targetSpeed = maxMovementSpeed * Math.sqrt(inputX*inputX + inputZ*inputZ);
                 const speedDiff = targetSpeed - movementAcceleration;
-                movementAcceleration += speedDiff * 0.1 * (delta * 60); // Make framerate independent
+                movementAcceleration += speedDiff * 0.08;
                 
-                // Calculate camera-relative movement vectors
-                // This makes WASD always move relative to camera view
+                // Always use camera direction for movement, not character direction
                 const cameraForward = new THREE.Vector3(0, 0, -1);
                 const cameraRight = new THREE.Vector3(1, 0, 0);
                 
-                // Apply camera orbit rotation to the movement vectors
-                cameraForward.applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraOrbitAngle);
-                cameraForward.y = 0; // Keep movement on horizontal plane
-                cameraForward.normalize();
-                
-                // Right is perpendicular to forward in horizontal plane
-                cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraForward);
+                if (cameraMode === "thirdPerson" && thirdPersonCamera) {
+                    // Get camera's forward and right vectors (ignoring Y component for horizontal movement)
+                    thirdPersonCamera.getWorldDirection(cameraForward);
+                    cameraForward.y = 0; // Keep movement on horizontal plane
+                    cameraForward.normalize();
+                    
+                    // Right is perpendicular to forward in horizontal plane
+                    cameraRight.crossVectors(new THREE.Vector3(0, 1, 0), cameraForward);
+                }
                 
                 // Calculate movement direction relative to camera
                 moveDirection.set(0, 0, 0)
-                    .add(cameraRight.multiplyScalar(inputX))
+                    .add(cameraRight.multiplyScalar(-inputX))  // Flipped for correct movement
                     .add(cameraForward.multiplyScalar(-inputZ));
                 
-                // Normalize and apply movement speed
-                if (moveDirection.length() > 0) {
-                    moveDirection.normalize().multiplyScalar(movementAcceleration);
+                moveDirection.normalize().multiplyScalar(movementAcceleration);
+                
+                // Update character position
+                const oldPosition = characterTilt.position.clone();
+                const newPosition = oldPosition.clone().add(moveDirection);
+                
+                // Check for collisions before applying movement
+                if (!checkCollision(oldPosition, moveDirection)) {
+                    // No collision, move normally
+                    characterTilt.position.copy(newPosition);
                     
-                    // Update character position
-                    characterTilt.position.add(moveDirection);
+                    // Check if we need to handle step climbing
+                    handleStepClimbing(characterTilt.position, moveDirection);
+                } else {
+                    // Collision detected, try to slide along the obstacle
+                    updateDebug("Collision detected, attempting to slide");
                     
-                    // Rotate character to face movement direction
-                    // We need to negate the x or z component to get the correct facing direction
-                    // Using atan2(x, -z) because we want character to face TOWARD the direction of movement
-                    targetRotation = Math.atan2(moveDirection.x, -moveDirection.z);
+                    // Try moving only in X direction
+                    const xMovement = new THREE.Vector3(moveDirection.x, 0, 0);
+                    if (xMovement.length() > 0.01 && !checkCollision(oldPosition, xMovement)) {
+                        characterTilt.position.add(xMovement);
+                    }
+                    
+                    // Try moving only in Z direction
+                    const zMovement = new THREE.Vector3(0, 0, moveDirection.z);
+                    if (zMovement.length() > 0.01 && !checkCollision(oldPosition, zMovement)) {
+                        characterTilt.position.add(zMovement);
+                    }
                 }
                 
-                // Smoothly rotate the character model to face the movement direction
-                if (characterTilt.rotation.y !== targetRotation) {
-                    const rotDiff = ((targetRotation - characterTilt.rotation.y + Math.PI) % (Math.PI * 2)) - Math.PI;
-                    characterTilt.rotation.y += rotDiff * 0.2; // Increased rotation speed
+                // If moving, rotate character mesh to face movement direction
+                if (characterModel && moveDirection.length() > 0.01) {
+                    // Get angle for the direction of movement
+                    const angle = Math.atan2(moveDirection.x, moveDirection.z);
+                    
+                    // Apply the rotation to the character model
+                    characterModel.rotation.y = angle;
+                    
+                    // In a true third-person system, the character rotation also affects camera
+                    // Only apply this when moving to maintain control
+                    characterTilt.rotation.y = THREE.MathUtils.lerp(
+                        characterTilt.rotation.y, 
+                        angle, 
+                        0.1 // Smooth transition
+                    );
+                }
+                
+                // Update animations based on movement state change - ONLY if state actually changed
+                if (!wasMoving || !lastMovementState) {
+                    // Just started moving or continuing to move
+                    if (!wasMoving) {
+                        updateDebug("State change: idle → moving");
+                    }
+                    
+                    // Force animation update on movement state change, overriding the time check
+                    if (attachedBags.length > 0) {
+                        const animName = `carry_walk_${carryWeightClass}`;
+                        switchAnimation(animName, true, animName, true);
+                    } else {
+                        switchAnimation("walk", true, "walk", true);
+                    }
+                    
+                    lastMovementState = "moving";
                 }
             } else {
-                // Character is not moving, slow down gradually
+                // Not moving - decelerate
                 movementAcceleration *= 0.8;
-                if (movementAcceleration < 0.001) {
-                    movementAcceleration = 0;
+                
+                // Character has stopped moving
+                if (wasMoving || lastMovementState !== "idle") {
+                    if (wasMoving) {
+                        updateDebug("State change: moving → idle");
+                    }
+                    
+                    // Force animation update
+                    if (attachedBags.length > 0) {
+                        const animName = `carry_idle_${carryWeightClass}`;
+                        switchAnimation(animName, true, animName, true);
+                    } else {
+                        switchAnimation("idle", true, "idle", true);
+                    }
+                    
+                    lastMovementState = "idle";
                 }
             }
             
-            // Update character animations based on movement state
-            if (isMoving) {
-                // Set appropriate animations for moving based on weight class
-                if (attachedBags.length > 0) {
-                    // Use weight-based carry animations
-                    const animName = `carry_walk_${carryWeightClass}`;
-                    if (currentUpperBodyAnimation !== animName) {
-                        forcedAnimationUpdate(animName);
-                    }
-                } else {
-                    // Regular walking animation when not carrying
-                    if (currentUpperBodyAnimation !== 'walk') {
-                        setUpperBodyAnimation('walk');
-                        setLowerBodyAnimation('walk');
-                    }
-                }
-            } else {
-                // Set appropriate animations for idle
-                if (attachedBags.length > 0) {
-                    // Use weight-based carry animations for idle
-                    const animName = `carry_idle_${carryWeightClass}`;
-                    if (currentUpperBodyAnimation !== animName) {
-                        forcedAnimationUpdate(animName);
-                    }
-                } else {
-                    // Regular idle animation when not carrying
-                    if (currentUpperBodyAnimation !== 'idle') {
-                        setUpperBodyAnimation('idle');
-                        setLowerBodyAnimation('idle');
-                    }
-                }
-            }
-            
-            // Enforce ground collision
-            enforceGroundCollision();
-            
-            // Update balance if carrying bags
-            if (attachedBags.length > 0 && balanceEnabled) {
-                updateMovementBasedBalance();
-            }
+            // Update weight class for carrying
+            updateCarryingEffects();
         }
         
         // Update third-person camera position
         function updateThirdPersonCamera() {
-            // Now handled by updateCameraPositionSafely() in the animation loop
-            return;
+            if (!characterTilt || !thirdPersonCamera) return;
+            
+            // Get character position
+            const characterPos = new THREE.Vector3();
+            characterTilt.getWorldPosition(characterPos);
+            
+            // Calculate camera position based on character position and rotation
+            const cameraOffset = thirdPersonCameraOffset.clone();
+            cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), characterTilt.rotation.y);
+            
+            // Set camera position and target
+            thirdPersonCamera.position.copy(characterPos).add(cameraOffset);
+            thirdPersonCameraTarget.copy(characterPos);
+            thirdPersonCameraTarget.y += 1.5; // Look slightly above character's feet
+            thirdPersonCamera.lookAt(thirdPersonCameraTarget);
         }
         
         // Initialize controls when everything is loaded
@@ -3617,30 +3273,10 @@
         
         // Interactive pickup function for touch/click
         function attemptPickupInteraction() {
-            // Don't allow pickups during pickup animations but with a timeout to prevent stuck state
+            // Don't allow pickups during pickup animations
             if (currentUpperBodyAnimation.startsWith('pickup')) {
-                // Only show message if we haven't shown it recently to avoid spam
-                const now = Date.now();
-                if (!lastPickupFeedbackTime || now - lastPickupFeedbackTime > 1500) {
-                    updateDebug("Cannot pickup: already in pickup animation");
-                    showPickupFeedback("Wait for pickup to finish");
-                    lastPickupFeedbackTime = now;
-                }
-                
-                // Add a failsafe to prevent getting stuck in pickup animation
-                if (!pickupTimeoutSet) {
-                    pickupTimeoutSet = true;
-                    setTimeout(() => {
-                        // If we're still in pickup animation after timeout, force reset
-                        if (currentUpperBodyAnimation.startsWith('pickup')) {
-                            updateDebug("Pickup animation timed out, forcing reset");
-                            setUpperBodyAnimation('idle');
-                            setLowerBodyAnimation('idle');
-                        }
-                        pickupTimeoutSet = false;
-                    }, 3000); // 3 second timeout
-                }
-                
+                updateDebug("Cannot pickup: already in pickup animation");
+                showPickupFeedback("Wait for pickup to finish");
                 return false;
             }
             
@@ -3654,36 +3290,24 @@
                     // Ground pickup
                     setUpperBodyAnimation('pickup_low');
                     
-                    // Reduced timeout for more responsive gameplay
                     setTimeout(() => {
                         if (rightHand && bagInView.bag && !attachedBags.some(b => b.mesh === bagInView.bag)) {
                             attachBagToHand(bagInView.bag, rightHand);
-                        }
-                        // Force animation to end and transition to carry state
-                        if (attachedBags.length > 0) {
-                            const animName = `carry_idle_${carryWeightClass}`;
-                            forcedAnimationUpdate(animName);
                         } else {
-                            setUpperBodyAnimation('idle');
+                            showPickupFeedback("Cannot pick up this bag");
                         }
-                    }, 500); // Reduced from longer time for more responsive feel
+                    }, 500);
                 } else {
                     // Car pickup
                     setUpperBodyAnimation('pickup_high');
                     
-                    // Reduced timeout for more responsive gameplay
                     setTimeout(() => {
                         if (leftHand && bagInView.bag && !attachedBags.some(b => b.mesh === bagInView.bag)) {
                             attachBagToHand(bagInView.bag, leftHand);
-                        }
-                        // Force animation to end and transition to carry state
-                        if (attachedBags.length > 0) {
-                            const animName = `carry_idle_${carryWeightClass}`;
-                            forcedAnimationUpdate(animName);
                         } else {
-                            setUpperBodyAnimation('idle');
+                            showPickupFeedback("Cannot pick up this bag");
                         }
-                    }, 500); // Reduced from longer time for more responsive feel
+                    }, 500);
                 }
                 return true;
             } else {
@@ -3926,21 +3550,32 @@
 
         // Handle rotation joystick (for mobile)
         function handleRotationJoystick() {
-            if (!rotationJoystickActive || !characterTilt || isGameOver) return;
+            if (!rotationJoystickActive || !characterTilt) return;
             
             // Calculate rotation amount based on joystick position
             const rotationAmount = rotationJoystickDirection.x * touchRotationSensitivity;
             
             if (Math.abs(rotationAmount) > 0.001) {
-                // Update camera orbit angle
-                cameraOrbitAngle = (cameraOrbitAngle + rotationAmount) % (Math.PI * 2);
+                // Rotate the character
+                characterTilt.rotation.y += rotationAmount;
                 
-                // Update camera position based on new orbit angle
-                updateCameraPositionSafely();
+                // Ensure character model matches the rotation
+                if (characterModel) {
+                    characterModel.rotation.y = characterTilt.rotation.y;
+                }
                 
-                // Note: The rotation joystick input is used for both camera orbit and balance
-                // Balance control happens in updateBalanceBasedOnControls using rotationJoystickDirection
-                // This way players can control both camera view and balance with the same input
+                // Handle balance shifts from rotation
+                if (attachedBags.length > 0 && balanceEnabled) {
+                    // Joystick rotation directly affects balance - main control for balance
+                    const balanceDisruption = Math.min(0.03, Math.abs(rotationAmount) * 3);
+                    
+                    if (rotationAmount > 0) { // Rotate right
+                        balanceValue = Math.max(0, balanceValue - balanceDisruption);
+                    } 
+                    else if (rotationAmount < 0) { // Rotate left
+                        balanceValue = Math.min(1, balanceValue + balanceDisruption);
+                    }
+                }
             }
         }
 
@@ -4020,101 +3655,8 @@
             }
         }
         
-        // Global variable to track game state
-        let isGameOver = false;
-        let fallRecoveryTimer = null;
-
-        // Function to reset position to ground level and prevent clipping
-        function enforceGroundCollision() {
-            if (characterTilt) {
-                // Ensure character never goes below ground level (y=0)
-                if (characterTilt.position.y < 0) {
-                    characterTilt.position.y = 0;
-                }
-            }
-        }
-        
-        // Function to handle game over state
-        function triggerGameOver() {
-            if (isGameOver) return; // Prevent multiple triggers
-            
-            isGameOver = true;
-            
-            // Show game over message
-            showPickupFeedback("GAME OVER - You fell! Recovering in 3 seconds...");
-            
-            // Drop all bags
-            dropAllBags();
-            
-            // Play fall animation
-            if (upperBodyActions['stumble_fall']) {
-                forcedAnimationUpdate('stumble_fall');
-            }
-            
-            // Disable controls temporarily
-            balanceEnabled = false;
-            
-            // Set a timer to recover
-            fallRecoveryTimer = setTimeout(() => {
-                // Reset game state
-                isGameOver = false;
-                balanceEnabled = true;
-                balanceValue = 0.5; // Reset balance to center
-                
-                // Reset character tilt
-                gsapTilt(0);
-                
-                // Show recovery message
-                showPickupFeedback("Recovered! Be more careful next time!");
-                
-                // Reset animations
-                forcedAnimationUpdate('idle');
-            }, 3000); // 3 second recovery time
-        }
-        
-        // Function to drop all bags at once
-        function dropAllBags() {
-            // Drop bags one by one until none are left
-            while (attachedBags.length > 0) {
-                detachBag();
-            }
-        }
-
-        // Function to ensure all attached bags are visible
-        function ensureAttachedBagsVisibility() {
-            // Skip if no bags are attached
-            if (attachedBags.length === 0) return;
-            
-            // Check each attached bag
-            attachedBags.forEach(bagData => {
-                const bag = bagData.mesh;
-                
-                // Ensure the bag and all its children are visible
-                bag.traverse(node => {
-                    if (node.isMesh) {
-                        // Make sure the mesh is visible
-                        node.visible = true;
-                        
-                        // Ensure material is properly set
-                        if (node.material) {
-                            node.material.transparent = false;
-                            node.material.opacity = 1.0;
-                            node.material.depthWrite = true;
-                            node.material.depthTest = true;
-                            node.material.needsUpdate = true;
-                        }
-                    }
-                });
-            });
-        }
-
         // Start the main animation loop
         animate(0);
-
-        // Variable is already declared at line 789
-        // let lastMouseMoveX = 0;
-        let lastPickupFeedbackTime = 0; // Track when we last showed feedback
-        let pickupTimeoutSet = false; // Flag to prevent multiple timeouts
     </script>
 </body>
 </html> 
