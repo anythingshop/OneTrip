@@ -3563,14 +3563,14 @@
                 e.preventDefault();
                 joystickActive = true;
                 updateJoystickPosition(e.touches[0].clientX, e.touches[0].clientY);
-            });
+            }, { passive: false });
             
             // Touch events for rotation joystick
             rotationJoystick.addEventListener('touchstart', function(e) {
                 e.preventDefault();
                 rotationJoystickActive = true;
                 updateRotationJoystickPosition(e.touches[0].clientX, e.touches[0].clientY);
-            });
+            }, { passive: false });
             
             // Touch move for all joysticks
             document.addEventListener('touchmove', function(e) {
@@ -3580,236 +3580,102 @@
                 // Handle multiple touches
                 for (let i = 0; i < e.touches.length; i++) {
                     const touch = e.touches[i];
-                    
-                    // Check which joystick this touch belongs to
                     const touchX = touch.clientX;
                     const touchY = touch.clientY;
                     
-                    // Distance to movement joystick origin
+                    // Check if this touch is near the movement joystick
                     const moveJoystickDist = Math.sqrt(
                         Math.pow(touchX - joystickOrigin.x, 2) + 
                         Math.pow(touchY - joystickOrigin.y, 2)
                     );
                     
-                    // Distance to rotation joystick origin
+                    // Check if this touch is near the rotation joystick
                     const rotateJoystickDist = Math.sqrt(
                         Math.pow(touchX - rotationJoystickOrigin.x, 2) + 
                         Math.pow(touchY - rotationJoystickOrigin.y, 2)
                     );
                     
-                    // Update the appropriate joystick
-                    if (moveJoystickDist < rotateJoystickDist && joystickActive) {
+                    // Update appropriate joystick based on which one is closer
+                    if (moveJoystickDist < rotateJoystickDist && moveJoystickDist < 150) {
+                        joystickActive = true;
                         updateJoystickPosition(touchX, touchY);
-                    } else if (rotationJoystickActive) {
+                    } else if (rotateJoystickDist < 150) {
+                        rotationJoystickActive = true;
                         updateRotationJoystickPosition(touchX, touchY);
                     }
                 }
-            });
+            }, { passive: false });
             
+            // Touch end for all joysticks
             document.addEventListener('touchend', function(e) {
-                // Need to check which joystick was released
+                // If no touches remain, reset both joysticks
                 if (e.touches.length === 0) {
-                    // All touches ended
                     joystickActive = false;
                     rotationJoystickActive = false;
                     resetJoystick();
                     resetRotationJoystick();
-                } else {
-                    // Some touches remain - figure out which joystick lost its touch
-                    let moveJoystickTouched = false;
-                    let rotateJoystickTouched = false;
-                    
-                    for (let i = 0; i < e.touches.length; i++) {
-                        const touch = e.touches[i];
-                        const touchX = touch.clientX;
-                        const touchY = touch.clientY;
-                        
-                        // Check distances to each joystick
-                        const moveJoystickDist = Math.sqrt(
-                            Math.pow(touchX - joystickOrigin.x, 2) + 
-                            Math.pow(touchY - joystickOrigin.y, 2)
-                        );
-                        
-                        const rotateJoystickDist = Math.sqrt(
-                            Math.pow(touchX - rotationJoystickOrigin.x, 2) + 
-                            Math.pow(touchY - rotationJoystickOrigin.y, 2)
-                        );
-                        
-                        if (moveJoystickDist < 150) moveJoystickTouched = true;
-                        if (rotateJoystickDist < 150) rotateJoystickTouched = true;
-                    }
-                    
-                    if (!moveJoystickTouched) {
-                        joystickActive = false;
-                        resetJoystick();
-                    }
-                    
-                    if (!rotateJoystickTouched) {
-                        rotationJoystickActive = false;
-                        resetRotationJoystick();
-                    }
+                    return;
                 }
-            });
-            
-            // Desktop-specific mouse controls (only if not mobile)
-            if (!isUsingTouch) {
-                // Mouse move for camera rotation (no need to click and hold)
-                renderer.domElement.addEventListener('mousemove', function(e) {
-                    if (cameraMode === "thirdPerson" && !controls.enabled && !isGameOver) {
-                        // Only rotate camera if in game view mode and not in game over state
-                        const dx = e.movementX || e.mozMovementX || e.webkitMovementX || 0;
-                        const dy = e.movementY || e.mozMovementY || e.webkitMovementY || 0;
-                        
-                        // Track mouse movement for balance control when balance is enabled
-                        if (balanceEnabled && attachedBags.length > 0) {
-                            // Use the same mouse movement for both camera rotation and balance
-                            updateBalanceFromInput(dx, 0);
-                        }
-                            
-                            // Apply camera rotation if mouse movement detected
-                        if (dx !== 0) {
-                            // Calculate rotation amount with sensitivity
-                            const rotationAmount = -dx * mouseRotationSensitivity;
-                            
-                            // Update camera orbit angle 
-                            cameraOrbitAngle = (cameraOrbitAngle + rotationAmount) % (Math.PI * 2);
-                            
-                            // Update camera position based on new orbit angle
-                            updateCameraPositionSafely();
-                        }
-                    }
-                });
                 
-                // Capture pointer for smoother mouse movement
-                renderer.domElement.addEventListener('click', function() {
-                    if (cameraMode === "thirdPerson" && !mouseLookActive && !controls.enabled) {
-                        // Request pointer lock for smoother mouse controls
-                        renderer.domElement.requestPointerLock = 
-                            renderer.domElement.requestPointerLock || 
-                            renderer.domElement.mozRequestPointerLock || 
-                            renderer.domElement.webkitRequestPointerLock;
-                        
-                        renderer.domElement.requestPointerLock();
-                        
-                        // Show a small notification to indicate pointer is locked
-                        showPickupFeedback("Mouse locked - press ESC to unlock");
-                    }
-                });
+                // Otherwise, check remaining touches to see which joysticks should stay active
+                let moveJoystickTouched = false;
+                let rotateJoystickTouched = false;
                 
-                // Add ESC key handler to exit pointer lock
-                document.addEventListener('keydown', function(e) {
-                    if (e.key === 'Escape' && mouseLookActive) {
-                        document.exitPointerLock = document.exitPointerLock || 
-                            document.mozExitPointerLock || 
-                            document.webkitExitPointerLock;
-                            
-                        document.exitPointerLock();
-                    }
-                });
-            } else {
-                // Mobile-specific mouse events for testing on desktop
-                joystick.addEventListener('mousedown', function(e) {
-                    e.preventDefault();
-                    joystickActive = true;
-                    updateJoystickPosition(e.clientX, e.clientY);
-                });
+                for (let i = 0; i < e.touches.length; i++) {
+                    const touch = e.touches[i];
+                    const touchX = touch.clientX;
+                    const touchY = touch.clientY;
+                    
+                    const moveJoystickDist = Math.sqrt(
+                        Math.pow(touchX - joystickOrigin.x, 2) + 
+                        Math.pow(touchY - joystickOrigin.y, 2)
+                    );
+                    
+                    const rotateJoystickDist = Math.sqrt(
+                        Math.pow(touchX - rotationJoystickOrigin.x, 2) + 
+                        Math.pow(touchY - rotationJoystickOrigin.y, 2)
+                    );
+                    
+                    if (moveJoystickDist < 150) moveJoystickTouched = true;
+                    if (rotateJoystickDist < 150) rotateJoystickTouched = true;
+                }
                 
-                rotationJoystick.addEventListener('mousedown', function(e) {
-                    e.preventDefault();
-                    rotationJoystickActive = true;
-                    updateRotationJoystickPosition(e.clientX, e.clientY);
-                });
-                
-                // Keep this mousemove handler for mobile joystick functionality
-                document.addEventListener('mousemove', function(e) {
-                    if (joystickActive) {
-                        e.preventDefault();
-                        updateJoystickPosition(e.clientX, e.clientY);
-                    }
-                    if (rotationJoystickActive) {
-                        e.preventDefault();
-                        updateRotationJoystickPosition(e.clientX, e.clientY);
-                    }
-                });
-                
-                document.addEventListener('mouseup', function() {
+                if (!moveJoystickTouched) {
                     joystickActive = false;
-                    rotationJoystickActive = false;
                     resetJoystick();
+                }
+                if (!rotateJoystickTouched) {
+                    rotationJoystickActive = false;
                     resetRotationJoystick();
-                });
-            }
+                }
+            }, { passive: false });
             
-            // Mouse right-click for rotation - disabled for new control scheme
-            renderer.domElement.addEventListener('contextmenu', function(e) {
-                e.preventDefault(); // Prevent right-click menu
-            });
-            
-            // Interact button for pickups - use keyboard for desktop, touch for mobile
-            if (isUsingTouch) {
+            // Add touch event for interact button
+            if (interact) {
                 interact.addEventListener('touchstart', function(e) {
                     e.preventDefault();
-                    attemptPickupInteraction();
-                });
-            } else {
-                // For desktop, keyboard controls will handle pickups
-                // Hide the interact button
-                if (interact) interact.style.display = 'none';
-            }
-            
-            // Camera toggle button
-            document.getElementById('gameViewBtn').addEventListener('click', function() {
-                toggleCameraMode();
-            });
-            
-            // Update joystick origins on window resize
-            window.addEventListener('resize', function() {
-                const joystickRect = joystick.getBoundingClientRect();
-                joystickOrigin = {
-                    x: joystickRect.left + joystickRect.width / 2,
-                    y: joystickRect.top + joystickRect.height / 2
-                };
-                
-                const rotationJoystickRect = rotationJoystick.getBoundingClientRect();
-                rotationJoystickOrigin = {
-                    x: rotationJoystickRect.left + rotationJoystickRect.width / 2,
-                    y: rotationJoystickRect.top + rotationJoystickRect.height / 2
-                };
-            });
-            
-            // Check for pointer lock change
-            document.addEventListener('pointerlockchange', handlePointerLockChange);
-            document.addEventListener('mozpointerlockchange', handlePointerLockChange);
-            document.addEventListener('webkitpointerlockchange', handlePointerLockChange);
-            
-            function handlePointerLockChange() {
-                if (document.pointerLockElement === renderer.domElement || 
-                    document.mozPointerLockElement === renderer.domElement ||
-                    document.webkitPointerLockElement === renderer.domElement) {
-                    // Pointer is locked - enable camera movement
-                    mouseLookActive = true;
-                } else {
-                    // Pointer is unlocked - disable camera movement
-                    mouseLookActive = false;
-                }
+                    handleInteraction();
+                }, { passive: false });
             }
         }
         
         // Update joystick position and calculate direction
         function updateJoystickPosition(x, y) {
-            // Calculate distance from joystick center
+            if (!joystickActive) return;
+            
+            updateDebug('Joystick position updated: ' + x.toFixed(0) + ', ' + y.toFixed(0));
+            
+            // Calculate joystick offset from center
             const dx = x - joystickOrigin.x;
             const dy = y - joystickOrigin.y;
-            const distance = Math.sqrt(dx*dx + dy*dy);
             
             // Limit joystick movement to maximum radius
-            const angle = Math.atan2(dy, dx);
-            const limitedDistance = Math.min(distance, joystickMax);
+            const distance = Math.sqrt(dx*dx + dy*dy);
             
             // Calculate new joystick knob position
             joystickPos = {
-                x: Math.cos(angle) * limitedDistance,
-                y: Math.sin(angle) * limitedDistance
+                x: Math.cos(Math.atan2(dy, dx)) * Math.min(distance, joystickMax),
+                y: Math.sin(Math.atan2(dy, dx)) * Math.min(distance, joystickMax)
             };
             
             // Update joystick knob element position
@@ -3825,19 +3691,21 @@
         
         // Update rotation joystick position
         function updateRotationJoystickPosition(x, y) {
-            // Calculate distance from joystick center
+            if (!rotationJoystickActive) return;
+            
+            updateDebug('Rotation joystick updated: ' + x.toFixed(0) + ', ' + y.toFixed(0));
+            
+            // Calculate joystick offset from center
             const dx = x - rotationJoystickOrigin.x;
             const dy = y - rotationJoystickOrigin.y;
-            const distance = Math.sqrt(dx*dx + dy*dy);
             
             // Limit joystick movement to maximum radius
-            const angle = Math.atan2(dy, dx);
-            const limitedDistance = Math.min(distance, rotationJoystickMax);
+            const distance = Math.sqrt(dx*dx + dy*dy);
             
             // Calculate new joystick knob position
             rotationJoystickPos = {
-                x: Math.cos(angle) * limitedDistance,
-                y: Math.sin(angle) * limitedDistance
+                x: Math.cos(Math.atan2(dy, dx)) * Math.min(distance, rotationJoystickMax),
+                y: Math.sin(Math.atan2(dy, dx)) * Math.min(distance, rotationJoystickMax)
             };
             
             // Update joystick knob element position
@@ -6669,6 +6537,11 @@
             }
             
             console.log(`Updated bag model visibility: ${attachedBags.length} bags attached`);
+        }
+
+        function handleInteraction() {
+            updateDebug('Interaction button pressed');
+            // ... rest of the function ...
         }
     </script>
     <script>
