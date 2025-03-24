@@ -3684,8 +3684,9 @@
             joystickKnobEl.style.transform = `translate(calc(-50% + ${joystickPos.x}px), calc(-50% + ${joystickPos.y}px))`;
             
             // Calculate normalized direction for movement (-1 to 1)
+            // Invert X direction to match desktop controls
             joystickDirection = {
-                x: joystickPos.x / joystickMax,
+                x: -(joystickPos.x / joystickMax), // Invert X direction
                 y: joystickPos.y / joystickMax
             };
         }
