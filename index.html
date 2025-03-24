@@ -239,14 +239,31 @@
             font-family: Arial, sans-serif;
             border-radius: 5px;
             z-index: 3000;
-            max-width: 80%;
+            max-width: 90%;
             text-align: center;
         }
-        #helpOverlay h2 {
-            margin-top: 0;
-            color: #4CAF50;
+
+        @media (max-width: 768px) {
+            #helpOverlay {
+                font-size: 14px;
+                padding: 15px;
+                width: 90%;
+            }
+            #helpOverlay h2 {
+                font-size: 18px;
+                margin: 0 0 10px 0;
+            }
+            #helpOverlay p {
+                margin: 8px 0;
+            }
+            #closeHelpBtn {
+                margin-top: 15px;
+                padding: 10px 20px;
+                font-size: 16px;
+            }
         }
-        #helpOverlay button {
+
+        #closeHelpBtn {
             margin-top: 10px;
             padding: 8px 16px;
             background: #4CAF50;
@@ -254,10 +271,15 @@
             border: none;
             border-radius: 4px;
             cursor: pointer;
+            font-size: 14px;
+            min-width: 100px;
+            min-height: 44px; /* Minimum touch target size */
         }
-        #helpOverlay button:hover {
+
+        #closeHelpBtn:hover {
             background: #3e8e41;
         }
+        
         #helpBtn {
             position: absolute;
             top: 10px;
@@ -426,11 +448,22 @@
     
     <div id="helpOverlay">
         <h2>Controls</h2>
-        <p><strong>Touch Controls:</strong> Left joystick to move, right joystick to rotate and control balance</p>
-        <p><strong>Keyboard/Mouse:</strong> WASD or arrows to move, mouse to rotate and control balance, SPACE to pick up, R to drop</p>
-        <p><strong>Balance Challenge:</strong> Use right joystick (mobile) or mouse movement (PC) to stabilize when tilting</p>
-        <p><strong>Tips:</strong> Get close to bags to pick them up. Ground bags use right hand, car bags use left hand.</p>
-        <p><strong>Game Over:</strong> If you lose your balance while carrying bags, you'll fall and drop everything. You'll recover after 3 seconds.</p>
+        <div id="mobileControls" style="display: none;">
+            <!-- Mobile-only instructions -->
+            <p><strong>Movement:</strong> Left joystick to move</p>
+            <p><strong>Camera & Balance:</strong> Right joystick to rotate and control balance</p>
+            <p><strong>Pick Up:</strong> Tap the Pick button when near bags</p>
+            <p><strong>Drop:</strong> Double tap Pick button to drop bags</p>
+            <p><strong>Tips:</strong> Keep the balance meter centered to avoid falling!</p>
+        </div>
+        <div id="desktopControls" style="display: none;">
+            <!-- Desktop-only instructions -->
+            <p><strong>Movement:</strong> WASD or arrows to move</p>
+            <p><strong>Camera & Balance:</strong> Mouse to rotate and control balance</p>
+            <p><strong>Pick Up:</strong> SPACE to pick up bags</p>
+            <p><strong>Drop:</strong> R to drop bags</p>
+            <p><strong>Tips:</strong> Keep the balance meter centered to avoid falling!</p>
+        </div>
         <button id="closeHelpBtn">Got it!</button>
     </div>
 
@@ -6542,6 +6575,50 @@
         function handleInteraction() {
             updateDebug('Interaction button pressed');
             // ... rest of the function ...
+        }
+
+        // Update the initialization code to show correct controls based on device
+        function initializeGame() {
+            // ... existing initialization code ...
+            
+            // Set up help overlay with device-specific instructions
+            const helpOverlay = document.getElementById('helpOverlay');
+            const mobileControls = document.getElementById('mobileControls');
+            const desktopControls = document.getElementById('desktopControls');
+            
+            // Check if we're on mobile
+            const isMobile = isMobileDevice();
+            
+            if (helpOverlay) {
+                helpOverlay.style.display = 'block';
+                
+                // Show appropriate controls based on device
+                if (mobileControls && desktopControls) {
+                    mobileControls.style.display = isMobile ? 'block' : 'none';
+                    desktopControls.style.display = isMobile ? 'none' : 'block';
+                }
+                
+                // Set up close button with both click and touch events
+                const closeHelpBtn = document.getElementById('closeHelpBtn');
+                if (closeHelpBtn) {
+                    // Remove any existing listeners
+                    const newCloseBtn = closeHelpBtn.cloneNode(true);
+                    closeHelpBtn.parentNode.replaceChild(newCloseBtn, closeHelpBtn);
+                    
+                    // Add both touch and click events
+                    newCloseBtn.addEventListener('touchend', function(e) {
+                        e.preventDefault();
+                        helpOverlay.style.display = 'none';
+                    }, { passive: false });
+                    
+                    newCloseBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        helpOverlay.style.display = 'none';
+                    }, { passive: false });
+                }
+            }
+            
+            // ... rest of initialization code ...
         }
     </script>
     <script>
