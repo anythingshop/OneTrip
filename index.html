@@ -235,28 +235,64 @@
             transform: translate(-50%, -50%);
             background: rgba(0,0,0,0.8);
             color: white;
-            padding: 20px;
+            padding: 15px;
             font-family: Arial, sans-serif;
             border-radius: 5px;
             z-index: 3000;
-            max-width: 80%;
+            max-width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
             text-align: center;
+            font-size: 14px;
         }
+
         #helpOverlay h2 {
             margin-top: 0;
+            margin-bottom: 10px;
             color: #4CAF50;
+            font-size: 18px;
         }
-        #helpOverlay button {
-            margin-top: 10px;
+
+        #helpOverlay p {
+            margin: 8px 0;
+            line-height: 1.4;
+        }
+
+        #closeHelpBtn {
+            margin-top: 15px;
             padding: 8px 16px;
             background: #4CAF50;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
+            font-size: 16px;
+            position: relative;
+            bottom: 10px;
+            width: 100%;
+            max-width: 200px;
         }
-        #helpOverlay button:hover {
+
+        #closeHelpBtn:hover {
             background: #3e8e41;
+        }
+
+        @media (max-width: 768px) {
+            #helpOverlay {
+                padding: 10px;
+                font-size: 12px;
+                max-height: 70vh;
+            }
+            
+            #helpOverlay h2 {
+                font-size: 16px;
+            }
+            
+            #closeHelpBtn {
+                padding: 10px;
+                font-size: 14px;
+                margin-top: 10px;
+            }
         }
         #helpBtn {
             position: absolute;
@@ -3261,30 +3297,25 @@
             if (joystickActive && joystickDirection) {
                 // Add a small deadzone to prevent tiny movements
                 if (Math.abs(joystickDirection.x) > 0.15) {
-                    inputX = joystickDirection.x;
+                    inputX = -joystickDirection.x; // Keep inverted for joystick only
                 }
                 if (Math.abs(joystickDirection.y) > 0.15) {
-                    inputZ = joystickDirection.y;
+                    inputZ = -joystickDirection.y;
                 }
             } 
             // Otherwise process keyboard input
             else {
-                // IMPORTANT: Always allow movement input, even during balance mode
-                // W or Up Arrow - Forward movement relative to camera
                 if (keysPressed['w'] || keysPressed['ArrowUp']) {
                     inputZ = 1;
                 }
-                // S or Down Arrow - Backward movement relative to camera
                 if (keysPressed['s'] || keysPressed['ArrowDown']) {
                     inputZ = -1;
                 }
-                // A or Left Arrow - Strafe left relative to camera
                 if (keysPressed['a'] || keysPressed['ArrowLeft']) {
-                    inputX = -1;
+                    inputX = -1; // Left is negative X
                 }
-                // D or Right Arrow - Strafe right relative to camera
                 if (keysPressed['d'] || keysPressed['ArrowRight']) {
-                    inputX = 1;
+                    inputX = 1;  // Right is positive X
                 }
             }
             
@@ -3295,26 +3326,24 @@
                 // Calculate movement speed with acceleration/deceleration
                 const targetSpeed = maxMovementSpeed * Math.sqrt(inputX*inputX + inputZ*inputZ);
                 const speedDiff = targetSpeed - movementAcceleration;
-                movementAcceleration += speedDiff * 0.1 * (delta * 60); // Make framerate independent
+                movementAcceleration += speedDiff * 0.1 * (delta * 60);
                 
                 // Calculate camera-relative movement vectors
-                // This makes WASD always move relative to camera view
                 const cameraForward = new THREE.Vector3(0, 0, -1);
                 const cameraRight = new THREE.Vector3(1, 0, 0);
                 
                 // Apply camera orbit rotation to the movement vectors
                 cameraForward.applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraOrbitAngle);
-                cameraForward.y = 0; // Keep movement on horizontal plane
+                cameraForward.y = 0;
                 cameraForward.normalize();
                 
-                // Calculate right vector properly (cross UP with FORWARD to get RIGHT)
                 const up = new THREE.Vector3(0, 1, 0);
                 cameraRight.crossVectors(up, cameraForward);
                 cameraRight.normalize();
                 
                 // Calculate movement direction relative to camera
                 moveDirection.set(0, 0, 0)
-                    .add(cameraRight.multiplyScalar(-inputX))
+                    .add(cameraRight.multiplyScalar(-inputX)) // Invert X for desktop controls
                     .add(cameraForward.multiplyScalar(inputZ));
                 
                 // Normalize and apply movement speed
@@ -6508,6 +6537,56 @@
             
             console.log(`Updated bag model visibility: ${attachedBags.length} bags attached`);
         }
+
+        // Update help content based on device type
+        function updateHelpContent() {
+            const helpOverlay = document.getElementById('helpOverlay');
+            if (!helpOverlay) return;
+            
+            const isMobile = isMobileDevice();
+            
+            // Set content based on device
+            if (isMobile) {
+                helpOverlay.innerHTML = `
+                    <h2>Mobile Controls</h2>
+                    <p>Left joystick: Move character</p>
+                    <p>Right joystick: Rotate camera & control balance</p>
+                    <p>Pick button: Grab bags</p>
+                    <p>Balance carefully when carrying bags!</p>
+                    <button id="closeHelpBtn">Got it!</button>
+                `;
+            } else {
+                helpOverlay.innerHTML = `
+                    <h2>Desktop Controls</h2>
+                    <p>WASD/Arrows: Move character</p>
+                    <p>Mouse: Look around & control balance</p>
+                    <p>Space/E: Pick up bags</p>
+                    <p>R: Drop bags</p>
+                    <button id="closeHelpBtn">Got it!</button>
+                `;
+            }
+            
+            // Add event listener to close button
+            const closeBtn = document.getElementById('closeHelpBtn');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', function() {
+                    helpOverlay.style.display = 'none';
+                });
+            }
+        }
+
+        // Call this when the page loads and when device orientation changes
+        window.addEventListener('load', updateHelpContent);
+        window.addEventListener('orientationchange', updateHelpContent);
+
+        // Also ensure the help button works
+        document.getElementById('helpBtn').addEventListener('click', function() {
+            const helpOverlay = document.getElementById('helpOverlay');
+            if (helpOverlay) {
+                helpOverlay.style.display = 'block';
+                updateHelpContent();
+            }
+        });
     </script>
     <script>
         // Ensure the game initializes properly when the page loads
